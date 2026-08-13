@@ -131,6 +131,13 @@ class MaspAdapter:
             sys.path.insert(0, root_text)
         from masp.domain import TransportTask, Vehicle
         from masp.online import OnlineDispatchRuntime
+        from masp.scenario_package import (
+            ScenarioPackage,
+            compile_scenario_package,
+            validate_scenario_package_document,
+        )
+        from masp.task_stream import generate_task_stream
+        from masp.task_stream import validate_task_stream_generation_document
         from masp.topology import MapTopology
 
         self._modules = {
@@ -138,8 +145,66 @@ class MaspAdapter:
             "Vehicle": Vehicle,
             "OnlineDispatchRuntime": OnlineDispatchRuntime,
             "MapTopology": MapTopology,
+            "ScenarioPackage": ScenarioPackage,
+            "compile_scenario_package": compile_scenario_package,
+            "validate_scenario_package_document": validate_scenario_package_document,
+            "generate_task_stream": generate_task_stream,
+            "validate_task_stream_generation_document": validate_task_stream_generation_document,
         }
         return self._modules
+
+    def validate_scenario_package(self, document: dict[str, Any]) -> dict[str, Any]:
+        """Validate an editable package without making it a runtime scenario."""
+        modules = self._engine_modules()
+        modules["validate_scenario_package_document"](
+            document,
+            self.root / "schemas" / "scenario-package.schema.json",
+        )
+        package = modules["ScenarioPackage"].from_dict(document)
+        return package.validate().to_dict()
+
+    def compile_scenario_package(
+        self, document: dict[str, Any], output_dir: Path
+    ) -> dict[str, Any]:
+        """Compile a validated package into an isolated, simulation-only asset set."""
+        self._require_engine()
+        modules = self._engine_modules()
+        modules["validate_scenario_package_document"](
+            document,
+            self.root / "schemas" / "scenario-package.schema.json",
+        )
+        package = modules["ScenarioPackage"].from_dict(document)
+        compiled = modules["compile_scenario_package"](
+            package,
+            scheduler_template=self._read_json(self.root / "config" / "scheduler.json"),
+        )
+        return {
+            "paths": compiled.write_to(output_dir),
+            "validation": compiled.validation.to_dict(),
+            "manifest": compiled.documents["manifest.json"],
+        }
+
+    def generate_scenario_tasks(
+        self, document: dict[str, Any], generation: dict[str, Any]
+    ) -> dict[str, Any]:
+        modules = self._engine_modules()
+        modules["validate_task_stream_generation_document"](
+            generation,
+            self.root / "schemas" / "task-stream-generation.schema.json",
+        )
+        modules["validate_scenario_package_document"](
+            document,
+            self.root / "schemas" / "scenario-package.schema.json",
+        )
+        package = modules["ScenarioPackage"].from_dict(document)
+        stream = modules["generate_task_stream"](package.warehouse_scene, generation)
+        return {
+            "streamId": stream.stream_id,
+            "seed": stream.seed,
+            "endTimeMs": stream.end_time_ms,
+            "tasks": [dict(item) for item in stream.tasks],
+            "events": [dict(item) for item in stream.events],
+        }
 
     def scenarios(self) -> list[dict[str, Any]]:
         rows = []

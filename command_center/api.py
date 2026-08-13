@@ -33,6 +33,7 @@ from .knowledge import KnowledgeBase
 from .orchestrator import DispatchOrchestrator
 from .provider import DeepSeekProvider
 from .settings import Settings
+from .scenario_drafts import ScenarioDraftConflict, ScenarioDraftStore
 
 
 settings = Settings.load()
@@ -56,6 +57,7 @@ incident_service = IncidentService(
     knowledge=knowledge,
     audit=audit,
 )
+scenario_drafts = ScenarioDraftStore(settings.data_dir, engine, audit)
 
 app = FastAPI(
     title="保利智仓·灵枢 API",
@@ -65,7 +67,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT"],
     allow_headers=["*"],
 )
 
@@ -89,6 +91,88 @@ def health() -> dict[str, Any]:
 @app.get("/api/v1/scenarios")
 def list_scenarios() -> list[dict[str, Any]]:
     return engine.scenarios()
+
+
+@app.post("/api/v1/scenario-drafts")
+def create_scenario_draft(document: dict[str, Any], requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+    try:
+        return scenario_drafts.create(document, requested_by)
+    except ScenarioDraftConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except (ValueError, KeyError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/v1/scenario-drafts")
+def list_scenario_drafts() -> list[dict[str, Any]]:
+    return scenario_drafts.list()
+
+
+@app.get("/api/v1/scenario-drafts/{package_id}")
+def get_scenario_draft(package_id: str) -> dict[str, Any]:
+    try:
+        return scenario_drafts.get(package_id)
+    except (KeyError, ValueError) as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.put("/api/v1/scenario-drafts/{package_id}")
+def update_scenario_draft(package_id: str, document: dict[str, Any], expected_revision: int = Query(alias="expectedRevision", ge=1), requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+    try:
+        return scenario_drafts.update(package_id, document, expected_revision, requested_by)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ScenarioDraftConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except (ValueError, KeyError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/v1/scenario-drafts/{package_id}/validate")
+def validate_scenario_draft(package_id: str, requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+    try:
+        return scenario_drafts.validate(package_id, requested_by)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/v1/scenario-drafts/{package_id}/generate-tasks")
+def generate_scenario_draft_tasks(package_id: str, generation: dict[str, Any], expected_revision: int = Query(alias="expectedRevision", ge=1), requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+    try:
+        return scenario_drafts.generate_tasks(package_id, generation, expected_revision, requested_by)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ScenarioDraftConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except (ValueError, KeyError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/v1/scenario-drafts/{package_id}/compile")
+def compile_scenario_draft(package_id: str, requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+    try:
+        result = scenario_drafts.compile(package_id, requested_by)
+        if not result["compiled"]:
+            raise HTTPException(status_code=422, detail=result["validation"])
+        return result
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/v1/scenario-drafts/{package_id}/publish")
+def publish_scenario_draft(package_id: str, requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+    try:
+        return scenario_drafts.publish(package_id, requested_by)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ScenarioDraftConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.get("/api/v1/world/snapshot")
