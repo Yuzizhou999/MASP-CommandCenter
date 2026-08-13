@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://masp-command-center.local/schemas/dispatch-intent.schema.json",
+  "title": "Lingshu dispatch intent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "intentId",
+    "intentType",
+    "requestedBy",
+    "environment",
+    "basedOnWorldRevision",
+    "reason"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "intentId": {"type": "string", "minLength": 1},
+    "intentType": {
+      "enum": [
+        "QUERY_STATUS",
+        "EXPLAIN_DECISION",
+        "CREATE_TASK",
+        "CHANGE_TASK_PRIORITY",
+        "RUN_WHAT_IF",
+        "REPORT_VEHICLE_FAULT",
+        "BLOCK_RESOURCE",
+        "CANCEL_TASK",
+        "REQUEST_RECOVERY",
+        "GENERATE_REPORT"
+      ]
+    },
+    "requestedBy": {"type": "string", "minLength": 1},
+    "environment": {"enum": ["simulation", "shadow", "production"]},
+    "basedOnWorldRevision": {"type": "integer", "minimum": 0},
+    "reason": {"type": "string", "minLength": 1},
+    "task": {"type": ["object", "null"]},
+    "resourceBlock": {"type": ["object", "null"]},
+    "query": {"type": ["string", "null"]}
+  }
+}
+

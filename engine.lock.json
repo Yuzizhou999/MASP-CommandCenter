@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "MASP",
+  "repository": "https://github.com/Yuzizhou999/MASP.git",
+  "commit": "a53af5b3f23d37e6fcee8204718c2345f012c16c",
+  "allowDirtyInDevelopment": true,
+  "productionRequiresCleanMatch": true
+}
+

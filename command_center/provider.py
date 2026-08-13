@@ -1,0 +1,261 @@
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from typing import Any
+
+import httpx
+
+from .contracts import (
+    DiagnosisReport,
+    DispatchIntent,
+    IncidentRecord,
+    IntentType,
+    ResourceBlockDraft,
+    TaskDraft,
+)
+from .diagnosis import ALLOWED_INCIDENT_ACTIONS, deterministic_diagnosis
+from .settings import Settings
+
+
+SYSTEM_PROMPT = """你是保利智仓·灵枢的调度意图解析器。
+你只能把用户请求转换为结构化调度意图，不得生成车辆轨迹、资源预约或解除安全停车。
+可用意图为 QUERY_STATUS、EXPLAIN_DECISION、CREATE_TASK、BLOCK_RESOURCE、GENERATE_REPORT。
+站点ID必须保留车型前缀。叉车使用 fork，搬运车使用 jack。
+封闭共享窄路时使用资源 zone:zone-jack-pp363-pp365。
+输出必须是单个JSON对象，不得包含Markdown。
+"""
+
+
+DIAGNOSIS_SYSTEM_PROMPT = """你是保利智仓·灵枢的故障诊断解释器。
+你只能根据输入中的 Incident、Evidence 和 DeterministicFindings 解释故障，不得补充未提供的遥测、实体或事实。
+每个根因候选和每条建议必须引用一个或多个输入中真实存在的 evidenceId。
+只能建议 WAIT_RECOVERY、ISOLATE_REASSIGN、SAFETY_STOP，所有建议均为 R3_HIGH，必须仿真并人工审批。
+不得声称已经控制车辆、解除停车、重派任务或执行恢复；不得生成路线和资源预约。
+事实和推断必须明确区分。证据不足时必须写入 uncertainties。
+输出必须是符合所给 schema 的单个 JSON 对象，不得包含 Markdown。
+"""
+
+
+@dataclass(frozen=True)
+class ParseResult:
+    intent: DispatchIntent
+    model: str
+    fallback_used: bool
+
+
+class DeepSeekProvider:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.settings.deepseek_api_key)
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "provider": "deepseek",
+            "model": self.settings.deepseek_model,
+            "configured": self.configured,
+            "mode": "api" if self.configured else "deterministic-fallback",
+            "baseUrl": self.settings.deepseek_base_url,
+        }
+
+    def parse_intent(
+        self,
+        text: str,
+        *,
+        world_revision: int,
+        requested_by: str,
+    ) -> ParseResult:
+        if not self.configured:
+            return ParseResult(
+                intent=self._fallback_intent(
+                    text,
+                    world_revision=world_revision,
+                    requested_by=requested_by,
+                ),
+                model="deterministic-fallback",
+                fallback_used=True,
+            )
+
+        try:
+            schema = DispatchIntent.model_json_schema(by_alias=True)
+            response = httpx.post(
+                f"{self.settings.deepseek_base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.settings.deepseek_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.settings.deepseek_model,
+                    "temperature": 0,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": json.dumps(
+                                {
+                                    "request": text,
+                                    "worldRevision": world_revision,
+                                    "requestedBy": requested_by,
+                                    "schema": schema,
+                                },
+                                ensure_ascii=False,
+                            ),
+                        },
+                    ],
+                },
+                timeout=self.settings.deepseek_timeout_seconds,
+            )
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+            parsed = json.loads(content)
+            parsed["basedOnWorldRevision"] = world_revision
+            parsed["requestedBy"] = requested_by
+            parsed["environment"] = "simulation"
+            return ParseResult(
+                intent=DispatchIntent.model_validate(parsed),
+                model=self.settings.deepseek_model,
+                fallback_used=False,
+            )
+        except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return ParseResult(
+                intent=self._fallback_intent(
+                    text,
+                    world_revision=world_revision,
+                    requested_by=requested_by,
+                ),
+                model=f"{self.settings.deepseek_model}:fallback",
+                fallback_used=True,
+            )
+
+    def diagnose_incident(self, incident: IncidentRecord) -> DiagnosisReport:
+        if not self.configured:
+            return deterministic_diagnosis(incident)
+        try:
+            schema = DiagnosisReport.model_json_schema(by_alias=True)
+            payload = {
+                "incident": {
+                    "incidentId": incident.incident_id,
+                    "incidentType": incident.incident_type.value,
+                    "severity": incident.severity.value,
+                    "scenarioId": incident.scenario_id,
+                    "runId": incident.run_id,
+                    "vehicleIds": incident.vehicle_ids,
+                    "taskIds": incident.task_ids,
+                    "resourceIds": incident.resource_ids,
+                    "faultCode": incident.fault_code,
+                    "faultAtMs": incident.fault_at_ms,
+                    "locationNodeId": incident.location_node_id,
+                    "loadState": incident.load_state,
+                },
+                "evidence": [
+                    row.model_dump(by_alias=True, mode="json")
+                    for row in incident.evidence
+                ],
+                "deterministicFindings": [
+                    row.model_dump(by_alias=True, mode="json")
+                    for row in incident.deterministic_findings
+                ],
+                "allowedActions": sorted(ALLOWED_INCIDENT_ACTIONS),
+                "schema": schema,
+            }
+            response = httpx.post(
+                f"{self.settings.deepseek_base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.settings.deepseek_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.settings.deepseek_model,
+                    "temperature": 0,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": DIAGNOSIS_SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": json.dumps(payload, ensure_ascii=False),
+                        },
+                    ],
+                },
+                timeout=self.settings.deepseek_timeout_seconds,
+            )
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+            parsed = json.loads(content)
+            parsed["model"] = self.settings.deepseek_model
+            parsed["fallbackUsed"] = False
+            return DiagnosisReport.model_validate(parsed)
+        except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return deterministic_diagnosis(
+                incident,
+                model=f"{self.settings.deepseek_model}:fallback",
+            )
+
+    def _fallback_intent(
+        self,
+        text: str,
+        *,
+        world_revision: int,
+        requested_by: str,
+    ) -> DispatchIntent:
+        normalized = text.strip()
+        if any(term in normalized for term in ("封闭", "封路", "检修", "禁行")):
+            return DispatchIntent(
+                intentType=IntentType.BLOCK_RESOURCE,
+                requestedBy=requested_by,
+                basedOnWorldRevision=world_revision,
+                reason=normalized,
+                resourceBlock=ResourceBlockDraft(
+                    resourceIds=["zone:zone-jack-pp363-pp365"],
+                    startMs=0,
+                    endMs=180000,
+                    reason=normalized,
+                ),
+            )
+        if any(term in normalized for term in ("报告", "总结", "班次")):
+            return DispatchIntent(
+                intentType=IntentType.GENERATE_REPORT,
+                requestedBy=requested_by,
+                basedOnWorldRevision=world_revision,
+                reason=normalized,
+                query=normalized,
+            )
+        if any(term in normalized for term in ("创建", "插单", "送到", "运到", "紧急")):
+            group = "jack" if any(term in normalized.lower() for term in ("jack", "搬运车", "料架")) else "fork"
+            ap_ids = re.findall(r"(?:fork:|jack:)?AP\d+", normalized, flags=re.IGNORECASE)
+            prefix = f"{group}:"
+            pickup = ap_ids[0] if ap_ids else ("jack:AP357" if group == "jack" else "fork:AP1123")
+            dropoff = ap_ids[1] if len(ap_ids) > 1 else ("jack:AP96" if group == "jack" else "fork:AP2121")
+            if ":" not in pickup:
+                pickup = prefix + pickup.upper()
+            if ":" not in dropoff:
+                dropoff = prefix + dropoff.upper()
+            return DispatchIntent(
+                intentType=IntentType.CREATE_TASK,
+                requestedBy=requested_by,
+                basedOnWorldRevision=world_revision,
+                reason=normalized,
+                task=TaskDraft(
+                    pickupNodeId=pickup,
+                    dropoffNodeId=dropoff,
+                    requiredRobotGroup=group,
+                    payloadType="shelf" if group == "jack" else "pallet",
+                    priorityClass=3,
+                    dueTimeMs=300000,
+                ),
+            )
+        return DispatchIntent(
+            intentType=(
+                IntentType.EXPLAIN_DECISION
+                if any(term in normalized for term in ("为什么", "原因", "解释"))
+                else IntentType.QUERY_STATUS
+            ),
+            requestedBy=requested_by,
+            basedOnWorldRevision=world_revision,
+            reason=normalized,
+            query=normalized,
+        )
