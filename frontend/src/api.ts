@@ -1,0 +1,117 @@
+import type {
+  Approval,
+  AuditEvent,
+  ChatResponse,
+  Comparison,
+  DispatchIntent,
+  Health,
+  Incident,
+  IncidentReport,
+  MapModel,
+  RunDetail,
+  ScenarioMeta,
+  SimulationSummary,
+  Snapshot,
+  ShiftReport,
+  WhatIfMode,
+} from "./types";
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(body.detail || response.statusText);
+  }
+  return response.json() as Promise<T>;
+}
+
+export const api = {
+  health: () => request<Health>("/api/health"),
+  scenarios: () => request<ScenarioMeta[]>("/api/v1/scenarios"),
+  snapshot: (scenarioId: string) =>
+    request<Snapshot>(`/api/v1/world/snapshot?scenarioId=${encodeURIComponent(scenarioId)}`),
+  map: () => request<MapModel>("/api/v1/map"),
+  chat: (message: string, scenarioId: string) =>
+    request<ChatResponse>("/api/v1/agent/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, scenarioId, requestedBy: "demo-operator" }),
+    }),
+  simulate: (
+    scenarioId: string,
+    label: string,
+    intent?: DispatchIntent | null,
+    policy = "top_k",
+  ) =>
+    request<SimulationSummary>("/api/v1/simulations", {
+      method: "POST",
+      body: JSON.stringify({ scenarioId, label, policy, seed: 0, intent: intent || null }),
+    }),
+  simulations: () => request<SimulationSummary[]>("/api/v1/simulations"),
+  runDetail: (runId: string) => request<RunDetail>(`/api/v1/simulations/${runId}`),
+  compare: (runIds: string[]) =>
+    request<Comparison>("/api/v1/simulations/compare", {
+      method: "POST",
+      body: JSON.stringify({ runIds }),
+    }),
+  approvals: () => request<Approval[]>("/api/v1/approvals"),
+  createApproval: (scenarioId: string, intent: DispatchIntent, runIds: string[]) => {
+    const query = runIds.map((id) => `runId=${encodeURIComponent(id)}`).join("&");
+    return request<Approval>(
+      `/api/v1/approvals?scenarioId=${encodeURIComponent(scenarioId)}&${query}`,
+      { method: "POST", body: JSON.stringify(intent) },
+    );
+  },
+  decideApproval: (approvalId: string, approved: boolean) =>
+    request<Approval>(`/api/v1/approvals/${approvalId}/decision`, {
+      method: "POST",
+      body: JSON.stringify({
+        approved,
+        decidedBy: "demo-supervisor",
+        reason: approved ? "已核对仿真结果和安全影响" : "当前影响范围不可接受",
+      }),
+    }),
+  commitIntent: (
+    scenarioId: string,
+    intent: DispatchIntent,
+    approvalId?: string | null,
+  ) => {
+    const approval = approvalId ? `&approvalId=${encodeURIComponent(approvalId)}` : "";
+    return request<Record<string, unknown>>(
+      `/api/v1/intents/${intent.intentId}/commit?scenarioId=${encodeURIComponent(scenarioId)}${approval}`,
+      { method: "POST", body: JSON.stringify(intent) },
+    );
+  },
+  audit: () => request<AuditEvent[]>("/api/v1/audit?limit=80"),
+  report: () => request<ShiftReport>("/api/v1/reports/shift"),
+  incidents: () => request<Incident[]>("/api/v1/incidents"),
+  injectVehicleFault: (
+    runId: string,
+    options: {
+      vehicleId?: string;
+      faultCode: string;
+      requestedAtMs?: number;
+      recoveryDurationMs: number;
+    },
+  ) => request<Incident>("/api/v1/incidents/inject", {
+    method: "POST",
+    body: JSON.stringify({ runId, requestedBy: "demo-operator", ...options }),
+  }),
+  diagnoseIncident: (incidentId: string) =>
+    request<Incident>(
+      `/api/v1/incidents/${encodeURIComponent(incidentId)}/diagnose?requestedBy=demo-operator`,
+      { method: "POST" },
+    ),
+  runIncidentWhatIf: (incidentId: string, mode: WhatIfMode) =>
+    request<Incident>(`/api/v1/incidents/${encodeURIComponent(incidentId)}/what-if`, {
+      method: "POST",
+      body: JSON.stringify({ mode, requestedBy: "demo-operator" }),
+    }),
+  incidentReport: (incidentId: string) =>
+    request<IncidentReport>(`/api/v1/incidents/${encodeURIComponent(incidentId)}/report`),
+};
