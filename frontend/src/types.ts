@@ -320,3 +320,49 @@ export interface ShiftReport {
   latestRun?: SimulationSummary | null;
   notice: string;
 }
+
+export interface ScenarioDraftSummary {
+  packageId: string;
+  version: string;
+  status: "draft" | "published" | "archived";
+  revision: number;
+  sceneId: string;
+  streamId: string;
+  taskCount: number;
+  updatedAt?: string | null;
+  build?: Record<string, unknown> | null;
+}
+
+export interface ScenarioPackageDocument {
+  schemaVersion: 1;
+  packageId: string;
+  version: string;
+  status: "draft" | "published" | "archived";
+  metadata?: Record<string, unknown>;
+  warehouseScene: {
+    sceneId: string;
+    name: string;
+    bounds: { minX: number; maxX: number; minY: number; maxY: number };
+    robotProfiles: Record<string, Record<string, unknown>>;
+    nodes: Array<Record<string, any>>;
+    edges: Array<Record<string, any>>;
+    workstations: Array<Record<string, any>>;
+    vehicles: Array<Record<string, any>>;
+    recoveryNodes: Array<Record<string, any>>;
+    trafficZones: Array<Record<string, any>>;
+    safety: Record<string, any>;
+  };
+  taskStream: {
+    streamId: string;
+    seed: number;
+    endTimeMs: number;
+    tasks: Array<Record<string, any>>;
+    events: Array<Record<string, any>>;
+  };
+}
+
+export interface ScenarioValidationReport {
+  valid: boolean;
+  issues: Array<{ severity: string; code: string; path: string; message: string }>;
+  stats: Record<string, number>;
+}

@@ -99,3 +99,19 @@ def test_task_generation_compile_and_publish(isolated_settings) -> None:
     published = drafts.publish("draft-api-test", "supervisor")
     assert published["status"] == "published"
     assert json.loads((isolated_settings.data_dir / "scenario-builds" / "draft-api-test" / "1.0.0" / "published" / "manifest.json").read_text(encoding="utf-8"))["status"] == "published"
+
+
+def test_runtime_import_uses_selected_scenario_vehicles(isolated_settings) -> None:
+    drafts = store(isolated_settings)
+    document = drafts.engine.scenario_package_from_runtime(
+        "explicit-single-vehicle",
+        package_id="explicit-import",
+        version="0.1.0",
+        created_by="operator",
+    )
+    assert len(document["warehouseScene"]["vehicles"]) == len(
+        read("scenarios/explicit-single-vehicle.json")["vehicles"]
+    )
+    assert document["warehouseScene"]["vehicles"][0]["vehicleId"] == read(
+        "scenarios/explicit-single-vehicle.json"
+    )["vehicles"][0]["vehicleId"]

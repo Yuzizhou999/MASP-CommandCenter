@@ -103,6 +103,26 @@ def create_scenario_draft(document: dict[str, Any], requested_by: str = Query(de
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
+@app.post("/api/v1/scenario-drafts/from-runtime")
+def create_scenario_draft_from_runtime(
+    scenario_id: str = Query(alias="scenarioId"),
+    package_id: str | None = Query(default=None, alias="packageId"),
+    version: str = Query(default="0.1.0"),
+    requested_by: str = Query(default="demo-operator", alias="requestedBy"),
+) -> dict[str, Any]:
+    try:
+        return scenario_drafts.create_from_runtime(
+            scenario_id,
+            package_id or f"{scenario_id}-draft",
+            version,
+            requested_by,
+        )
+    except ScenarioDraftConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except (ValueError, KeyError, RuntimeError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @app.get("/api/v1/scenario-drafts")
 def list_scenario_drafts() -> list[dict[str, Any]]:
     return scenario_drafts.list()

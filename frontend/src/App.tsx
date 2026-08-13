@@ -29,6 +29,7 @@ import {
   ShieldError20Regular,
   SignOut20Regular,
   VehicleTruck20Regular,
+  Wrench20Regular,
 } from "@fluentui/react-icons";
 import { api } from "./api";
 import { ApprovalsPanel } from "./components/ApprovalsPanel";
@@ -36,6 +37,7 @@ import { AssistantPanel } from "./components/AssistantPanel";
 import { IncidentWorkbench } from "./components/IncidentWorkbench";
 import { OperationsPanel } from "./components/OperationsPanel";
 import { SimulationTable } from "./components/SimulationTable";
+import { ScenarioDesigner } from "./components/ScenarioDesigner";
 import { WarehouseMap } from "./components/WarehouseMap";
 import type {
   Approval,
@@ -53,10 +55,11 @@ import type {
   Snapshot,
 } from "./types";
 
-type View = "command" | "simulations" | "incidents" | "approvals" | "operations";
+type View = "command" | "designer" | "simulations" | "incidents" | "approvals" | "operations";
 
 const viewItems: Array<{ id: View; label: string; icon: ReactElement }> = [
   { id: "command", label: "调度总览", icon: <Home20Regular /> },
+  { id: "designer", label: "场景设计", icon: <Wrench20Regular /> },
   { id: "simulations", label: "方案仿真", icon: <Play20Regular /> },
   { id: "incidents", label: "异常诊断", icon: <ShieldError20Regular /> },
   { id: "approvals", label: "风险审批", icon: <ShieldLock20Regular /> },
@@ -93,6 +96,9 @@ export default function App() {
   const [speed, setSpeed] = useState(5);
   const [report, setReport] = useState<ShiftReport | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+
+  const handleDesignerNotice = (message: string) => setNotice(message);
+  const handleDesignerError = (message: string) => setError(message);
 
   const loadRun = useCallback(async (runId: string) => {
     setSelectedRunId(runId);
@@ -676,6 +682,15 @@ export default function App() {
               onSpeedChange={setSpeed}
             />
           </div>
+        )}
+
+        {view === "designer" && (
+          <ScenarioDesigner
+            scenarios={scenarios}
+            initialScenarioId={selectedScenario}
+            onNotice={handleDesignerNotice}
+            onError={handleDesignerError}
+          />
         )}
 
         {view === "approvals" && (

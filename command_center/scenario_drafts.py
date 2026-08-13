@@ -86,6 +86,21 @@ class ScenarioDraftStore:
         self._audit("SCENARIO_DRAFT_CREATED", actor, value)
         return self._record(value)
 
+    def create_from_runtime(
+        self,
+        scenario_id: str,
+        package_id: str,
+        version: str,
+        actor: str,
+    ) -> dict[str, Any]:
+        document = self.engine.scenario_package_from_runtime(
+            scenario_id,
+            package_id=package_id,
+            version=version,
+            created_by=actor,
+        )
+        return self.create(document, actor)
+
     def list(self) -> list[dict[str, Any]]:
         rows = []
         for path in sorted(self.drafts_dir.glob("*.json")):

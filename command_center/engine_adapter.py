@@ -134,6 +134,7 @@ class MaspAdapter:
         from masp.scenario_package import (
             ScenarioPackage,
             compile_scenario_package,
+            package_from_assets,
             validate_scenario_package_document,
         )
         from masp.task_stream import generate_task_stream
@@ -147,6 +148,7 @@ class MaspAdapter:
             "MapTopology": MapTopology,
             "ScenarioPackage": ScenarioPackage,
             "compile_scenario_package": compile_scenario_package,
+            "package_from_assets": package_from_assets,
             "validate_scenario_package_document": validate_scenario_package_document,
             "generate_task_stream": generate_task_stream,
             "validate_task_stream_generation_document": validate_task_stream_generation_document,
@@ -183,6 +185,56 @@ class MaspAdapter:
             "validation": compiled.validation.to_dict(),
             "manifest": compiled.documents["manifest.json"],
         }
+
+    def scenario_package_from_runtime(
+        self, scenario_id: str, *, package_id: str, version: str, created_by: str
+    ) -> dict[str, Any]:
+        """Create an editable package from a fixed MASP scenario and runtime assets."""
+        self._require_engine()
+        modules = self._engine_modules()
+        assets = self._assets()
+        runtime_scenario = self.load_scenario(scenario_id)
+        package = modules["package_from_assets"](
+            package_id=package_id,
+            version=version,
+            map_document=assets["model"],
+            profile_document=assets["profiles"],
+            workstation_document=assets["workstations"],
+            vehicle_document={"vehicles": runtime_scenario["vehicles"]},
+            traffic_document=assets["zones"],
+            scenario_document=runtime_scenario,
+            conflict_document=assets["conflicts"],
+            created_by=created_by,
+        )
+        document = {
+            "schemaVersion": 1,
+            "packageId": package.package_id,
+            "version": package.version,
+            "status": package.status,
+            "metadata": dict(package.metadata),
+            "warehouseScene": {
+                "sceneId": package.warehouse_scene.scene_id,
+                "name": package.warehouse_scene.name,
+                "bounds": dict(package.warehouse_scene.bounds),
+                "robotProfiles": package.warehouse_scene.robot_profiles,
+                "nodes": list(package.warehouse_scene.nodes),
+                "edges": list(package.warehouse_scene.edges),
+                "workstations": list(package.warehouse_scene.workstations),
+                "vehicles": list(package.warehouse_scene.vehicles),
+                "recoveryNodes": list(package.warehouse_scene.recovery_nodes),
+                "trafficZones": list(package.warehouse_scene.traffic_zones),
+                "safety": dict(package.warehouse_scene.safety),
+            },
+            "taskStream": {
+                "streamId": package.task_stream.stream_id,
+                "seed": package.task_stream.seed,
+                "endTimeMs": package.task_stream.end_time_ms,
+                "tasks": list(package.task_stream.tasks),
+                "events": list(package.task_stream.events),
+            },
+        }
+        self.validate_scenario_package(document)
+        return document
 
     def generate_scenario_tasks(
         self, document: dict[str, Any], generation: dict[str, Any]

@@ -14,6 +14,9 @@ import type {
   Snapshot,
   ShiftReport,
   WhatIfMode,
+  ScenarioDraftSummary,
+  ScenarioPackageDocument,
+  ScenarioValidationReport,
 } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -114,4 +117,19 @@ export const api = {
     }),
   incidentReport: (incidentId: string) =>
     request<IncidentReport>(`/api/v1/incidents/${encodeURIComponent(incidentId)}/report`),
+  scenarioDrafts: () => request<ScenarioDraftSummary[]>('/api/v1/scenario-drafts'),
+  scenarioDraft: (packageId: string) =>
+    request<ScenarioPackageDocument>(`/api/v1/scenario-drafts/${encodeURIComponent(packageId)}`),
+  createScenarioDraftFromRuntime: (scenarioId: string, packageId: string) =>
+    request<ScenarioDraftSummary>(`/api/v1/scenario-drafts/from-runtime?scenarioId=${encodeURIComponent(scenarioId)}&packageId=${encodeURIComponent(packageId)}`, { method: 'POST' }),
+  updateScenarioDraft: (packageId: string, document: ScenarioPackageDocument, revision: number) =>
+    request<ScenarioDraftSummary>(`/api/v1/scenario-drafts/${encodeURIComponent(packageId)}?expectedRevision=${revision}&requestedBy=demo-operator`, { method: 'PUT', body: JSON.stringify(document) }),
+  validateScenarioDraft: (packageId: string) =>
+    request<ScenarioValidationReport>(`/api/v1/scenario-drafts/${encodeURIComponent(packageId)}/validate?requestedBy=demo-operator`, { method: 'POST' }),
+  generateScenarioTasks: (packageId: string, generation: Record<string, unknown>, revision: number) =>
+    request<ScenarioDraftSummary>(`/api/v1/scenario-drafts/${encodeURIComponent(packageId)}/generate-tasks?expectedRevision=${revision}&requestedBy=demo-operator`, { method: 'POST', body: JSON.stringify(generation) }),
+  compileScenarioDraft: (packageId: string) =>
+    request<Record<string, unknown>>(`/api/v1/scenario-drafts/${encodeURIComponent(packageId)}/compile?requestedBy=demo-operator`, { method: 'POST' }),
+  publishScenarioDraft: (packageId: string) =>
+    request<ScenarioDraftSummary>(`/api/v1/scenario-drafts/${encodeURIComponent(packageId)}/publish?requestedBy=demo-supervisor`, { method: 'POST' }),
 };
