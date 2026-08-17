@@ -38,6 +38,7 @@ import { AgentPolicyPanel } from "./components/AgentPolicyPanel";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { IncidentWorkbench } from "./components/IncidentWorkbench";
 import { EvaluationCenter } from "./components/EvaluationCenter";
+import { PlanExplanationPanel } from "./components/PlanExplanationPanel";
 import { OperationsPanel } from "./components/OperationsPanel";
 import { SimulationTable } from "./components/SimulationTable";
 import { ScenarioDesigner } from "./components/ScenarioDesigner";
@@ -51,6 +52,7 @@ import type {
   Health,
   Incident,
   MapModel,
+  PlanExplanationReport,
   RunDetail,
   ScenarioMeta,
   ShiftReport,
@@ -93,6 +95,8 @@ export default function App() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [chatResponse, setChatResponse] = useState<ChatResponse | null>(null);
+  const [conversationId] = useState(() => `conversation-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`);
+  const [planExplanation, setPlanExplanation] = useState<PlanExplanationReport | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [busyApprovalId, setBusyApprovalId] = useState<string | null>(null);
   const [playbackMs, setPlaybackMs] = useState(0);
@@ -226,9 +230,15 @@ export default function App() {
     setBusy("chat");
     setError(null);
     try {
-      const response = await api.chat(message, selectedScenario);
+      const response = await api.chat(message, selectedScenario, conversationId);
       setChatResponse(response);
-      setNotice(response.fallbackUsed ? "DeepSeek 不可用，已使用确定性本地解析" : "DeepSeek 已生成结构化调度意图");
+      setNotice(
+        response.state === "CLARIFICATION_REQUIRED"
+          ? "参数尚不完整，请在对话中补充缺失信息"
+          : response.fallbackUsed
+            ? "DeepSeek 不可用，已使用确定性本地解析"
+            : "DeepSeek 已生成结构化调度意图",
+      );
       setAudit(await api.audit());
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "调度请求解析失败");
@@ -268,6 +278,22 @@ export default function App() {
       setNotice("当前场景规则基线仿真已完成");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "基线仿真失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleExplainPlan = async (options: { question: string; vehicleId?: string; taskId?: string }) => {
+    if (!runDetail) return;
+    setBusy("plan-explain");
+    setError(null);
+    try {
+      const explanation = await api.explainPlan(runDetail.summary.runId, options);
+      setPlanExplanation(explanation);
+      setNotice(explanation.fallbackUsed ? "已根据 MASP 证据生成确定性规划解释" : "DeepSeek 已根据 MASP 证据生成规划解释");
+      setAudit(await api.audit());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "规划解释生成失败");
     } finally {
       setBusy(null);
     }
@@ -673,6 +699,12 @@ export default function App() {
                 onRun={(policy, candidateCount) => void handlePolicyRun(policy, candidateCount)}
               />
             )}
+            <PlanExplanationPanel
+              run={runDetail}
+              report={planExplanation?.runId === runDetail?.summary.runId ? planExplanation : null}
+              busy={busy === "plan-explain"}
+              onExplain={(options) => void handleExplainPlan(options)}
+            />
             <WarehouseMap
               map={map}
               snapshot={snapshot}

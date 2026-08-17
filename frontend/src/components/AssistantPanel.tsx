@@ -94,6 +94,13 @@ export function AssistantPanel({
         {response && (
           <div className="assistant-response">
             <p className="response-copy">{response.message}</p>
+            {response.clarification && (
+              <div className="clarification-box" role="status">
+                <strong>需要补充信息</strong>
+                <span>已保留：{Object.entries(response.clarification.collectedParameters).map(([key, value]) => `${key}=${String(value)}`).join("，") || "暂无"}</span>
+                {response.clarification.questions.map((question) => <p key={question}>{question}</p>)}
+              </div>
+            )}
             {validation && (
               <div className="validation-row">
                 <Badge

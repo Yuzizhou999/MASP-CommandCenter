@@ -15,6 +15,7 @@ import type {
   Incident,
   IncidentReport,
   MapModel,
+  PlanExplanationReport,
   RunDetail,
   ScenarioMeta,
   SimulationSummary,
@@ -48,10 +49,10 @@ export const api = {
   snapshot: (scenarioId: string) =>
     request<Snapshot>(`/api/v1/world/snapshot?scenarioId=${encodeURIComponent(scenarioId)}`),
   map: () => request<MapModel>("/api/v1/map"),
-  chat: (message: string, scenarioId: string) =>
+  chat: (message: string, scenarioId: string, conversationId: string) =>
     request<ChatResponse>("/api/v1/agent/chat", {
       method: "POST",
-      body: JSON.stringify({ message, scenarioId, requestedBy: "demo-operator" }),
+      body: JSON.stringify({ message, scenarioId, conversationId, requestedBy: "demo-operator" }),
     }),
   simulate: (
     scenarioId: string,
@@ -73,6 +74,11 @@ export const api = {
     }),
   simulations: () => request<SimulationSummary[]>("/api/v1/simulations"),
   runDetail: (runId: string) => request<RunDetail>(`/api/v1/simulations/${runId}`),
+  explainPlan: (runId: string, options: { question: string; vehicleId?: string; taskId?: string }) =>
+    request<PlanExplanationReport>(`/api/v1/simulations/${encodeURIComponent(runId)}/explain`, {
+      method: "POST",
+      body: JSON.stringify({ ...options, requestedBy: "demo-operator" }),
+    }),
   compare: (runIds: string[]) =>
     request<Comparison>("/api/v1/simulations/compare", {
       method: "POST",

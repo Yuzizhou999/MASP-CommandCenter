@@ -457,6 +457,26 @@ class MaspAdapter:
             "nodes": deepcopy(assets["model"].get("nodes", [])),
         }
 
+    def resolve_node_reference(
+        self, reference: str, robot_group: str | None = None
+    ) -> list[str]:
+        """Resolve a user-provided node alias against the approved map catalog."""
+        normalized = reference.strip()
+        if not normalized:
+            return []
+        lowered = normalized.lower()
+        rows = self._assets()["model"].get("nodes", [])
+        matches: list[str] = []
+        for row in rows:
+            node_id = str(row["id"])
+            group, _, alias = node_id.partition(":")
+            if robot_group is not None and group != robot_group:
+                continue
+            aliases = {str(value).lower() for value in row.get("aliases", {}).values()}
+            if lowered in {node_id.lower(), alias.lower(), *aliases}:
+                matches.append(node_id)
+        return sorted(set(matches))
+
     def scenarios(self) -> list[dict[str, Any]]:
         rows = []
         for path in sorted((self.root / "scenarios").glob("*.json")):

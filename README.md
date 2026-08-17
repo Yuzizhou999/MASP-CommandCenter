@@ -7,6 +7,7 @@
 ## 核心能力
 
 - 自然语言紧急插单、通道封锁、状态查询和报告生成；
+- 缺失站点、车型或资源时进入多轮澄清，不使用默认实体补齐；
 - DeepSeek API 调用，未配置密钥或 API 异常时自动使用确定性本地解析；
 - 可从场景包自动生成或在画布手工配置路网、工位、车辆和任务流；
 - 多车型车辆轨迹、任务路径和资源封锁时窗回放；
@@ -20,6 +21,7 @@
 - Actor-Critic/PPO 群车优先级策略接入、Top-K guardian、安全降级和逐轮候选证据。
 - 多种子评测矩阵、均值/标准差/95% 置信区间、安全门槛和失败案例留档；
 - 运行证据脱敏导出、固定数据划分、质量扫描和版本化资产包。
+- 任务分配、等待、路线筛选和策略回退的 `PE-*` 规划证据解释。
 
 ## 仓库边界
 
@@ -130,6 +132,7 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 | `POST` | `/api/v1/intents/validate` | 确定性校验和风险分级 |
 | `POST` | `/api/v1/simulations` | 运行数字孪生 |
 | `POST` | `/api/v1/simulations/compare` | 比较 2-4 个方案 |
+| `POST` | `/api/v1/simulations/{id}/explain` | 按车辆或任务生成规划证据解释 |
 | `POST` | `/api/v1/approvals` | 创建高风险审批 |
 | `POST` | `/api/v1/approvals/{id}/decision` | 人工审批决策 |
 | `POST` | `/api/v1/intents/{id}/commit` | 仅提交到仿真环境 |

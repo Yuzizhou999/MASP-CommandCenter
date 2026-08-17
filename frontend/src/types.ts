@@ -155,9 +155,17 @@ export interface Evidence {
 
 export interface ChatResponse {
   traceId: string;
+  conversationId: string;
+  state: "READY" | "CLARIFICATION_REQUIRED";
   message: string;
   intent?: DispatchIntent | null;
   validation?: Validation | null;
+  clarification?: {
+    code: "MISSING_REQUIRED_FIELDS" | "AMBIGUOUS_ENTITY";
+    missingFields: string[];
+    questions: string[];
+    collectedParameters: Record<string, unknown>;
+  } | null;
   evidence: Evidence[];
   model: string;
   fallbackUsed: boolean;
@@ -268,6 +276,37 @@ export interface RunDetail {
   };
   planning: Record<string, unknown>;
   agentEvidence?: AgentPolicyArtifact;
+}
+
+export interface PlanExplanationEvidence {
+  evidenceId: string;
+  category: "RUN" | "ASSIGNMENT" | "WAIT" | "ROUTE" | "SAFETY" | "FALLBACK";
+  fact: string;
+  source: string;
+  attributes: Record<string, unknown>;
+}
+
+export interface PlanExplanationFinding {
+  code: string;
+  title: string;
+  explanation: string;
+  classification: "FACT" | "INFERENCE";
+  evidenceIds: string[];
+}
+
+export interface PlanExplanationReport {
+  schemaVersion: 1;
+  runId: string;
+  question: string;
+  vehicleId?: string | null;
+  taskId?: string | null;
+  summary: string;
+  findings: PlanExplanationFinding[];
+  uncertainties: string[];
+  evidence: PlanExplanationEvidence[];
+  model: string;
+  fallbackUsed: boolean;
+  generatedAt: string;
 }
 
 export type WhatIfMode = "WAIT_RECOVERY" | "ISOLATE_REASSIGN" | "SAFETY_STOP";

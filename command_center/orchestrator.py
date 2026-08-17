@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .audit import AuditStore
+from .clarifications import ClarificationResolver, ClarificationStore
 from .contracts import (
     ChatRequest,
     ChatResponse,
@@ -21,21 +22,22 @@ class DispatchOrchestrator:
         provider: DeepSeekProvider,
         knowledge: KnowledgeBase,
         audit: AuditStore,
+        clarifications: ClarificationResolver | None = None,
     ) -> None:
         self.engine = engine
         self.provider = provider
         self.knowledge = knowledge
         self.audit = audit
+        self.clarifications = clarifications or ClarificationResolver(
+            ClarificationStore(engine.settings.data_dir / "clarifications.json"), engine
+        )
 
     def chat(self, request: ChatRequest) -> ChatResponse:
         trace_id = new_id("trace")
         snapshot = self.engine.world_snapshot(request.scenario_id)
-        parsed = self.provider.parse_intent(
-            request.message,
-            world_revision=int(snapshot["worldRevision"]),
-            requested_by=request.requested_by,
+        resolved = self.clarifications.resolve(
+            request.message, request.conversation_id
         )
-        validation = self.engine.validate_intent(parsed.intent, request.scenario_id)
         evidence = [
             EvidenceItem(
                 source=f"MASP:{request.scenario_id}",
@@ -49,6 +51,45 @@ class DispatchOrchestrator:
             )
         ]
         evidence.extend(self.knowledge.search(request.message, limit=2))
+        if resolved.clarification is not None:
+            message = "还不能形成可执行草案。" + " ".join(
+                resolved.clarification.questions
+            )
+            response = ChatResponse(
+                traceId=trace_id,
+                conversationId=request.conversation_id,
+                state="CLARIFICATION_REQUIRED",
+                message=message,
+                clarification=resolved.clarification,
+                evidence=evidence,
+                model="deterministic-parameter-resolver",
+                fallbackUsed=False,
+                suggestedActions=resolved.clarification.questions,
+            )
+            self.audit.append(
+                trace_id=trace_id,
+                event_type="AGENT_CLARIFICATION_REQUESTED",
+                actor=request.requested_by,
+                payload={
+                    "conversationId": request.conversation_id,
+                    "request": request.message,
+                    "scenarioId": request.scenario_id,
+                    "clarification": resolved.clarification.model_dump(
+                        by_alias=True, mode="json"
+                    ),
+                },
+            )
+            return response
+        parsed = self.provider.parse_intent(
+            resolved.message,
+            world_revision=int(snapshot["worldRevision"]),
+            requested_by=request.requested_by,
+            resolved_task=resolved.task,
+            resolved_resource_block=resolved.resource_block,
+        )
+        if parsed.intent is None:
+            raise ValueError("意图解析未生成结构化结果")
+        validation = self.engine.validate_intent(parsed.intent, request.scenario_id)
 
         intent_type = parsed.intent.intent_type
         if intent_type is IntentType.CREATE_TASK:
@@ -93,6 +134,7 @@ class DispatchOrchestrator:
 
         response = ChatResponse(
             traceId=trace_id,
+            conversationId=request.conversation_id,
             message=message,
             intent=parsed.intent,
             validation=validation,

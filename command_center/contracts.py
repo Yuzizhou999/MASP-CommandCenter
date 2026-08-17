@@ -370,6 +370,9 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     scenario_id: str = Field(default="interactive-multi-fleet", alias="scenarioId")
     requested_by: str = Field(default="demo-operator", alias="requestedBy")
+    conversation_id: str = Field(
+        default_factory=lambda: new_id("conversation"), alias="conversationId"
+    )
 
 
 class EvidenceItem(BaseModel):
@@ -378,15 +381,70 @@ class EvidenceItem(BaseModel):
     detail: str
 
 
+class ClarificationRequest(BaseModel):
+    code: Literal["MISSING_REQUIRED_FIELDS", "AMBIGUOUS_ENTITY"]
+    missing_fields: list[str] = Field(default_factory=list, alias="missingFields")
+    questions: list[str] = Field(default_factory=list)
+    collected_parameters: dict[str, Any] = Field(
+        default_factory=dict, alias="collectedParameters"
+    )
+
+
 class ChatResponse(BaseModel):
     trace_id: str = Field(default_factory=lambda: new_id("trace"), alias="traceId")
+    conversation_id: str = Field(alias="conversationId")
+    state: Literal["READY", "CLARIFICATION_REQUIRED"] = "READY"
     message: str
     intent: DispatchIntent | None = None
     validation: IntentValidation | None = None
+    clarification: ClarificationRequest | None = None
     evidence: list[EvidenceItem] = Field(default_factory=list)
     model: str
     fallback_used: bool = Field(alias="fallbackUsed")
     suggested_actions: list[str] = Field(default_factory=list, alias="suggestedActions")
+
+
+class PlanExplanationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    question: str = Field(default="为什么这样调度？", min_length=1, max_length=1000)
+    vehicle_id: str | None = Field(default=None, alias="vehicleId")
+    task_id: str | None = Field(default=None, alias="taskId")
+    requested_by: str = Field(default="demo-operator", alias="requestedBy")
+
+
+class PlanExplanationEvidence(BaseModel):
+    evidence_id: str = Field(alias="evidenceId")
+    category: Literal["RUN", "ASSIGNMENT", "WAIT", "ROUTE", "SAFETY", "FALLBACK"]
+    fact: str
+    source: str
+    attributes: dict[str, Any] = Field(default_factory=dict)
+
+
+class PlanExplanationFinding(BaseModel):
+    code: str
+    title: str
+    explanation: str
+    classification: Literal["FACT", "INFERENCE"]
+    evidence_ids: list[str] = Field(min_length=1, alias="evidenceIds")
+
+
+class PlanExplanationNarrative(BaseModel):
+    summary: str
+    findings: list[PlanExplanationFinding] = Field(default_factory=list)
+    uncertainties: list[str] = Field(default_factory=list)
+
+
+class PlanExplanationReport(PlanExplanationNarrative):
+    schema_version: Literal[1] = Field(default=1, alias="schemaVersion")
+    run_id: str = Field(alias="runId")
+    question: str
+    vehicle_id: str | None = Field(default=None, alias="vehicleId")
+    task_id: str | None = Field(default=None, alias="taskId")
+    evidence: list[PlanExplanationEvidence] = Field(default_factory=list)
+    model: str
+    fallback_used: bool = Field(alias="fallbackUsed")
+    generated_at: datetime = Field(default_factory=utc_now, alias="generatedAt")
 
 
 class AuditEvent(BaseModel):

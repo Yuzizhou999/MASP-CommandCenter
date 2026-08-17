@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .approvals import ApprovalStore
 from .audit import AuditStore
 from .benchmark import BenchmarkRunner
+from .clarifications import ClarificationResolver, ClarificationStore
 from .contracts import (
     ApprovalDecision,
     ApprovalRequest,
@@ -25,12 +26,15 @@ from .contracts import (
     FaultInjectionRequest,
     IncidentRecord,
     IncidentWhatIfRequest,
+    PlanExplanationReport,
+    PlanExplanationRequest,
     SimulationRequest,
     SimulationSummary,
     new_id,
 )
 from .dataset_exports import DatasetExporter
 from .engine_adapter import EngineVersionError, MaspAdapter
+from .explanations import PlanExplanationService
 from .intent_store import IntentStore
 from .incidents import IncidentService, IncidentStore
 from .knowledge import KnowledgeBase
@@ -47,11 +51,14 @@ approvals = ApprovalStore(settings.data_dir / "approvals.json")
 intents = IntentStore(settings.data_dir / "committed-intents.json")
 knowledge = KnowledgeBase(settings.root / "knowledge")
 provider = DeepSeekProvider(settings)
+clarification_store = ClarificationStore(settings.data_dir / "clarifications.json")
+clarification_resolver = ClarificationResolver(clarification_store, engine)
 orchestrator = DispatchOrchestrator(
     engine=engine,
     provider=provider,
     knowledge=knowledge,
     audit=audit,
+    clarifications=clarification_resolver,
 )
 incident_store = IncidentStore(settings.data_dir / "incidents.json")
 incident_service = IncidentService(
@@ -70,6 +77,11 @@ dataset_exports = DatasetExporter(
     approvals=approvals,
     intents=intents,
     incidents=incident_store,
+)
+plan_explanations = PlanExplanationService(
+    engine=engine,
+    provider=provider,
+    audit=audit,
 )
 
 app = FastAPI(
@@ -347,6 +359,22 @@ def simulation_detail(run_id: str) -> dict[str, Any]:
         return engine.get_run_detail(run_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/simulations/{run_id}/explain",
+    response_model=PlanExplanationReport,
+    response_model_by_alias=True,
+)
+async def explain_simulation_plan(
+    run_id: str, request: PlanExplanationRequest
+) -> PlanExplanationReport:
+    try:
+        return await asyncio.to_thread(plan_explanations.explain, run_id, request)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.post(
