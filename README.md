@@ -17,6 +17,7 @@
 - SOP 知识检索和模型决策依据展示。
 - 车辆故障安全节点注入、`EV-*` 证据链和 DeepSeek 根因解释；
 - 等待恢复、隔离重派、安全停车三类可比较的 MASP 故障 What-if。
+- Actor-Critic/PPO 群车优先级策略接入、Top-K guardian、安全降级和逐轮候选证据。
 
 ## 仓库边界
 
@@ -41,6 +42,8 @@ E:\project\MASP-CommandCenter   灵枢应用、智能体、治理、前端和比
 | 存储 | JSON/JSONL 演示存储，运行证据按 run 独立落盘 |
 
 大模型只负责理解和解释。路径、资源预约、冲突判断、方案指标全部来自 MASP 确定性引擎。故障诊断中的每条根因与建议必须引用真实 `EV-*` 证据，虚构证据、车辆、任务或越权动作会使整份 AI 报告降级为规则诊断。
+
+车端策略模型只输出任务与车辆候选顺序，不直接生成轨迹。每个学习候选仍须经过 MASP 候选评估、连续时间 SIPP、资源预约和 Top-K guardian 校验；权重缺失、版本不兼容、推理失败或安全评分不占优时，运行自动切回确定性规则候选并记录原因。
 
 ## 快速启动
 
@@ -80,6 +83,25 @@ DEEPSEEK_TIMEOUT_SECONDS=30
 
 可以直接调用 DeepSeek 官方 API。密钥只由 FastAPI 后端读取，绝不进入浏览器资源。若未配置密钥、请求超时、返回非 JSON 或 Schema 校验失败，系统自动切换到本地解析器，并在界面和审计日志中明确标注降级状态。
 
+## 配置群车策略模型
+
+学习策略使用服务端登记的 MASP Actor-Critic/PPO checkpoint，浏览器不能提交文件路径。启用模型推理时先安装额外依赖：
+
+```powershell
+pip install -r requirements-agent.txt
+```
+
+再在 `.env` 中配置：
+
+```dotenv
+MASP_AGENT_MODEL_ID=masp-ppo-priority
+MASP_AGENT_MODEL_VERSION=1.0.0
+MASP_AGENT_CHECKPOINT=models/ppo-priority-v1.pt
+MASP_AGENT_DEVICE=cpu
+```
+
+checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先级前缀元数据。运行前校验失败时不会加载学习策略，界面会显示规则基线及具体降级原因。
+
 ## 比赛演示流程
 
 1. 点击“14车32任务基线”，展示真实多车型调度和零资源冲突回放。
@@ -98,6 +120,7 @@ DEEPSEEK_TIMEOUT_SECONDS=30
 | `GET` | `/api/health` | 引擎、模型和安全边界状态 |
 | `GET` | `/api/v1/world/snapshot` | 场景世界快照 |
 | `GET` | `/api/v1/map` | MASP 统一路网 |
+| `GET` | `/api/v1/agent-policy` | 群车策略模型登记与权重状态 |
 | `POST` | `/api/v1/agent/chat` | 自然语言到结构化意图 |
 | `POST` | `/api/v1/intents/validate` | 确定性校验和风险分级 |
 | `POST` | `/api/v1/simulations` | 运行数字孪生 |
@@ -124,6 +147,7 @@ DEEPSEEK_TIMEOUT_SECONDS=30
 - `result.json`：事件日志、最终状态和业务指标；
 - `manifest.json`：引擎版本、种子、意图和结果摘要；
 - `command-center-summary.json`：界面使用的方案摘要。
+- `agent-policy-evidence.json`：模型版本、推理与接管计数、逐轮候选和安全边界；
 - `incident-context.json`：故障分支、冻结窗口、人工转运和已知限制。
 
 这些目录默认不进入 Git，避免把运行数据和源代码混在一起。

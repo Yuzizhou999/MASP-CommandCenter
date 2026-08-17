@@ -8,6 +8,20 @@ export interface EngineStatus {
   warning?: string | null;
 }
 
+export interface AgentModelStatus {
+  modelId: string;
+  modelVersion: string;
+  algorithm: string;
+  mode: "LEARNED" | "BASELINE";
+  configured: boolean;
+  checkpointPresent: boolean;
+  checkpointName?: string | null;
+  checkpointSha256?: string | null;
+  device: string;
+  safetyController: string;
+  notice: string;
+}
+
 export interface Health {
   status: string;
   environment: string;
@@ -18,6 +32,7 @@ export interface Health {
     configured: boolean;
     mode: string;
   };
+  agentPolicy: AgentModelStatus;
   safety: {
     mode: string;
     fieldExecutionEnabled: boolean;
@@ -149,6 +164,62 @@ export interface ChatResponse {
   suggestedActions: string[];
 }
 
+export interface AgentPolicyOptions {
+  modelId?: string | null;
+  candidateCount: number;
+  allowDeviation: boolean;
+}
+
+export interface AgentPolicyEvidence {
+  requested: boolean;
+  mode: "LEARNED" | "BASELINE";
+  modelId: string;
+  modelVersion: string;
+  checkpointSha256?: string | null;
+  candidateCount: number;
+  deviationRequested: boolean;
+  deviationEnabled: boolean;
+  inferenceCount: number;
+  inferenceMs: number;
+  fallbackCount: number;
+  safetyFallbackCount: number;
+  guardianCandidateCount: number;
+  guardianOverrideCount: number;
+  agentCandidateCount: number;
+  selectedAgentCandidateCount: number;
+  decisionCycleCount: number;
+  fallbackReasons: string[];
+  notes: string[];
+  evidencePath?: string | null;
+}
+
+export interface AgentDecisionCandidate {
+  candidateId: string;
+  strategy: string;
+  feasible: boolean;
+  plannedTaskCount: number;
+  order: Array<{ vehicleId: string; taskId: string }>;
+  failureCode?: string;
+}
+
+export interface AgentDecisionCycle {
+  cycleIndex: number;
+  decisionTimeMs: number;
+  candidateCount: number;
+  feasibleCandidateCount: number;
+  selectedCandidateIds: string[];
+  candidates: AgentDecisionCandidate[];
+}
+
+export interface AgentPolicyArtifact {
+  schemaVersion: number;
+  runId: string;
+  model: Record<string, unknown>;
+  execution: AgentPolicyEvidence;
+  safetyBoundary: Record<string, unknown>;
+  decisionCycles: AgentDecisionCycle[];
+}
+
 export interface SimulationSummary {
   runId: string;
   scenarioId: string;
@@ -160,6 +231,7 @@ export interface SimulationSummary {
   metrics: Record<string, number | null | Record<string, number>>;
   planning: Record<string, unknown>;
   safety: Record<string, unknown>;
+  agentPolicy?: AgentPolicyEvidence | null;
   intentId?: string | null;
   createdAt: string;
   error?: string | null;
@@ -194,6 +266,8 @@ export interface RunDetail {
   result: {
     eventLog: Array<Record<string, unknown>>;
   };
+  planning: Record<string, unknown>;
+  agentEvidence?: AgentPolicyArtifact;
 }
 
 export type WhatIfMode = "WAIT_RECOVERY" | "ISOLATE_REASSIGN" | "SAFETY_STOP";

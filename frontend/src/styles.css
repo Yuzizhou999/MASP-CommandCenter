@@ -1009,6 +1009,194 @@ p {
   background: #eef6fc;
 }
 
+.agent-policy-panel {
+  min-height: 260px;
+}
+
+.agent-policy-heading,
+.agent-evidence-title,
+.agent-policy-runbar,
+.agent-cycle-heading {
+  display: flex;
+  align-items: center;
+}
+
+.agent-policy-heading,
+.agent-evidence-title {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.agent-policy-body {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+}
+
+.agent-policy-controls,
+.agent-policy-evidence {
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+.agent-policy-controls {
+  border-right: 1px solid #e6e8eb;
+}
+
+.agent-policy-controls [role="tablist"] {
+  width: 100%;
+}
+
+.agent-policy-runbar {
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.agent-policy-runbar label {
+  display: grid;
+  grid-template-columns: auto 74px;
+  align-items: center;
+  gap: 8px;
+  color: #515151;
+  font-size: 11px;
+}
+
+.agent-policy-runbar button {
+  margin-left: auto;
+}
+
+.agent-model-notice {
+  margin-top: 12px;
+  color: #515151;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.agent-model-facts {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0 0;
+  font-size: 10px;
+}
+
+.agent-model-facts > div {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.agent-model-facts dt {
+  color: #707070;
+}
+
+.agent-model-facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.agent-evidence-title h3 {
+  font-size: 13px;
+}
+
+.agent-evidence-title p {
+  margin-top: 2px;
+  color: #707070;
+  font-size: 10px;
+}
+
+.agent-evidence-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+  margin-top: 12px;
+  border-block: 1px solid #e6e8eb;
+}
+
+.agent-evidence-metrics > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+}
+
+.agent-evidence-metrics > div + div {
+  border-left: 1px solid #e6e8eb;
+}
+
+.agent-evidence-metrics span {
+  color: #707070;
+  font-size: 10px;
+}
+
+.agent-evidence-metrics strong {
+  font-size: 16px;
+}
+
+.agent-evidence-notes {
+  margin-top: 8px;
+  color: #6d4600;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.agent-cycle-list {
+  max-height: 220px;
+  margin-top: 6px;
+  overflow-y: auto;
+}
+
+.agent-cycle-heading {
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  font-size: 11px;
+}
+
+.agent-cycle-heading span {
+  color: #616161;
+}
+
+.agent-candidate-list {
+  display: grid;
+  gap: 5px;
+}
+
+.agent-candidate-list > div {
+  display: grid;
+  grid-template-columns: 54px minmax(100px, 1fr) 72px minmax(0, auto);
+  gap: 8px;
+  min-height: 28px;
+  font-size: 10px;
+}
+
+.agent-candidate-list small {
+  min-width: 0;
+  color: #a4262c;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .agent-policy-body {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-policy-controls {
+    border-right: 0;
+    border-bottom: 1px solid #e6e8eb;
+  }
+
+  .agent-evidence-metrics {
+    grid-template-columns: repeat(2, minmax(72px, 1fr));
+  }
+
+  .agent-evidence-metrics > div:nth-child(3) {
+    border-left: 0;
+    border-top: 1px solid #e6e8eb;
+  }
+
+  .agent-evidence-metrics > div:nth-child(4) {
+    border-top: 1px solid #e6e8eb;
+  }
+}
+
 .check-column {
   width: 42px;
 }

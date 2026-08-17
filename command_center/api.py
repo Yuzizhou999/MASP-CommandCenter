@@ -80,12 +80,20 @@ def health() -> dict[str, Any]:
         "environment": settings.app_env,
         "engine": status,
         "model": provider.status(),
+        "agentPolicy": engine.agent_model_status().model_dump(
+            by_alias=True, mode="json"
+        ),
         "safety": {
             "mode": "simulation-only",
             "fieldExecutionEnabled": False,
             "approvalBoundaryEnabled": True,
         },
     }
+
+
+@app.get("/api/v1/agent-policy")
+def agent_policy_status() -> dict[str, Any]:
+    return engine.agent_model_status().model_dump(by_alias=True, mode="json")
 
 
 @app.get("/api/v1/scenarios")

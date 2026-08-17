@@ -1,4 +1,6 @@
 import type {
+  AgentModelStatus,
+  AgentPolicyOptions,
   Approval,
   AuditEvent,
   ChatResponse,
@@ -36,6 +38,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<Health>("/api/health"),
+  agentPolicy: () => request<AgentModelStatus>("/api/v1/agent-policy"),
   scenarios: () => request<ScenarioMeta[]>("/api/v1/scenarios"),
   snapshot: (scenarioId: string) =>
     request<Snapshot>(`/api/v1/world/snapshot?scenarioId=${encodeURIComponent(scenarioId)}`),
@@ -50,10 +53,18 @@ export const api = {
     label: string,
     intent?: DispatchIntent | null,
     policy = "top_k",
+    agentPolicy?: AgentPolicyOptions,
   ) =>
     request<SimulationSummary>("/api/v1/simulations", {
       method: "POST",
-      body: JSON.stringify({ scenarioId, label, policy, seed: 0, intent: intent || null }),
+      body: JSON.stringify({
+        scenarioId,
+        label,
+        policy,
+        seed: 0,
+        intent: intent || null,
+        agentPolicy,
+      }),
     }),
   simulations: () => request<SimulationSummary[]>("/api/v1/simulations"),
   runDetail: (runId: string) => request<RunDetail>(`/api/v1/simulations/${runId}`),

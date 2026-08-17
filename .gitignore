@@ -9,6 +9,8 @@ frontend/dist/
 frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+models/*
+!models/.gitkeep
 runs/*
 !runs/.gitkeep
 data/audit.jsonl

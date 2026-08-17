@@ -11,6 +11,9 @@ from threading import Lock
 from typing import Any
 
 from .contracts import (
+    AgentModelStatus,
+    AgentPolicyEvidence,
+    AgentPolicyOptions,
     ComparisonResult,
     DispatchIntent,
     IncidentRecord,
@@ -91,6 +94,188 @@ class MaspAdapter:
                 else None
             ),
         }
+
+    @staticmethod
+    def _file_sha256(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def agent_model_status(self) -> AgentModelStatus:
+        checkpoint = self.settings.agent_checkpoint
+        checkpoint_present = bool(checkpoint and checkpoint.is_file())
+        checkpoint_sha256 = (
+            self._file_sha256(checkpoint)
+            if checkpoint is not None and checkpoint_present
+            else None
+        )
+        if checkpoint_present:
+            notice = "已检测到模型权重，运行前将校验版本、观测和动作契约。"
+        elif checkpoint is not None:
+            notice = "配置的模型权重不存在，智能体请求将使用规则基线。"
+        else:
+            notice = "未配置模型权重，智能体请求将使用规则基线。"
+        return AgentModelStatus(
+            modelId=self.settings.agent_model_id,
+            modelVersion=self.settings.agent_model_version,
+            algorithm="Actor-Critic/PPO priority policy",
+            mode="LEARNED" if checkpoint_present else "BASELINE",
+            configured=checkpoint is not None,
+            checkpointPresent=checkpoint_present,
+            checkpointName=checkpoint.name if checkpoint is not None else None,
+            checkpointSha256=checkpoint_sha256,
+            device=self.settings.agent_device,
+            safetyController="MASP Top-K guardian + SIPP + resource reservation",
+            notice=notice,
+        )
+
+    def _prepare_agent_policy(
+        self, options: AgentPolicyOptions | None, seed: int
+    ) -> dict[str, Any]:
+        requested = options or AgentPolicyOptions()
+        status = self.agent_model_status()
+        if requested.model_id not in (None, status.model_id):
+            raise ValueError(
+                f"未登记智能体模型 {requested.model_id!r}，当前仅允许 {status.model_id!r}。"
+            )
+
+        reasons: list[str] = []
+        metadata: dict[str, Any] = {}
+        deviation_enabled = False
+        checkpoint_path: Path | None = None
+        if not requested.allow_deviation:
+            reasons.append("本次运行未授权学习策略改变规则候选顺序。")
+        elif self.settings.agent_checkpoint is None:
+            reasons.append("服务端未配置智能体模型权重。")
+        elif not self.settings.agent_checkpoint.is_file():
+            reasons.append("服务端配置的智能体模型权重不存在。")
+        else:
+            try:
+                root_text = str(self.root)
+                if root_text not in sys.path:
+                    sys.path.insert(0, root_text)
+                from masp.rl_priority import load_checkpoint
+
+                payload = load_checkpoint(
+                    self.settings.agent_checkpoint,
+                    device=self.settings.agent_device,
+                )
+                raw_metadata = dict(payload.get("metadata", {}))
+                metadata = {
+                    key: raw_metadata[key]
+                    for key in (
+                        "observation_version",
+                        "action_mode",
+                        "reward_version",
+                        "candidate_count",
+                        "priority_prefix_count",
+                    )
+                    if key in raw_metadata
+                }
+                deviation_enabled = True
+                checkpoint_path = self.settings.agent_checkpoint
+            except Exception as error:
+                reasons.append(
+                    "模型权重兼容性校验失败，已禁止学习策略输出："
+                    f"{type(error).__name__}: {error}"
+                )
+
+        return {
+            "modelId": status.model_id,
+            "modelVersion": status.model_version,
+            "checkpointSha256": status.checkpoint_sha256,
+            "checkpointPath": checkpoint_path,
+            "candidateCount": requested.candidate_count,
+            "deviationRequested": requested.allow_deviation,
+            "deviationEnabled": deviation_enabled,
+            "fallbackReasons": reasons,
+            "checkpointMetadata": metadata,
+            "seed": seed,
+        }
+
+    @staticmethod
+    def _agent_policy_evidence(
+        planning_summary: dict[str, Any],
+        prepared: dict[str, Any],
+        evidence_path: Path,
+    ) -> AgentPolicyEvidence:
+        cycles = list(planning_summary.get("cycles", []))
+        agent_candidate_count = 0
+        selected_agent_candidate_count = 0
+        for cycle in cycles:
+            candidates = {
+                row.get("candidateId"): row
+                for row in cycle.get("candidates", [])
+            }
+            agent_candidate_count += sum(
+                row.get("strategy") == "rl" for row in candidates.values()
+            )
+            selected_agent_candidate_count += sum(
+                candidates.get(candidate_id, {}).get("strategy") == "rl"
+                for candidate_id in cycle.get("selectedCandidateIds", [])
+            )
+
+        inference_count = int(planning_summary.get("rlInferenceCount", 0))
+        runtime_fallback_count = int(planning_summary.get("rlFallbackCount", 0))
+        decision_cycle_count = int(planning_summary.get("decisionCycleCount", 0))
+        fallback_count = (
+            runtime_fallback_count
+            if prepared["deviationEnabled"]
+            else decision_cycle_count
+        )
+        safety_fallback_count = int(
+            planning_summary.get("rlSafetyFallbackCount", 0)
+        )
+        guardian_override_count = int(
+            planning_summary.get("rlGuardianOverrideCount", 0)
+        )
+        reasons = list(prepared["fallbackReasons"])
+        if runtime_fallback_count:
+            reasons.append(
+                f"{runtime_fallback_count} 次推理未产生有效候选，已使用确定性候选。"
+            )
+        if safety_fallback_count:
+            reasons.append(
+                f"{safety_fallback_count} 次学习候选未通过安全选优，已采用规则接管。"
+            )
+        if guardian_override_count:
+            reasons.append(
+                f"Top-K guardian 以更优安全评分覆盖学习候选 {guardian_override_count} 次。"
+            )
+        notes: list[str] = []
+        if prepared["deviationEnabled"] and inference_count == 0:
+            notes.append("本次场景未形成需要学习策略排序的耦合冲突分量。")
+        if not prepared["deviationEnabled"] and decision_cycle_count:
+            notes.append(f"{decision_cycle_count} 个决策周期由规则基线接管。")
+        if selected_agent_candidate_count:
+            notes.append(
+                f"安全校验后共有 {selected_agent_candidate_count} 个学习候选被采用。"
+            )
+        return AgentPolicyEvidence(
+            mode="LEARNED" if prepared["deviationEnabled"] else "BASELINE",
+            modelId=prepared["modelId"],
+            modelVersion=prepared["modelVersion"],
+            checkpointSha256=prepared["checkpointSha256"],
+            candidateCount=prepared["candidateCount"],
+            deviationRequested=prepared["deviationRequested"],
+            deviationEnabled=prepared["deviationEnabled"],
+            inferenceCount=inference_count,
+            inferenceMs=float(planning_summary.get("rlInferenceMs", 0.0)),
+            fallbackCount=fallback_count,
+            safetyFallbackCount=safety_fallback_count,
+            guardianCandidateCount=int(
+                planning_summary.get("rlGuardianCandidateCount", 0)
+            ),
+            guardianOverrideCount=guardian_override_count,
+            agentCandidateCount=agent_candidate_count,
+            selectedAgentCandidateCount=selected_agent_candidate_count,
+            decisionCycleCount=decision_cycle_count,
+            fallbackReasons=list(dict.fromkeys(reasons)),
+            notes=notes,
+            evidencePath=str(evidence_path),
+        )
 
     def _require_engine(self) -> None:
         status = self.engine_status()
@@ -500,15 +685,21 @@ class MaspAdapter:
         run_id = new_id("run")
         output_dir = self.settings.runs_dir / run_id
         output_dir.mkdir(parents=True, exist_ok=False)
+        prepared_agent: dict[str, Any] | None = None
         try:
             scenario = deepcopy(self.load_scenario(request.scenario_id))
             scenario["seed"] = request.seed
             if request.intent and request.intent.intent_type is IntentType.CREATE_TASK:
                 task_doc = request.intent.task.model_dump(by_alias=True, exclude_none=True)
                 scenario["tasks"].append(task_doc)
+            if request.policy == "rl":
+                prepared_agent = self._prepare_agent_policy(
+                    request.agent_policy, request.seed
+                )
             runtime = self._run_scenario(
                 scenario,
                 policy=request.policy,
+                agent_runtime=prepared_agent,
                 resource_block=(
                     request.intent.resource_block
                     if request.intent
@@ -520,6 +711,39 @@ class MaspAdapter:
             planning_summary = planning.summary()
             result = runtime.result()
             planned = runtime.planned_scenario(request.scenario_id, request.seed)
+            agent_evidence: AgentPolicyEvidence | None = None
+            if prepared_agent is not None:
+                evidence_path = output_dir / "agent-policy-evidence.json"
+                agent_evidence = self._agent_policy_evidence(
+                    planning_summary, prepared_agent, evidence_path
+                )
+                self._write_json(
+                    evidence_path,
+                    {
+                        "schemaVersion": 1,
+                        "runId": run_id,
+                        "seed": prepared_agent["seed"],
+                        "model": {
+                            "modelId": prepared_agent["modelId"],
+                            "modelVersion": prepared_agent["modelVersion"],
+                            "checkpointSha256": prepared_agent["checkpointSha256"],
+                            "checkpointMetadata": prepared_agent[
+                                "checkpointMetadata"
+                            ],
+                        },
+                        "execution": agent_evidence.model_dump(
+                            by_alias=True, mode="json"
+                        ),
+                        "safetyBoundary": {
+                            "candidateOutputOnly": True,
+                            "deterministicValidationRequired": True,
+                            "guardianStrategy": "Top-K congestion guardian",
+                            "trajectoryPlanner": "continuous-time SIPP",
+                            "fieldExecutionEnabled": False,
+                        },
+                        "decisionCycles": planning_summary.get("cycles", []),
+                    },
+                )
             self._write_json(output_dir / "input-scenario.json", scenario)
             self._write_json(output_dir / "planned-scenario.json", planned)
             self._write_json(output_dir / "planning-summary.json", planning_summary)
@@ -531,6 +755,11 @@ class MaspAdapter:
                 "policy": request.policy,
                 "seed": request.seed,
                 "engine": self.engine_status(),
+                "agentPolicy": (
+                    agent_evidence.model_dump(by_alias=True, mode="json")
+                    if agent_evidence is not None
+                    else None
+                ),
                 "intent": (
                     request.intent.model_dump(by_alias=True, mode="json")
                     if request.intent
@@ -570,6 +799,7 @@ class MaspAdapter:
                     "unplannedTaskCount": len(planning.unplanned_task_ids),
                     "simulationOnly": True,
                 },
+                agentPolicy=agent_evidence,
                 intentId=request.intent.intent_id if request.intent else None,
                 manifestPath=str(output_dir / "manifest.json"),
             )
@@ -590,6 +820,23 @@ class MaspAdapter:
                 metrics={},
                 planning={},
                 safety={"conflictFree": False, "simulationOnly": True},
+                agentPolicy=(
+                    AgentPolicyEvidence(
+                        mode="BASELINE",
+                        modelId=prepared_agent["modelId"],
+                        modelVersion=prepared_agent["modelVersion"],
+                        checkpointSha256=prepared_agent["checkpointSha256"],
+                        candidateCount=prepared_agent["candidateCount"],
+                        deviationRequested=prepared_agent["deviationRequested"],
+                        deviationEnabled=False,
+                        fallbackReasons=[
+                            *prepared_agent["fallbackReasons"],
+                            f"智能体仿真失败：{type(error).__name__}: {error}",
+                        ],
+                    )
+                    if prepared_agent is not None
+                    else None
+                ),
                 intentId=request.intent.intent_id if request.intent else None,
                 manifestPath=str(output_dir / "manifest.json"),
                 error=str(error),
@@ -606,6 +853,7 @@ class MaspAdapter:
         *,
         policy: str,
         resource_block: Any | None,
+        agent_runtime: dict[str, Any] | None = None,
         unavailable_until: dict[str, int] | None = None,
     ) -> Any:
         modules = self._engine_modules()
@@ -637,6 +885,22 @@ class MaspAdapter:
             end_time_ms=int(scenario["endTimeMs"]),
             policy=policy,
             seed=int(scenario["seed"]),
+            rl_checkpoint=(
+                str(agent_runtime["checkpointPath"])
+                if agent_runtime is not None
+                and agent_runtime["checkpointPath"] is not None
+                else None
+            ),
+            rl_candidate_count=(
+                int(agent_runtime["candidateCount"])
+                if agent_runtime is not None
+                else None
+            ),
+            rl_allow_deviation=(
+                bool(agent_runtime["deviationEnabled"])
+                if agent_runtime is not None
+                else False
+            ),
         )
         if resource_block is not None:
             for table_name, table in (
@@ -924,12 +1188,16 @@ class MaspAdapter:
         root = self.settings.runs_dir / run_id
         if not root.exists():
             raise KeyError(run_id)
-        return {
+        detail = {
             "summary": self._read_json(root / "command-center-summary.json"),
             "scenario": self._read_json(root / "planned-scenario.json"),
             "result": self._read_json(root / "result.json"),
             "planning": self._read_json(root / "planning-summary.json"),
         }
+        evidence_path = root / "agent-policy-evidence.json"
+        if evidence_path.exists():
+            detail["agentEvidence"] = self._read_json(evidence_path)
+        return detail
 
     def compare(self, run_ids: list[str]) -> ComparisonResult:
         runs = [self.get_run(run_id) for run_id in run_ids]

@@ -30,6 +30,10 @@ class Settings:
     deepseek_base_url: str
     deepseek_model: str
     deepseek_timeout_seconds: float
+    agent_model_id: str = "masp-ppo-priority"
+    agent_model_version: str = "unconfigured"
+    agent_checkpoint: Path | None = None
+    agent_device: str = "cpu"
     root: Path = ROOT
 
     @property
@@ -49,6 +53,13 @@ class Settings:
         lock = json.loads((ROOT / "engine.lock.json").read_text(encoding="utf-8"))
         default_engine = ROOT.parent / "MASP"
         engine_root = Path(os.getenv("MASP_ENGINE_ROOT", str(default_engine))).resolve()
+        checkpoint_value = os.getenv("MASP_AGENT_CHECKPOINT", "").strip()
+        checkpoint = None
+        if checkpoint_value:
+            checkpoint = Path(checkpoint_value)
+            if not checkpoint.is_absolute():
+                checkpoint = ROOT / checkpoint
+            checkpoint = checkpoint.resolve()
         return cls(
             app_env=os.getenv("APP_ENV", "development").strip().lower(),
             host=os.getenv("APP_HOST", "127.0.0.1"),
@@ -67,4 +78,12 @@ class Settings:
             deepseek_timeout_seconds=float(
                 os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "30")
             ),
+            agent_model_id=os.getenv(
+                "MASP_AGENT_MODEL_ID", "masp-ppo-priority"
+            ).strip(),
+            agent_model_version=os.getenv(
+                "MASP_AGENT_MODEL_VERSION", "unconfigured"
+            ).strip(),
+            agent_checkpoint=checkpoint,
+            agent_device=os.getenv("MASP_AGENT_DEVICE", "cpu").strip().lower(),
         )

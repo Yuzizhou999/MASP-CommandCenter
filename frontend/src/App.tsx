@@ -33,6 +33,7 @@ import {
 } from "@fluentui/react-icons";
 import { api } from "./api";
 import { ApprovalsPanel } from "./components/ApprovalsPanel";
+import { AgentPolicyPanel } from "./components/AgentPolicyPanel";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { IncidentWorkbench } from "./components/IncidentWorkbench";
 import { OperationsPanel } from "./components/OperationsPanel";
@@ -264,6 +265,42 @@ export default function App() {
       setNotice("14 车 32 任务基线仿真已完成");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "基线仿真失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handlePolicyRun = async (policy: "top_k" | "rl", candidateCount: number) => {
+    setBusy("policy-run");
+    setError(null);
+    try {
+      const label = policy === "rl" ? "群车智能体协同" : "Top-K 规则基线";
+      const result = await api.simulate(
+        selectedScenario,
+        label,
+        null,
+        policy,
+        policy === "rl"
+          ? {
+              modelId: health?.agentPolicy.modelId,
+              candidateCount,
+              allowDeviation: true,
+            }
+          : undefined,
+      );
+      setRuns((current) => [result, ...current.filter((row) => row.runId !== result.runId)]);
+      await loadRun(result.runId);
+      setCheckedRunIds((current) => [...new Set([result.runId, ...current])].slice(0, 4));
+      if (result.agentPolicy?.mode === "BASELINE") {
+        setNotice("智能体权重未启用，本次已由 MASP 规则策略安全接管");
+      } else if (result.agentPolicy) {
+        setNotice(`智能体推理完成：采用 ${result.agentPolicy.selectedAgentCandidateCount} 个安全候选`);
+      } else {
+        setNotice("Top-K 规则基线仿真已完成");
+      }
+      setAudit(await api.audit());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "策略仿真失败");
     } finally {
       setBusy(null);
     }
@@ -625,6 +662,14 @@ export default function App() {
 
         {snapshot && map && view === "simulations" && (
           <div className="simulation-workspace">
+            {health?.agentPolicy && (
+              <AgentPolicyPanel
+                status={health.agentPolicy}
+                run={runDetail}
+                busy={busy === "policy-run"}
+                onRun={(policy, candidateCount) => void handlePolicyRun(policy, candidateCount)}
+              />
+            )}
             <WarehouseMap
               map={map}
               snapshot={snapshot}

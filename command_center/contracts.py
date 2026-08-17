@@ -153,16 +153,82 @@ class IntentValidation(BaseModel):
     checked_at: datetime = Field(default_factory=utc_now, alias="checkedAt")
 
 
+class AgentPolicyOptions(BaseModel):
+    """Run-time controls for the server-registered vehicle policy model."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    model_id: str | None = Field(default=None, alias="modelId")
+    candidate_count: int = Field(default=2, ge=1, le=8, alias="candidateCount")
+    allow_deviation: bool = Field(default=True, alias="allowDeviation")
+
+
+class AgentModelStatus(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    model_id: str = Field(alias="modelId")
+    model_version: str = Field(alias="modelVersion")
+    algorithm: str
+    mode: Literal["LEARNED", "BASELINE"]
+    configured: bool
+    checkpoint_present: bool = Field(alias="checkpointPresent")
+    checkpoint_name: str | None = Field(default=None, alias="checkpointName")
+    checkpoint_sha256: str | None = Field(default=None, alias="checkpointSha256")
+    device: str
+    safety_controller: str = Field(alias="safetyController")
+    notice: str
+
+
+class AgentPolicyEvidence(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    requested: bool = True
+    mode: Literal["LEARNED", "BASELINE"]
+    model_id: str = Field(alias="modelId")
+    model_version: str = Field(alias="modelVersion")
+    checkpoint_sha256: str | None = Field(default=None, alias="checkpointSha256")
+    candidate_count: int = Field(alias="candidateCount")
+    deviation_requested: bool = Field(alias="deviationRequested")
+    deviation_enabled: bool = Field(alias="deviationEnabled")
+    inference_count: int = Field(default=0, alias="inferenceCount")
+    inference_ms: float = Field(default=0.0, alias="inferenceMs")
+    fallback_count: int = Field(default=0, alias="fallbackCount")
+    safety_fallback_count: int = Field(default=0, alias="safetyFallbackCount")
+    guardian_candidate_count: int = Field(default=0, alias="guardianCandidateCount")
+    guardian_override_count: int = Field(default=0, alias="guardianOverrideCount")
+    agent_candidate_count: int = Field(default=0, alias="agentCandidateCount")
+    selected_agent_candidate_count: int = Field(
+        default=0, alias="selectedAgentCandidateCount"
+    )
+    decision_cycle_count: int = Field(default=0, alias="decisionCycleCount")
+    fallback_reasons: list[str] = Field(default_factory=list, alias="fallbackReasons")
+    notes: list[str] = Field(default_factory=list)
+    evidence_path: str | None = Field(default=None, alias="evidencePath")
+
+
 class SimulationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     scenario_id: str = Field(default="interactive-multi-fleet", alias="scenarioId")
     policy: Literal[
-        "top_k", "task_age", "shortest_remaining", "congestion", "previous_order", "random"
+        "top_k",
+        "task_age",
+        "shortest_remaining",
+        "congestion",
+        "previous_order",
+        "random",
+        "rl",
     ] = "top_k"
     seed: int = 0
     intent: DispatchIntent | None = None
     label: str = "候选方案"
+    agent_policy: AgentPolicyOptions | None = Field(default=None, alias="agentPolicy")
+
+    @model_validator(mode="after")
+    def validate_agent_policy(self) -> "SimulationRequest":
+        if self.policy != "rl" and self.agent_policy is not None:
+            raise ValueError("agentPolicy is only valid when policy is rl")
+        return self
 
 
 class SimulationSummary(BaseModel):
@@ -176,6 +242,7 @@ class SimulationSummary(BaseModel):
     metrics: dict[str, Any]
     planning: dict[str, Any]
     safety: dict[str, Any]
+    agent_policy: AgentPolicyEvidence | None = Field(default=None, alias="agentPolicy")
     intent_id: str | None = Field(default=None, alias="intentId")
     manifest_path: str | None = Field(default=None, alias="manifestPath")
     created_at: datetime = Field(default_factory=utc_now, alias="createdAt")

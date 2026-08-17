@@ -18,6 +18,17 @@ def test_health_exposes_model_and_safety_boundary() -> None:
         "fieldExecutionEnabled": False,
         "approvalBoundaryEnabled": True,
     }
+    assert payload["agentPolicy"]["modelId"] == "masp-ppo-priority"
+    assert payload["agentPolicy"]["safetyController"].startswith("MASP Top-K")
+
+
+def test_agent_policy_status_does_not_expose_server_path() -> None:
+    response = client.get("/api/v1/agent-policy")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "checkpointPath" not in payload
+    assert payload["mode"] in {"LEARNED", "BASELINE"}
+    assert payload["device"] == "cpu"
 
 
 def test_real_map_is_exposed() -> None:
