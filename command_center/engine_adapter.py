@@ -17,6 +17,7 @@ from .contracts import (
     ComparisonResult,
     DispatchIntent,
     IncidentRecord,
+    IncidentType,
     IntentType,
     IntentValidation,
     RiskLevel,
@@ -346,6 +347,57 @@ class MaspAdapter:
         }
         return self._modules
 
+    def workstation_catalog(self) -> list[dict[str, Any]]:
+        """Return the version-locked MASP workstation catalog."""
+
+        self._require_engine()
+        return deepcopy(self._assets()["workstations"]["workstations"])
+
+    def deadlock_recovery_evidence(
+        self, deadlock_case: str = "RECOVERABLE"
+    ) -> dict[str, Any]:
+        """Run MASP's deterministic wait-graph and recovery acceptance scenario."""
+
+        self._require_engine()
+        with self._simulation_lock:
+            return self._deadlock_recovery_evidence_locked(deadlock_case)
+
+    def _deadlock_recovery_evidence_locked(
+        self, deadlock_case: str
+    ) -> dict[str, Any]:
+        root_text = str(self.root)
+        if root_text not in sys.path:
+            sys.path.insert(0, root_text)
+        from masp.recovery_scenario import run_recovery_scenario
+
+        key_by_case = {
+            "RECOVERABLE": ("recoverableDeadlock", "recoverableDeadlock"),
+            "UNRECOVERABLE": ("unrecoverableDeadlock", "unrecoverableDeadlock"),
+        }
+        if deadlock_case not in key_by_case:
+            raise ValueError(f"未知死锁演示类型 {deadlock_case!r}。")
+        result_key, scenario_key = key_by_case[deadlock_case]
+        scenario = self._read_json(self.root / "scenarios" / "deadlock-recovery.json")
+        assets = self._assets()
+        result = run_recovery_scenario(
+            scenario,
+            assets["model"],
+            assets["conflicts"],
+            assets["workstations"],
+            assets["profiles"],
+            assets["scheduler"],
+            assets["zones"],
+            self.root / "schemas",
+        ).to_dict()
+        if not result.get("accepted"):
+            raise ValueError("MASP 死锁恢复验收场景未通过全部安全检查。")
+        return {
+            "scenario": scenario,
+            "scenarioCase": deepcopy(scenario[scenario_key]),
+            "result": result,
+            "case": deepcopy(result[result_key]),
+        }
+
     def validate_scenario_package(self, document: dict[str, Any]) -> dict[str, Any]:
         """Validate an editable package without making it a runtime scenario."""
         modules = self._engine_modules()
@@ -662,6 +714,13 @@ class MaspAdapter:
             }
             valid_resources.update(
                 row["ownResource"] for row in assets["conflicts"]["edgeResources"]
+            )
+            valid_resources.update(
+                f"node:{row['id']}" for row in assets["model"]["nodes"]
+            )
+            valid_resources.update(
+                f"workstation:{row['id']}"
+                for row in assets["workstations"]["workstations"]
             )
             for resource_id in (intent.resource_block.resource_ids if intent.resource_block else []):
                 if resource_id not in valid_resources:
@@ -1067,18 +1126,33 @@ class MaspAdapter:
         if not source_path.exists():
             raise KeyError(incident.run_id)
 
+        if incident.incident_type is IncidentType.DEADLOCK_RISK:
+            return self._simulate_deadlock_option_locked(
+                incident=incident,
+                mode=mode,
+                run_id=run_id,
+                output_dir=output_dir,
+                source_dir=source_dir,
+                started=started,
+            )
+
         scenario = deepcopy(self._read_json(source_path))
         scenario["seed"] = int(scenario.get("seed", 0))
         end_time_ms = int(scenario["endTimeMs"])
-        fault_vehicle_id = incident.vehicle_ids[0]
-        known_vehicle_ids = {row["vehicleId"] for row in scenario["vehicles"]}
-        if fault_vehicle_id not in known_vehicle_ids:
-            raise ValueError("源场景中不存在故障车辆，无法建立分支仿真。")
+        is_workstation_outage = (
+            incident.incident_type is IncidentType.WORKSTATION_DISABLED
+        )
+        fault_vehicle_id = incident.vehicle_ids[0] if incident.vehicle_ids else None
+        if not is_workstation_outage:
+            known_vehicle_ids = {row["vehicleId"] for row in scenario["vehicles"]}
+            if fault_vehicle_id not in known_vehicle_ids:
+                raise ValueError("源场景中不存在故障车辆，无法建立分支仿真。")
         if incident.fault_at_ms >= end_time_ms:
-            raise ValueError("故障时刻必须早于源场景结束时间。")
+            raise ValueError("事件时刻必须早于源场景结束时间。")
 
         manual_transfer_required = (
-            incident.load_state == "loaded"
+            not is_workstation_outage
+            and incident.load_state == "loaded"
             and mode in {WhatIfMode.ISOLATE_REASSIGN, WhatIfMode.SAFETY_STOP}
         )
         removed_task_ids: list[str] = []
@@ -1088,9 +1162,19 @@ class MaspAdapter:
             incident.fault_at_ms + incident.recovery_duration_ms,
         )
 
-        if mode is WhatIfMode.WAIT_RECOVERY:
+        if is_workstation_outage:
+            if mode is WhatIfMode.SUSPEND_AFFECTED_TASKS:
+                removed_task_ids = list(incident.task_ids)
+                removed = set(removed_task_ids)
+                scenario["tasks"] = [
+                    row for row in scenario["tasks"] if row["taskId"] not in removed
+                ]
+            elif mode is WhatIfMode.SAFETY_STOP:
+                freeze_end_ms = end_time_ms
+        elif mode is WhatIfMode.WAIT_RECOVERY:
             # MASP has no public mid-run fault API. Delaying availability from the
             # beginning is a conservative bound and is disclosed in every artifact.
+            assert fault_vehicle_id is not None
             unavailable_until[fault_vehicle_id] = freeze_end_ms
         else:
             scenario["vehicles"] = [
@@ -1126,13 +1210,16 @@ class MaspAdapter:
         mode_labels = {
             WhatIfMode.WAIT_RECOVERY: "等待恢复",
             WhatIfMode.ISOLATE_REASSIGN: "隔离与重派",
+            WhatIfMode.SUSPEND_AFFECTED_TASKS: "暂停受影响任务",
             WhatIfMode.SAFETY_STOP: "安全停车",
         }
+        incident_label = "工位停用推演" if is_workstation_outage else "故障推演"
         branch_context = {
             "schemaVersion": 1,
             "incidentId": incident.incident_id,
             "sourceRunId": incident.run_id,
             "whatIfMode": mode.value,
+            "incidentType": incident.incident_type.value,
             "faultVehicleId": fault_vehicle_id,
             "faultAtMs": incident.fault_at_ms,
             "safeFaultNodeId": incident.location_node_id,
@@ -1141,11 +1228,21 @@ class MaspAdapter:
             "vehicleUnavailableUntilMs": unavailable_until.get(fault_vehicle_id),
             "removedTaskIds": removed_task_ids,
             "manualTransferRequired": manual_transfer_required,
+            "workstationId": incident.workstation_id,
+            "suspendedTaskIds": removed_task_ids if is_workstation_outage else [],
             "branchModel": "conservative-whole-scenario-counterfactual",
             "limitations": [
-                "MASP 当前没有公开的中途车辆故障续跑接口。",
+                (
+                    "工位停用分支冻结真实工位和节点资源；暂停任务分支不会自行改写任务起终点。"
+                    if is_workstation_outage
+                    else "MASP 当前没有公开的中途车辆故障续跑接口。"
+                ),
                 "分支使用同一源场景做保守反事实推演，不表示真实车辆已经执行处置。",
-                "故障点来自已完成移动段的安全节点，未构造边内急停轨迹。",
+                (
+                    "工位对象来自 MASP 工位目录，停用分支没有构造替代工位。"
+                    if is_workstation_outage
+                    else "故障点来自已完成移动段的安全节点，未构造边内急停轨迹。"
+                ),
             ],
         }
         try:
@@ -1176,11 +1273,16 @@ class MaspAdapter:
             }
             self._write_json(output_dir / "manifest.json", manifest)
             metrics = dict(result["metrics"])
-            metrics["manualTransferTaskCount"] = len(removed_task_ids)
+            metrics["manualTransferTaskCount"] = (
+                len(removed_task_ids) if manual_transfer_required else 0
+            )
+            metrics["suspendedTaskCount"] = (
+                len(removed_task_ids) if is_workstation_outage else 0
+            )
             summary = SimulationSummary(
                 runId=run_id,
                 scenarioId=incident.scenario_id,
-                label=f"故障推演 | {mode_labels[mode]}",
+                label=f"{incident_label} | {mode_labels[mode]}",
                 policy="top_k",
                 seed=scenario["seed"],
                 status="COMPLETED",
@@ -1209,11 +1311,16 @@ class MaspAdapter:
                     "incidentId": incident.incident_id,
                     "sourceRunId": incident.run_id,
                     "whatIfMode": mode.value,
+                    "incidentType": incident.incident_type.value,
                     "faultVehicleId": fault_vehicle_id,
                     "faultAtMs": incident.fault_at_ms,
                     "faultNodeId": incident.location_node_id,
                     "resourceFreezeEndMs": freeze_end_ms,
                     "manualTransferRequired": manual_transfer_required,
+                    "workstationId": incident.workstation_id,
+                    "suspendedTaskIds": (
+                        removed_task_ids if is_workstation_outage else []
+                    ),
                     "branchModel": branch_context["branchModel"],
                     "requiresApproval": True,
                 },
@@ -1229,7 +1336,7 @@ class MaspAdapter:
             summary = SimulationSummary(
                 runId=run_id,
                 scenarioId=incident.scenario_id,
-                label=f"故障推演 | {mode_labels[mode]}",
+                label=f"{incident_label} | {mode_labels[mode]}",
                 policy="top_k",
                 seed=scenario["seed"],
                 status="FAILED",
@@ -1240,6 +1347,7 @@ class MaspAdapter:
                     "conflictFree": False,
                     "simulationOnly": True,
                     "incidentId": incident.incident_id,
+                    "incidentType": incident.incident_type.value,
                     "whatIfMode": mode.value,
                     "manualTransferRequired": manual_transfer_required,
                 },
@@ -1251,6 +1359,127 @@ class MaspAdapter:
                 summary.model_dump(by_alias=True, mode="json"),
             )
             raise
+
+    def _simulate_deadlock_option_locked(
+        self,
+        *,
+        incident: IncidentRecord,
+        mode: WhatIfMode,
+        run_id: str,
+        output_dir: Path,
+        source_dir: Path,
+        started: float,
+    ) -> SimulationSummary:
+        deadlock_case = str(incident.event_attributes.get("deadlockCase", "RECOVERABLE"))
+        recovery = self._deadlock_recovery_evidence_locked(deadlock_case)
+        case = recovery["case"]
+        decision = case["decision"]
+        plan = decision.get("plan")
+        if mode is WhatIfMode.CONTROLLED_REVERSE and plan is None:
+            raise ValueError("当前等待环没有通过 MASP 校验的受控倒退计划。")
+        if mode not in {WhatIfMode.CONTROLLED_REVERSE, WhatIfMode.SAFETY_STOP}:
+            raise ValueError(f"死锁事件不支持处置模式 {mode.value}。")
+
+        source_input = self._read_json(source_dir / "input-scenario.json")
+        source_planned = self._read_json(source_dir / "planned-scenario.json")
+        source_result = self._read_json(source_dir / "result.json")
+        source_planning = self._read_json(source_dir / "planning-summary.json")
+        recovery_metrics = dict(recovery["result"]["metrics"])
+        if mode is WhatIfMode.SAFETY_STOP and plan is not None:
+            recovery_metrics.update(
+                {
+                    "recoverySuccessCount": 0,
+                    "reverseRecoveryCount": 0,
+                    "reverseDistanceM": 0.0,
+                    "safeStopCount": 1,
+                }
+            )
+        metrics = dict(source_result.get("metrics", {}))
+        metrics.update(recovery_metrics)
+        action = "reverse" if mode is WhatIfMode.CONTROLLED_REVERSE else "safety_stop"
+        branch_context = {
+            "schemaVersion": 1,
+            "incidentId": incident.incident_id,
+            "incidentType": incident.incident_type.value,
+            "sourceRunId": incident.run_id,
+            "whatIfMode": mode.value,
+            "deadlockCase": deadlock_case,
+            "waitGraph": case["waitGraph"],
+            "maspDecision": decision,
+            "selectedAction": action,
+            "branchModel": "masp-deterministic-deadlock-recovery",
+            "limitations": [
+                "等待环使用版本锁定的 MASP 仓储拓扑和预约快照进行确定性重放。",
+                "受控倒退计划来自 MASP 恢复控制器，大模型没有生成或修改路线。",
+                "所有恢复候选仍需主管审批和执行前世界版本复核。",
+            ],
+        }
+        planned = deepcopy(source_planned)
+        planned["deadlockRecovery"] = branch_context
+        result = deepcopy(source_result)
+        result["metrics"] = metrics
+        result["deadlockRecovery"] = recovery["result"]
+        planning = deepcopy(source_planning)
+        planning["deadlockRecovery"] = branch_context
+        planning.update(recovery_metrics)
+        self._write_json(output_dir / "input-scenario.json", source_input)
+        self._write_json(output_dir / "planned-scenario.json", planned)
+        self._write_json(output_dir / "planning-summary.json", planning)
+        self._write_json(output_dir / "result.json", result)
+        self._write_json(output_dir / "incident-context.json", branch_context)
+        self._write_json(output_dir / "recovery-result.json", recovery["result"])
+        manifest = {
+            "schemaVersion": 1,
+            "runId": run_id,
+            "scenarioId": incident.scenario_id,
+            "policy": "deterministic_recovery",
+            "seed": int(source_input.get("seed", 0)),
+            "engine": self.engine_status(),
+            "incident": branch_context,
+            "recoveryChecks": recovery["result"]["checks"],
+        }
+        self._write_json(output_dir / "manifest.json", manifest)
+        summary = SimulationSummary(
+            runId=run_id,
+            scenarioId=incident.scenario_id,
+            label=(
+                "等待环推演 | 受控倒退"
+                if mode is WhatIfMode.CONTROLLED_REVERSE
+                else "等待环推演 | 安全停车"
+            ),
+            policy="deterministic_recovery",
+            seed=int(source_input.get("seed", 0)),
+            status="COMPLETED",
+            durationMs=round((time.perf_counter() - started) * 1000, 3),
+            metrics=metrics,
+            planning={
+                "waitGraphCycleCount": recovery_metrics.get("waitGraphCycleCount", 0),
+                "maxWaitGraphCycleLength": recovery_metrics.get(
+                    "maxWaitGraphCycleLength", 0
+                ),
+                "recoverySuccessCount": recovery_metrics.get("recoverySuccessCount", 0),
+                "reverseDistanceM": recovery_metrics.get("reverseDistanceM", 0),
+            },
+            safety={
+                "conflictFree": True,
+                "simulationOnly": True,
+                "incidentId": incident.incident_id,
+                "incidentType": incident.incident_type.value,
+                "sourceRunId": incident.run_id,
+                "whatIfMode": mode.value,
+                "selectedAction": action,
+                "maspReasonCode": decision["reasonCode"],
+                "recoveryPlanId": plan.get("id") if plan else None,
+                "requiresApproval": True,
+                "branchModel": branch_context["branchModel"],
+            },
+            manifestPath=str(output_dir / "manifest.json"),
+        )
+        self._write_json(
+            output_dir / "command-center-summary.json",
+            summary.model_dump(by_alias=True, mode="json"),
+        )
+        return summary
 
     def list_runs(self) -> list[SimulationSummary]:
         rows: list[SimulationSummary] = []

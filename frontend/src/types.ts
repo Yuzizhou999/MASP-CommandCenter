@@ -309,7 +309,12 @@ export interface PlanExplanationReport {
   generatedAt: string;
 }
 
-export type WhatIfMode = "WAIT_RECOVERY" | "ISOLATE_REASSIGN" | "SAFETY_STOP";
+export type WhatIfMode =
+  | "WAIT_RECOVERY"
+  | "ISOLATE_REASSIGN"
+  | "SUSPEND_AFFECTED_TASKS"
+  | "CONTROLLED_REVERSE"
+  | "SAFETY_STOP";
 
 export interface IncidentEvidence {
   evidenceId: string;
@@ -375,11 +380,14 @@ export interface Incident {
   recoveryDurationMs: number;
   locationNodeId?: string | null;
   locationEdgeId?: string | null;
+  workstationId?: string | null;
   loadState?: string | null;
+  eventAttributes: Record<string, any>;
   evidence: IncidentEvidence[];
   deterministicFindings: DeterministicFinding[];
   diagnosis?: DiagnosisReport | null;
   whatIfRunIds: Partial<Record<WhatIfMode, string>>;
+  approvalIds: Partial<Record<WhatIfMode, string>>;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

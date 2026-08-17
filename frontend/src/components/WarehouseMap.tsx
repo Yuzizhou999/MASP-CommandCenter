@@ -289,7 +289,7 @@ export function WarehouseMap({
                 r={0.75}
                 className="incident-node-core"
               />
-              <title>{`故障节点 ${incident.locationNodeId}`}</title>
+              <title>{`异常位置 ${incident.locationNodeId}`}</title>
             </g>
           )}
           <g className="map-vehicles">
@@ -318,7 +318,7 @@ export function WarehouseMap({
           <span><i className="legend-line legend-jack" />搬运车路网</span>
           <span><i className="legend-line legend-route" />仿真路径</span>
           {blockedEdges.size > 0 && <span><i className="legend-line legend-blocked" />封锁资源</span>}
-          {incident && <span><i className="legend-line legend-incident" />故障影响</span>}
+          {incident && <span><i className="legend-line legend-incident" />异常影响</span>}
         </div>
       </div>
 

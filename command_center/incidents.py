@@ -8,6 +8,7 @@ from typing import Any
 from .audit import AuditStore
 from .contracts import (
     DeterministicFinding,
+    DeadlockInjectionRequest,
     DiagnosisReport,
     FaultInjectionRequest,
     IncidentEvidence,
@@ -16,9 +17,10 @@ from .contracts import (
     IncidentStatus,
     IncidentType,
     WhatIfMode,
+    WorkstationInjectionRequest,
     utc_now,
 )
-from .diagnosis import ALLOWED_INCIDENT_ACTIONS, deterministic_diagnosis
+from .diagnosis import allowed_actions_for, deterministic_diagnosis
 from .engine_adapter import MaspAdapter
 from .knowledge import KnowledgeBase
 from .provider import DeepSeekProvider
@@ -254,11 +256,287 @@ class IncidentService:
         )
         return incident
 
+    def inject_workstation_outage(
+        self, request: WorkstationInjectionRequest
+    ) -> IncidentRecord:
+        detail = self._completed_run_detail(request.run_id)
+        scenario = detail["scenario"]
+        workstations = {
+            row["nodeId"]: row for row in self.engine.workstation_catalog()
+        }
+        task_counts: dict[str, int] = {}
+        for task in scenario.get("tasks", []):
+            for node_id in (task["pickupNodeId"], task["dropoffNodeId"]):
+                if node_id in workstations:
+                    task_counts[node_id] = task_counts.get(node_id, 0) + 1
+        node_id = request.workstation_node_id
+        if node_id is None:
+            if not task_counts:
+                raise ValueError("运行中没有可用于停用演示的任务工位。")
+            node_id = max(sorted(task_counts), key=task_counts.get)
+        station = workstations.get(node_id)
+        if station is None:
+            raise ValueError(f"运行中不存在工位节点 {node_id!r}。")
+
+        event_at_ms = request.requested_at_ms
+        if event_at_ms is None:
+            event_at_ms = max(1, int(scenario["endTimeMs"] * 0.18))
+        if event_at_ms >= int(scenario["endTimeMs"]):
+            raise ValueError("工位停用时刻必须早于运行结束时间。")
+        outage_end_ms = min(
+            int(scenario["endTimeMs"]),
+            event_at_ms + request.recovery_duration_ms,
+        )
+        affected_tasks = [
+            task
+            for task in scenario.get("tasks", [])
+            if node_id in {task["pickupNodeId"], task["dropoffNodeId"]}
+            and int(task.get("releaseTimeMs", 0)) < outage_end_ms
+        ]
+        affected_task_ids = [row["taskId"] for row in affected_tasks]
+        affected_vehicle_ids = sorted(
+            {
+                plan["vehicleId"]
+                for plan in scenario.get("plans", [])
+                if plan.get("taskId") in set(affected_task_ids)
+            }
+        )
+        station_resource = f"workstation:{station['id']}"
+        resource_ids = [station_resource, f"node:{node_id}"]
+        evidence = [
+            IncidentEvidence(
+                evidenceId="EV-001",
+                evidenceType="WORKSTATION_OUTAGE",
+                fact=(
+                    f"工位 {station['id']} 自 {event_at_ms}ms 起停用，"
+                    f"演示恢复窗口结束于 {outage_end_ms}ms。"
+                ),
+                source=f"injection:{request.run_id}",
+                observedAtMs=event_at_ms,
+                attributes={
+                    "workstationId": station["id"],
+                    "nodeId": node_id,
+                    "outageEndMs": outage_end_ms,
+                },
+            ),
+            IncidentEvidence(
+                evidenceId="EV-002",
+                evidenceType="WORKSTATION_DEFINITION",
+                fact=(
+                    f"工位位于 {node_id}，容量 {station['capacity']}，"
+                    f"允许车型 {', '.join(station['allowedRobotGroups'])}。"
+                ),
+                source="MASP:xiate-workstations.json",
+                attributes={"workstation": station, "resourceIds": resource_ids},
+            ),
+            IncidentEvidence(
+                evidenceId="EV-003",
+                evidenceType="AFFECTED_TASKS",
+                fact=f"停用窗口涉及 {len(affected_task_ids)} 个取货或放货任务。",
+                source=f"MASP:{request.run_id}:planned-scenario",
+                observedAtMs=event_at_ms,
+                attributes={
+                    "taskIds": affected_task_ids,
+                    "vehicleIds": affected_vehicle_ids,
+                },
+            ),
+            IncidentEvidence(
+                evidenceId="EV-004",
+                evidenceType="PLANNING_METRICS",
+                fact=(
+                    f"基线完成 {detail['summary']['metrics'].get('completedTaskCount', 0)} 个任务，"
+                    f"插入等待 {detail['summary']['planning'].get('insertedWaitMs', 0)}ms。"
+                ),
+                source=f"MASP:{request.run_id}:result",
+                attributes={"metrics": detail["summary"]["metrics"]},
+            ),
+        ]
+        findings = [
+            DeterministicFinding(
+                code="workstation.outage.reported",
+                title="工位停用事件已登记",
+                detail=f"停用对象已解析为工位 {station['id']} 和节点 {node_id}。",
+                certainty="CONFIRMED",
+                evidenceIds=["EV-001", "EV-002"],
+            ),
+            DeterministicFinding(
+                code="workstation.tasks.affected",
+                title="关联任务已经确定",
+                detail=f"共有 {len(affected_task_ids)} 个任务直接使用该工位。",
+                certainty="CONFIRMED",
+                evidenceIds=["EV-003"],
+            ),
+            DeterministicFinding(
+                code="workstation.queue.risk",
+                title="工位能力损失可能形成积压",
+                detail="实际等待和未规划任务数量必须以各 What-if 分支的 MASP 结果为准。",
+                certainty="INFERRED",
+                evidenceIds=["EV-003", "EV-004"],
+            ),
+        ]
+        incident = IncidentRecord(
+            incidentType=IncidentType.WORKSTATION_DISABLED,
+            severity=IncidentSeverity.HIGH,
+            scenarioId=detail["summary"]["scenarioId"],
+            runId=request.run_id,
+            vehicleIds=affected_vehicle_ids,
+            taskIds=affected_task_ids,
+            resourceIds=resource_ids,
+            faultCode="WORKSTATION_DISABLED",
+            faultAtMs=event_at_ms,
+            recoveryDurationMs=request.recovery_duration_ms,
+            locationNodeId=node_id,
+            workstationId=station["id"],
+            eventAttributes={
+                "outageEndMs": outage_end_ms,
+                "availableWhatIfModes": [
+                    WhatIfMode.WAIT_RECOVERY.value,
+                    WhatIfMode.SUSPEND_AFFECTED_TASKS.value,
+                    WhatIfMode.SAFETY_STOP.value,
+                ],
+            },
+            evidence=evidence,
+            deterministicFindings=findings,
+            createdBy=request.requested_by,
+        )
+        return self._record_injection(incident, request.requested_by)
+
+    def inject_deadlock(self, request: DeadlockInjectionRequest) -> IncidentRecord:
+        detail = self._completed_run_detail(request.run_id)
+        recovery = self.engine.deadlock_recovery_evidence(request.deadlock_case)
+        case = recovery["case"]
+        scenario_case = recovery["scenarioCase"]
+        wait_graph = case["waitGraph"]
+        decision = case["decision"]
+        plan = decision.get("plan")
+        vehicle_ids = list(wait_graph.get("blockedVehicleIds", []))
+        resource_ids = sorted(
+            {
+                row["resourceId"]
+                for row in wait_graph.get("dependencies", [])
+            }
+            | set(decision.get("frozenResourceIds", []))
+        )
+        location_node_id = next(
+            (
+                row.get("currentNodeId")
+                for row in scenario_case.get("recoveryVehicles", [])
+                if row.get("currentNodeId")
+            ),
+            plan.get("recoveryNodeId") if plan else None,
+        )
+        evidence = [
+            IncidentEvidence(
+                evidenceId="EV-001",
+                evidenceType="WAIT_GRAPH_CYCLE",
+                fact=(
+                    f"MASP 等待图在 {wait_graph['analyzedAtMs']}ms 检测到 "
+                    f"{len(wait_graph['cycles'])} 个循环，最大长度 {wait_graph['maxCycleLength']}。"
+                ),
+                source="MASP:deadlock-supervisor",
+                observedAtMs=wait_graph["analyzedAtMs"],
+                attributes={"cycles": wait_graph["cycles"]},
+            ),
+            IncidentEvidence(
+                evidenceId="EV-002",
+                evidenceType="WAIT_DEPENDENCIES",
+                fact=f"循环车辆之间存在 {len(wait_graph['dependencies'])} 条确定性资源依赖。",
+                source="MASP:reservation-table",
+                observedAtMs=wait_graph["analyzedAtMs"],
+                attributes={
+                    "dependencies": wait_graph["dependencies"],
+                    "priorityAgeMs": wait_graph["priorityAgeMs"],
+                },
+            ),
+            IncidentEvidence(
+                evidenceId="EV-003",
+                evidenceType="RECOVERY_DECISION",
+                fact=(
+                    f"MASP 恢复控制器给出 {decision['action']} 决策，"
+                    f"原因码为 {decision['reasonCode']}。"
+                ),
+                source="MASP:recovery-controller",
+                observedAtMs=wait_graph["analyzedAtMs"],
+                attributes={"decision": decision},
+            ),
+            IncidentEvidence(
+                evidenceId="EV-004",
+                evidenceType="RECOVERY_PLAN" if plan else "SAFETY_STOP",
+                fact=(
+                    f"受控倒退车辆为 {plan['vehicleId']}，距离 {plan['totalDistanceM']}m，"
+                    f"预约 {plan['reservationCount']} 个资源。"
+                    if plan
+                    else f"无合法倒退计划，已冻结 {len(decision['freezeReservationIds'])} 条预约并安全停车。"
+                ),
+                source="MASP:recovery-controller",
+                observedAtMs=wait_graph["analyzedAtMs"],
+                attributes={"plan": plan, "freezeReservationIds": decision["freezeReservationIds"]},
+            ),
+            IncidentEvidence(
+                evidenceId="EV-005",
+                evidenceType="RECOVERY_ACCEPTANCE",
+                fact="MASP 死锁场景的等待环、倒退预约和安全停车验收项全部通过。",
+                source="MASP:recovery-scenario",
+                attributes={"checks": recovery["result"]["checks"]},
+            ),
+        ]
+        recovery_available = plan is not None
+        findings = [
+            DeterministicFinding(
+                code="deadlock.wait_graph.cycle",
+                title="等待图循环依赖已确认",
+                detail=f"循环包含 {wait_graph['maxCycleLength']} 辆车，依赖边来自预约表。",
+                certainty="CONFIRMED",
+                evidenceIds=["EV-001", "EV-002"],
+            ),
+            DeterministicFinding(
+                code="deadlock.recovery.decision",
+                title="恢复可行性已确定",
+                detail=(
+                    "MASP 已生成并预约受控倒退计划。"
+                    if recovery_available
+                    else "MASP 未找到合法倒退计划，确定性安全停车已经生效。"
+                ),
+                certainty="CONFIRMED",
+                evidenceIds=["EV-003", "EV-004", "EV-005"],
+            ),
+        ]
+        modes = [WhatIfMode.SAFETY_STOP.value]
+        if recovery_available:
+            modes.insert(0, WhatIfMode.CONTROLLED_REVERSE.value)
+        incident = IncidentRecord(
+            incidentType=IncidentType.DEADLOCK_RISK,
+            severity=(IncidentSeverity.HIGH if recovery_available else IncidentSeverity.CRITICAL),
+            scenarioId=detail["summary"]["scenarioId"],
+            runId=request.run_id,
+            vehicleIds=vehicle_ids,
+            resourceIds=resource_ids,
+            faultCode=("WAIT_GRAPH_CYCLE" if recovery_available else "DEADLOCK_SAFETY_STOP"),
+            faultAtMs=wait_graph["analyzedAtMs"],
+            recoveryDurationMs=max(0, recovery["scenario"]["endTimeMs"] - wait_graph["analyzedAtMs"]),
+            locationNodeId=location_node_id,
+            locationEdgeId=(scenario_case.get("evidenceEdgeIds") or [None])[0],
+            eventAttributes={
+                "deadlockCase": request.deadlock_case,
+                "maxCycleLength": wait_graph["maxCycleLength"],
+                "recoveryAvailable": recovery_available,
+                "recoveryDecision": decision,
+                "availableWhatIfModes": modes,
+            },
+            evidence=evidence,
+            deterministicFindings=findings,
+            createdBy=request.requested_by,
+        )
+        return self._record_injection(incident, request.requested_by)
+
     def diagnose(self, incident_id: str, actor: str = "demo-operator") -> IncidentRecord:
         incident = self.store.get(incident_id)
-        sop_rows = self.knowledge.search(
-            f"车辆故障 {incident.fault_code or ''} 安全停车 任务重派", limit=3
-        )
+        query = {
+            IncidentType.VEHICLE_FAULT: f"车辆故障 {incident.fault_code or ''} 安全停车 任务重派",
+            IncidentType.WORKSTATION_DISABLED: "工位停用 作业能力 任务暂停 安全封锁",
+            IncidentType.DEADLOCK_RISK: "等待图 死锁 受控倒退 安全停车",
+        }.get(incident.incident_type, "仓储异常 安全处置")
+        sop_rows = self.knowledge.search(query, limit=3)
         evidence = [row for row in incident.evidence if row.evidence_type != "SOP"]
         for row in sop_rows:
             evidence.append(
@@ -293,6 +571,8 @@ class IncidentService:
         self, incident_id: str, mode: WhatIfMode, actor: str = "demo-operator"
     ) -> IncidentRecord:
         incident = self.store.get(incident_id)
+        if mode.value not in allowed_actions_for(incident):
+            raise ValueError(f"{incident.incident_type.value} 不支持处置模式 {mode.value}。")
         summary = self.engine.simulate_incident_option(incident, mode)
         run_ids = dict(incident.what_if_run_ids)
         run_ids[mode.value] = summary.run_id
@@ -315,6 +595,44 @@ class IncidentService:
             },
         )
         return updated
+
+    def link_approval(
+        self, incident_id: str, mode: WhatIfMode, approval_id: str, actor: str
+    ) -> IncidentRecord:
+        incident = self.store.get(incident_id)
+        approval_ids = dict(incident.approval_ids)
+        approval_ids[mode.value] = approval_id
+        updated = incident.model_copy(
+            update={"approval_ids": approval_ids, "updated_at": utc_now()}
+        )
+        self.store.put(updated)
+        self.audit.append(
+            trace_id=incident_id,
+            event_type="INCIDENT_APPROVAL_CREATED",
+            actor=actor,
+            payload={
+                "incidentId": incident_id,
+                "mode": mode.value,
+                "approvalId": approval_id,
+            },
+        )
+        return updated
+
+    def _completed_run_detail(self, run_id: str) -> dict[str, Any]:
+        detail = self.engine.get_run_detail(run_id)
+        if detail["summary"]["status"] != "COMPLETED":
+            raise ValueError("只能在已完成且证据完整的仿真运行上注入事件。")
+        return detail
+
+    def _record_injection(self, incident: IncidentRecord, actor: str) -> IncidentRecord:
+        self.store.put(incident)
+        self.audit.append(
+            trace_id=incident.incident_id,
+            event_type="INCIDENT_INJECTED",
+            actor=actor,
+            payload=incident.model_dump(by_alias=True, mode="json"),
+        )
+        return incident
 
     @staticmethod
     def _default_vehicle(plans: list[dict[str, Any]]) -> str:
@@ -369,7 +687,7 @@ class IncidentService:
                 incident, model=f"{diagnosis.model}:invalid-task"
             )
         if any(
-            row.action_code not in ALLOWED_INCIDENT_ACTIONS
+            row.action_code not in allowed_actions_for(incident)
             or row.risk_level.value != "R3_HIGH"
             or not row.requires_simulation
             or not row.requires_approval

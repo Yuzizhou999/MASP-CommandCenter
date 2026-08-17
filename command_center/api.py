@@ -21,15 +21,21 @@ from .contracts import (
     ChatResponse,
     ComparisonRequest,
     ComparisonResult,
+    DeadlockInjectionRequest,
     DispatchIntent,
     DatasetExportRequest,
     FaultInjectionRequest,
+    IncidentApprovalRequest,
     IncidentRecord,
+    IncidentType,
     IncidentWhatIfRequest,
+    IntentType,
     PlanExplanationReport,
     PlanExplanationRequest,
+    ResourceBlockDraft,
     SimulationRequest,
     SimulationSummary,
+    WorkstationInjectionRequest,
     new_id,
 )
 from .dataset_exports import DatasetExporter
@@ -417,6 +423,36 @@ def inject_incident(request: FaultInjectionRequest) -> IncidentRecord:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
+@app.post(
+    "/api/v1/incidents/inject/workstation",
+    response_model=IncidentRecord,
+    response_model_by_alias=True,
+)
+def inject_workstation_incident(
+    request: WorkstationInjectionRequest,
+) -> IncidentRecord:
+    try:
+        return incident_service.inject_workstation_outage(request)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, EngineVersionError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/incidents/inject/deadlock",
+    response_model=IncidentRecord,
+    response_model_by_alias=True,
+)
+def inject_deadlock_incident(request: DeadlockInjectionRequest) -> IncidentRecord:
+    try:
+        return incident_service.inject_deadlock(request)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, EngineVersionError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @app.get(
     "/api/v1/incidents/{incident_id}",
     response_model=IncidentRecord,
@@ -470,6 +506,72 @@ async def incident_what_if(
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
+@app.post(
+    "/api/v1/incidents/{incident_id}/approvals",
+    response_model=ApprovalRequest,
+    response_model_by_alias=True,
+)
+def create_incident_approval(
+    incident_id: str,
+    request: IncidentApprovalRequest,
+) -> ApprovalRequest:
+    try:
+        incident = incident_store.get(incident_id)
+        existing_id = incident.approval_ids.get(request.mode.value)
+        if existing_id:
+            return approvals.get(existing_id)
+        run_id = incident.what_if_run_ids.get(request.mode.value)
+        if run_id is None:
+            raise ValueError("处置方案尚未完成 What-if 推演，不能提交审批。")
+        run = engine.get_run(run_id)
+        if run.status != "COMPLETED":
+            raise ValueError("处置方案推演未成功，不能提交审批。")
+        revision = engine.world_revision(incident.scenario_id)
+        if incident.incident_type is IncidentType.WORKSTATION_DISABLED:
+            intent = DispatchIntent(
+                intentType=IntentType.BLOCK_RESOURCE,
+                requestedBy=request.requested_by,
+                basedOnWorldRevision=revision,
+                reason=f"异常 {incident_id} 的 {request.mode.value} 处置申请",
+                resourceBlock=ResourceBlockDraft(
+                    resourceIds=incident.resource_ids,
+                    startMs=incident.fault_at_ms,
+                    endMs=incident.fault_at_ms + incident.recovery_duration_ms,
+                    reason=f"工位 {incident.workstation_id or incident.location_node_id} 停用处置",
+                ),
+            )
+        else:
+            intent = DispatchIntent(
+                intentType=(
+                    IntentType.REQUEST_RECOVERY
+                    if incident.incident_type is IncidentType.DEADLOCK_RISK
+                    else IntentType.REPORT_VEHICLE_FAULT
+                ),
+                requestedBy=request.requested_by,
+                basedOnWorldRevision=revision,
+                reason=f"异常 {incident_id} 的 {request.mode.value} 处置申请",
+                query=f"incident={incident_id}; mode={request.mode.value}; run={run_id}",
+            )
+        validation = engine.validate_intent(intent, incident.scenario_id)
+        if not validation.valid or not validation.approval_required:
+            raise ValueError("处置意图未通过高风险审批策略校验。")
+        approval = approvals.create(intent, validation, [run_id])
+        incident_service.link_approval(
+            incident_id, request.mode, approval.approval_id, request.requested_by
+        )
+        audit.append(
+            trace_id=intent.intent_id,
+            event_type="APPROVAL_CREATED",
+            actor=request.requested_by,
+            payload=approval.model_dump(by_alias=True, mode="json"),
+        )
+        return approval
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, EngineVersionError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @app.get("/api/v1/incidents/{incident_id}/report")
 def incident_report(incident_id: str) -> dict[str, Any]:
     try:
@@ -494,8 +596,8 @@ def incident_report(incident_id: str) -> dict[str, Any]:
         "incident": incident.model_dump(by_alias=True, mode="json"),
         "whatIfRuns": what_if_runs,
         "safetyNotice": (
-            "AI 仅解释已提供证据，恢复方案均为 R3 高风险仿真候选，"
-            "未连接或控制真实车辆。"
+            "AI 仅解释已提供证据，工位封锁、车辆隔离和倒退恢复均为 "
+            "R3 高风险仿真候选，未连接或控制真实设备。"
         ),
     }
 

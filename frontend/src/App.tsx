@@ -58,6 +58,7 @@ import type {
   ShiftReport,
   SimulationSummary,
   Snapshot,
+  WhatIfMode,
 } from "./types";
 
 type View = "command" | "designer" | "simulations" | "incidents" | "evaluation" | "approvals" | "operations";
@@ -283,6 +284,40 @@ export default function App() {
     }
   };
 
+  const handleDemoIntent = async (message: string) => {
+    setBusy("demo-intent");
+    setError(null);
+    try {
+      const response = await api.chat(
+        message,
+        selectedScenario,
+        `demo-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`,
+      );
+      setChatResponse(response);
+      if (response.state !== "READY" || !response.intent) {
+        throw new Error("演示意图缺少必要参数，未启动仿真。")
+      }
+      const label = response.intent.intentType === "BLOCK_RESOURCE"
+        ? "一键演示 | 通道封闭"
+        : "一键演示 | 紧急插单";
+      const run = await api.simulate(selectedScenario, label, response.intent);
+      setRuns((current) => [run, ...current.filter((row) => row.runId !== run.runId)]);
+      await loadRun(run.runId);
+      if (response.intent.intentType === "BLOCK_RESOURCE") {
+        const approval = await api.createApproval(selectedScenario, response.intent, [run.runId]);
+        setApprovals((current) => [approval, ...current.filter((row) => row.approvalId !== approval.approvalId)]);
+        setNotice("通道封闭推演已完成并提交 R3 审批");
+      } else {
+        setNotice("紧急插单演示已完成 MASP 安全仿真");
+      }
+      setAudit(await api.audit());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "一键调度演示失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const handleExplainPlan = async (options: { question: string; vehicleId?: string; taskId?: string }) => {
     if (!runDetail) return;
     setBusy("plan-explain");
@@ -428,6 +463,54 @@ export default function App() {
     }
   };
 
+  const handleInjectWorkstation = async (options: {
+    runId: string;
+    workstationNodeId?: string;
+    requestedAtMs?: number;
+    recoveryDurationMs: number;
+  }) => {
+    setBusy("incident-inject-workstation");
+    setError(null);
+    try {
+      const incident = await api.injectWorkstationOutage(options.runId, options);
+      setIncidents((current) => [incident, ...current.filter((row) => row.incidentId !== incident.incidentId)]);
+      setSelectedIncidentId(incident.incidentId);
+      await loadRun(incident.runId);
+      setPlaybackMs(incident.faultAtMs);
+      setNotice(`工位 ${incident.workstationId || incident.locationNodeId || "-"} 已建立停用分支`);
+      setAudit(await api.audit());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "工位停用注入失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleInjectDeadlock = async (
+    runId: string,
+    deadlockCase: "RECOVERABLE" | "UNRECOVERABLE",
+  ) => {
+    setBusy("incident-inject-deadlock");
+    setError(null);
+    try {
+      const incident = await api.injectDeadlock(runId, deadlockCase);
+      setIncidents((current) => [incident, ...current.filter((row) => row.incidentId !== incident.incidentId)]);
+      setSelectedIncidentId(incident.incidentId);
+      await loadRun(incident.runId);
+      setPlaybackMs(incident.faultAtMs);
+      setNotice(
+        incident.eventAttributes.recoveryAvailable
+          ? "MASP 已检测等待环并生成受控倒退候选"
+          : "MASP 已检测不可恢复死锁并保持安全停车",
+      );
+      setAudit(await api.audit());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "等待环注入失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const handleDiagnoseIncident = async (incidentId: string) => {
     setBusy("incident-diagnose");
     setError(null);
@@ -443,7 +526,7 @@ export default function App() {
     }
   };
 
-  const handleIncidentWhatIf = async (incidentId: string, mode: import("./types").WhatIfMode) => {
+  const handleIncidentWhatIf = async (incidentId: string, mode: WhatIfMode) => {
     setBusy(`incident-${mode}`);
     setError(null);
     try {
@@ -455,6 +538,23 @@ export default function App() {
       setAudit(await api.audit());
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "处置方案推演失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleIncidentApproval = async (incidentId: string, mode: WhatIfMode) => {
+    setBusy(`incident-approval-${mode}`);
+    setError(null);
+    try {
+      const approval = await api.createIncidentApproval(incidentId, mode);
+      const nextIncidents = await api.incidents();
+      setApprovals((current) => [approval, ...current.filter((row) => row.approvalId !== approval.approvalId)]);
+      setIncidents(nextIncidents);
+      setNotice("处置方案已绑定仿真证据并提交主管审批");
+      setAudit(await api.audit());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "处置方案送审失败");
     } finally {
       setBusy(null);
     }
@@ -744,8 +844,13 @@ export default function App() {
                 void loadRun(incident.runId).then(() => setPlaybackMs(incident.faultAtMs));
               }}
               onInject={handleInjectIncident}
+              onInjectWorkstation={handleInjectWorkstation}
+              onInjectDeadlock={handleInjectDeadlock}
               onDiagnose={handleDiagnoseIncident}
               onWhatIf={handleIncidentWhatIf}
+              onRequestApproval={handleIncidentApproval}
+              onDemoTask={() => handleDemoIntent("创建紧急叉车任务，从 AP1123 运到 AP2121")}
+              onDemoRoadblock={() => handleDemoIntent("共享窄路需要检修，请封闭三分钟并评估任务影响")}
               onCompare={(runIds) => void handleIncidentCompare(runIds)}
               onDownloadReport={downloadIncidentReport}
             />

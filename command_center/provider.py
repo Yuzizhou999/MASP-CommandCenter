@@ -18,7 +18,7 @@ from .contracts import (
     ResourceBlockDraft,
     TaskDraft,
 )
-from .diagnosis import ALLOWED_INCIDENT_ACTIONS, deterministic_diagnosis
+from .diagnosis import allowed_actions_for, deterministic_diagnosis
 from .settings import Settings
 
 
@@ -33,10 +33,10 @@ authoritativeParameters 中的实体已经由确定性目录解析，必须原�
 """
 
 
-DIAGNOSIS_SYSTEM_PROMPT = """你是保利智仓·灵枢的故障诊断解释器。
-你只能根据输入中的 Incident、Evidence 和 DeterministicFindings 解释故障，不得补充未提供的遥测、实体或事实。
+DIAGNOSIS_SYSTEM_PROMPT = """你是保利智仓·灵枢的异常诊断解释器。
+你只能根据输入中的 Incident、Evidence 和 DeterministicFindings 解释车辆故障、工位停用或等待环，不得补充未提供的遥测、实体或事实。
 每个根因候选和每条建议必须引用一个或多个输入中真实存在的 evidenceId。
-只能建议 WAIT_RECOVERY、ISOLATE_REASSIGN、SAFETY_STOP，所有建议均为 R3_HIGH，必须仿真并人工审批。
+只能从 allowedActions 中选择建议，所有建议均为 R3_HIGH，必须仿真并人工审批。
 不得声称已经控制车辆、解除停车、重派任务或执行恢复；不得生成路线和资源预约。
 事实和推断必须明确区分。证据不足时必须写入 uncertainties。
 输出必须是符合所给 schema 的单个 JSON 对象，不得包含 Markdown。
@@ -177,7 +177,9 @@ class DeepSeekProvider:
                     "faultCode": incident.fault_code,
                     "faultAtMs": incident.fault_at_ms,
                     "locationNodeId": incident.location_node_id,
+                    "workstationId": incident.workstation_id,
                     "loadState": incident.load_state,
+                    "eventAttributes": incident.event_attributes,
                 },
                 "evidence": [
                     row.model_dump(by_alias=True, mode="json")
@@ -187,7 +189,7 @@ class DeepSeekProvider:
                     row.model_dump(by_alias=True, mode="json")
                     for row in incident.deterministic_findings
                 ],
-                "allowedActions": sorted(ALLOWED_INCIDENT_ACTIONS),
+                "allowedActions": sorted(allowed_actions_for(incident)),
                 "schema": schema,
             }
             response = httpx.post(

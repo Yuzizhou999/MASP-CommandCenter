@@ -127,6 +127,24 @@ export const api = {
     method: "POST",
     body: JSON.stringify({ runId, requestedBy: "demo-operator", ...options }),
   }),
+  injectWorkstationOutage: (
+    runId: string,
+    options: {
+      workstationNodeId?: string;
+      requestedAtMs?: number;
+      recoveryDurationMs: number;
+    },
+  ) => request<Incident>("/api/v1/incidents/inject/workstation", {
+    method: "POST",
+    body: JSON.stringify({ runId, requestedBy: "demo-operator", ...options }),
+  }),
+  injectDeadlock: (
+    runId: string,
+    deadlockCase: "RECOVERABLE" | "UNRECOVERABLE" = "RECOVERABLE",
+  ) => request<Incident>("/api/v1/incidents/inject/deadlock", {
+    method: "POST",
+    body: JSON.stringify({ runId, deadlockCase, requestedBy: "demo-operator" }),
+  }),
   diagnoseIncident: (incidentId: string) =>
     request<Incident>(
       `/api/v1/incidents/${encodeURIComponent(incidentId)}/diagnose?requestedBy=demo-operator`,
@@ -134,6 +152,11 @@ export const api = {
     ),
   runIncidentWhatIf: (incidentId: string, mode: WhatIfMode) =>
     request<Incident>(`/api/v1/incidents/${encodeURIComponent(incidentId)}/what-if`, {
+      method: "POST",
+      body: JSON.stringify({ mode, requestedBy: "demo-operator" }),
+    }),
+  createIncidentApproval: (incidentId: string, mode: WhatIfMode) =>
+    request<Approval>(`/api/v1/incidents/${encodeURIComponent(incidentId)}/approvals`, {
       method: "POST",
       body: JSON.stringify({ mode, requestedBy: "demo-operator" }),
     }),

@@ -46,6 +46,7 @@ class ApprovalStatus(str, Enum):
 
 class IncidentType(str, Enum):
     VEHICLE_FAULT = "VEHICLE_FAULT"
+    WORKSTATION_DISABLED = "WORKSTATION_DISABLED"
     TASK_FAILED = "TASK_FAILED"
     PLANNING_FAILED = "PLANNING_FAILED"
     PLANNING_TIMEOUT = "PLANNING_TIMEOUT"
@@ -72,6 +73,8 @@ class IncidentStatus(str, Enum):
 class WhatIfMode(str, Enum):
     WAIT_RECOVERY = "WAIT_RECOVERY"
     ISOLATE_REASSIGN = "ISOLATE_REASSIGN"
+    SUSPEND_AFFECTED_TASKS = "SUSPEND_AFFECTED_TASKS"
+    CONTROLLED_REVERSE = "CONTROLLED_REVERSE"
     SAFETY_STOP = "SAFETY_STOP"
 
 
@@ -471,6 +474,28 @@ class FaultInjectionRequest(BaseModel):
     requested_by: str = Field(default="demo-operator", alias="requestedBy")
 
 
+class WorkstationInjectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    run_id: str = Field(alias="runId")
+    workstation_node_id: str | None = Field(default=None, alias="workstationNodeId")
+    requested_at_ms: int | None = Field(default=None, ge=0, alias="requestedAtMs")
+    recovery_duration_ms: int = Field(
+        default=180000, ge=10000, le=900000, alias="recoveryDurationMs"
+    )
+    requested_by: str = Field(default="demo-operator", alias="requestedBy")
+
+
+class DeadlockInjectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    run_id: str = Field(alias="runId")
+    deadlock_case: Literal["RECOVERABLE", "UNRECOVERABLE"] = Field(
+        default="RECOVERABLE", alias="deadlockCase"
+    )
+    requested_by: str = Field(default="demo-operator", alias="requestedBy")
+
+
 class IncidentEvidence(BaseModel):
     evidence_id: str = Field(alias="evidenceId")
     evidence_type: str = Field(alias="evidenceType")
@@ -541,19 +566,29 @@ class IncidentRecord(BaseModel):
     recovery_duration_ms: int = Field(ge=0, alias="recoveryDurationMs")
     location_node_id: str | None = Field(default=None, alias="locationNodeId")
     location_edge_id: str | None = Field(default=None, alias="locationEdgeId")
+    workstation_id: str | None = Field(default=None, alias="workstationId")
     load_state: str | None = Field(default=None, alias="loadState")
+    event_attributes: dict[str, Any] = Field(default_factory=dict, alias="eventAttributes")
     evidence: list[IncidentEvidence] = Field(default_factory=list)
     deterministic_findings: list[DeterministicFinding] = Field(
         default_factory=list, alias="deterministicFindings"
     )
     diagnosis: DiagnosisReport | None = None
     what_if_run_ids: dict[str, str] = Field(default_factory=dict, alias="whatIfRunIds")
+    approval_ids: dict[str, str] = Field(default_factory=dict, alias="approvalIds")
     created_by: str = Field(default="demo-operator", alias="createdBy")
     created_at: datetime = Field(default_factory=utc_now, alias="createdAt")
     updated_at: datetime = Field(default_factory=utc_now, alias="updatedAt")
 
 
 class IncidentWhatIfRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    mode: WhatIfMode
+    requested_by: str = Field(default="demo-operator", alias="requestedBy")
+
+
+class IncidentApprovalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     mode: WhatIfMode
