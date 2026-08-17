@@ -71,11 +71,34 @@ Copy-Item .env.example .env
 .\scripts\start.ps1 -SkipBuild
 ```
 
+现场网络不稳定或不准备调用 DeepSeek 时，可显式使用离线降级：
+
+```powershell
+.\scripts\start.ps1 -SkipBuild -Offline
+```
+
 完整检查：
 
 ```powershell
 .\scripts\check.ps1
 ```
+
+## 生成离线演示包
+
+正式打包前需先提交代码。以下命令会构建前端、从 `engine.lock.json` 指定的提交导出干净 MASP 引擎、下载本机 Python 版本对应的离线依赖，并生成带摘要清单的 ZIP：
+
+```powershell
+.\scripts\delivery-check.ps1
+```
+
+产物位于 `.delivery/`，不会进入 Git。解压后在目标 Windows 电脑执行：
+
+```powershell
+.\scripts\install-demo.ps1
+.\scripts\start-demo.ps1
+```
+
+离线包默认不调用 DeepSeek，意图解析和诊断自动使用确定性降级；需要联网调用时使用 `start-demo.ps1 -OnlineAI`，并由现场人员在服务端环境中配置密钥。详细要求见[部署说明](docs/DEPLOYMENT.md)、[演示操作手册](docs/DEMO_OPERATIONS.md)和[交付检查表](docs/DELIVERY_CHECKLIST.md)。
 
 ## 配置 DeepSeek
 
@@ -178,6 +201,9 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 - [数据卡](docs/DATA_CARD.md)
 - [评测方法](docs/EVALUATION.md)
 - [安全与权益说明](docs/SECURITY_AND_RIGHTS.md)
+- [部署说明](docs/DEPLOYMENT.md)
+- [演示操作手册](docs/DEMO_OPERATIONS.md)
+- [交付检查表](docs/DELIVERY_CHECKLIST.md)
 
 ## 当前安全边界
 

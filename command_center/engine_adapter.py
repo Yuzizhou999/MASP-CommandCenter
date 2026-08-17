@@ -61,17 +61,89 @@ class MaspAdapter:
 
     @staticmethod
     def _git(root: Path, *args: str) -> str:
-        result = subprocess.run(
-            ["git", *args],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                ["git", *args],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return ""
         return result.stdout.strip() if result.returncode == 0 else ""
 
+    def _bundle_status(self) -> dict[str, Any] | None:
+        manifest_path = self.root / "engine.bundle.json"
+        if not manifest_path.is_file():
+            return None
+        try:
+            manifest = self._read_json(manifest_path)
+            if manifest.get("schemaVersion") != 1:
+                raise ValueError("unsupported schema version")
+            commit = str(manifest["commit"])
+            hashes = dict(manifest["files"])
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
+            return {
+                "currentCommit": "",
+                "commitMatches": False,
+                "dirty": True,
+                "dirtyFileCount": 1,
+                "bundleVerified": False,
+                "warning": f"MASP 离线版本证明无效：{error}",
+            }
+
+        mismatches: list[str] = []
+        for relative, expected_hash in hashes.items():
+            relative_path = Path(relative)
+            if relative_path.is_absolute() or ".." in relative_path.parts:
+                mismatches.append(str(relative))
+                continue
+            candidate = (self.root / relative_path).resolve()
+            if not candidate.is_file() or self._file_sha256(candidate) != expected_hash:
+                mismatches.append(str(relative))
+
+        required = {
+            "masp/online.py",
+            "generated/xiate-unified-map-model.json",
+            "scenarios/interactive-multi-fleet.json",
+        }
+        normalized = {str(Path(path)).replace("\\", "/") for path in hashes}
+        missing_required = sorted(required - normalized)
+        mismatches.extend(missing_required)
+        verified = not mismatches
+        return {
+            "currentCommit": commit,
+            "commitMatches": commit == self.settings.engine_commit,
+            "dirty": not verified,
+            "dirtyFileCount": len(set(mismatches)),
+            "bundleVerified": verified,
+            "warning": (
+                None
+                if verified
+                else f"MASP 离线文件校验失败，共 {len(set(mismatches))} 项不一致。"
+            ),
+        }
+
     def engine_status(self) -> dict[str, Any]:
-        current = self._git(self.root, "rev-parse", "HEAD")
+        git_top_level = self._git(self.root, "rev-parse", "--show-toplevel")
+        is_engine_worktree = bool(git_top_level) and (
+            Path(git_top_level).resolve() == self.root.resolve()
+        )
+        current = self._git(self.root, "rev-parse", "HEAD") if is_engine_worktree else ""
+        if not current:
+            bundle = self._bundle_status()
+            if bundle is not None:
+                matches = bool(bundle["commitMatches"])
+                verified = bool(bundle["bundleVerified"])
+                return {
+                    "root": str(self.root),
+                    "expectedCommit": self.settings.engine_commit,
+                    **bundle,
+                    "allowed": matches and verified,
+                    "environment": self.settings.app_env,
+                    "source": "verified-bundle",
+                }
         dirty_rows = self._git(self.root, "status", "--porcelain=v1").splitlines()
         matches = current == self.settings.engine_commit
         dirty = bool(dirty_rows)
@@ -89,6 +161,8 @@ class MaspAdapter:
             "dirtyFileCount": len(dirty_rows),
             "allowed": allowed,
             "environment": self.settings.app_env,
+            "source": "git-worktree",
+            "bundleVerified": False,
             "warning": (
                 "开发模式正在使用包含未提交修改的MASP工作区，比赛发布前必须固定干净版本。"
                 if dirty and allowed
