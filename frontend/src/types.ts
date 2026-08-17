@@ -440,3 +440,107 @@ export interface ScenarioValidationReport {
   issues: Array<{ severity: string; code: string; path: string; message: string }>;
   stats: Record<string, number>;
 }
+
+export interface BenchmarkRequest {
+  suiteName: string;
+  baseScenarioId: string;
+  vehicleCounts: number[];
+  arrivalProfiles: Array<"low" | "medium" | "high">;
+  fleetMixes: Array<"mixed" | "fork" | "jack">;
+  policies: Array<"top_k" | "task_age" | "shortest_remaining" | "congestion" | "previous_order" | "random" | "rl">;
+  seeds: number[];
+  horizonMs: number;
+  requestedBy: string;
+  agentPolicy?: AgentPolicyOptions;
+}
+
+export interface BenchmarkCoverage {
+  baseScenarioId: string;
+  vehicleCounts: number[];
+  arrivalProfiles: string[];
+  fleetMixes: string[];
+  policies: string[];
+  seeds: number[];
+  horizonMs: number;
+}
+
+export interface BenchmarkSafetyGate {
+  passed: boolean;
+  conflictCaseCount: number;
+  planningTimeoutCaseCount: number;
+  failedCaseCount: number;
+  fieldExecutionEnabled: boolean;
+}
+
+export interface BenchmarkSummary {
+  benchmarkId: string;
+  suiteName: string;
+  status: string;
+  createdAt: string;
+  durationMs: number;
+  caseCount: number;
+  completedCaseCount: number;
+  coverage: BenchmarkCoverage;
+  safetyGate: BenchmarkSafetyGate;
+}
+
+export interface BenchmarkStatistic {
+  count: number;
+  mean?: number | null;
+  stddev?: number | null;
+  ci95Low?: number | null;
+  ci95High?: number | null;
+}
+
+export interface BenchmarkAggregate {
+  vehicleCount: number;
+  arrivalProfile: string;
+  fleetMix: string;
+  policy: string;
+  caseCount: number;
+  successfulCaseCount: number;
+  failedCaseCount: number;
+  metrics: Record<string, BenchmarkStatistic>;
+}
+
+export interface BenchmarkReport extends BenchmarkSummary {
+  aggregates: BenchmarkAggregate[];
+  failureCases: Array<{ caseId: string; error?: string | null }>;
+  cases: Array<Record<string, unknown>>;
+  artifacts: Record<string, string>;
+}
+
+export interface DatasetExportRequest {
+  name: string;
+  includeAudit: boolean;
+  includeIncidents: boolean;
+  includeEvidenceText: boolean;
+  requestedBy: string;
+}
+
+export interface DatasetQualityReport {
+  passed: boolean;
+  recordCount: number;
+  recordTypeCounts: Record<string, number>;
+  splitCounts: Record<string, number>;
+  duplicateRecordIds: string[];
+  missingRequiredRecordIndexes: number[];
+  sensitiveFieldFindings: Array<Record<string, unknown>>;
+  checks: Record<string, boolean>;
+}
+
+export interface DatasetExportManifest {
+  schemaVersion: number;
+  exportId: string;
+  name: string;
+  createdAt: string;
+  createdBy: string;
+  classification: string;
+  simulationOnly: boolean;
+  includeEvidenceText: boolean;
+  recordCount: number;
+  quality: DatasetQualityReport;
+  splits: Record<string, string>;
+  usageRestrictions: string[];
+  artifacts: Record<string, string>;
+}

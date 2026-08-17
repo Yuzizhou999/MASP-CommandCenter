@@ -21,6 +21,7 @@ import {
   Bot20Regular,
   BrainCircuit24Regular,
   ClipboardTaskListLtr20Regular,
+  DataTrending20Regular,
   DocumentArrowDown20Regular,
   DocumentText20Regular,
   Home20Regular,
@@ -36,6 +37,7 @@ import { ApprovalsPanel } from "./components/ApprovalsPanel";
 import { AgentPolicyPanel } from "./components/AgentPolicyPanel";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { IncidentWorkbench } from "./components/IncidentWorkbench";
+import { EvaluationCenter } from "./components/EvaluationCenter";
 import { OperationsPanel } from "./components/OperationsPanel";
 import { SimulationTable } from "./components/SimulationTable";
 import { ScenarioDesigner } from "./components/ScenarioDesigner";
@@ -56,13 +58,14 @@ import type {
   Snapshot,
 } from "./types";
 
-type View = "command" | "designer" | "simulations" | "incidents" | "approvals" | "operations";
+type View = "command" | "designer" | "simulations" | "incidents" | "evaluation" | "approvals" | "operations";
 
 const viewItems: Array<{ id: View; label: string; icon: ReactElement }> = [
   { id: "command", label: "调度总览", icon: <Home20Regular /> },
   { id: "designer", label: "场景设计", icon: <Wrench20Regular /> },
   { id: "simulations", label: "方案仿真", icon: <Play20Regular /> },
   { id: "incidents", label: "异常诊断", icon: <ShieldError20Regular /> },
+  { id: "evaluation", label: "评测中心", icon: <DataTrending20Regular /> },
   { id: "approvals", label: "风险审批", icon: <ShieldLock20Regular /> },
   { id: "operations", label: "运营审计", icon: <ClipboardTaskListLtr20Regular /> },
 ];
@@ -253,16 +256,16 @@ export default function App() {
   };
 
   const runBaseline = async () => {
-    const scenarioId = "realistic-multi-fleet";
+    const scenarioId = selectedScenario;
     setSelectedScenario(scenarioId);
     setBusy("baseline");
     setError(null);
     try {
-      const result = await api.simulate(scenarioId, "14车32任务基线");
+      const result = await api.simulate(scenarioId, "当前场景规则基线");
       setRuns((current) => [result, ...current.filter((row) => row.runId !== result.runId)]);
       await loadRun(result.runId);
       setCheckedRunIds([result.runId]);
-      setNotice("14 车 32 任务基线仿真已完成");
+      setNotice("当前场景规则基线仿真已完成");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "基线仿真失败");
     } finally {
@@ -584,7 +587,7 @@ export default function App() {
               disabled={Boolean(busy)}
               onClick={() => void runBaseline()}
             >
-              {busy === "baseline" ? "基线运行中" : "14车32任务基线"}
+              {busy === "baseline" ? "基线运行中" : "运行当前场景基线"}
             </Button>
             <Button
               appearance="secondary"
@@ -736,6 +739,10 @@ export default function App() {
             onNotice={handleDesignerNotice}
             onError={handleDesignerError}
           />
+        )}
+
+        {view === "evaluation" && (
+          <EvaluationCenter onNotice={setNotice} onError={setError} />
         )}
 
         {view === "approvals" && (

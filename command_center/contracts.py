@@ -206,6 +206,92 @@ class AgentPolicyEvidence(BaseModel):
     evidence_path: str | None = Field(default=None, alias="evidencePath")
 
 
+class BenchmarkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    suite_name: str = Field(default="仓储群车高负载基准", min_length=2, alias="suiteName")
+    base_scenario_id: str = Field(
+        default="rhpp-high-volume-long-distance", alias="baseScenarioId"
+    )
+    vehicle_counts: list[int] = Field(
+        default_factory=lambda: [14], min_length=1, max_length=4, alias="vehicleCounts"
+    )
+    arrival_profiles: list[Literal["low", "medium", "high"]] = Field(
+        default_factory=lambda: ["high"],
+        min_length=1,
+        max_length=3,
+        alias="arrivalProfiles",
+    )
+    fleet_mixes: list[Literal["mixed", "fork", "jack"]] = Field(
+        default_factory=lambda: ["mixed"],
+        min_length=1,
+        max_length=3,
+        alias="fleetMixes",
+    )
+    policies: list[
+        Literal[
+            "top_k",
+            "task_age",
+            "shortest_remaining",
+            "congestion",
+            "previous_order",
+            "random",
+            "rl",
+        ]
+    ] = Field(default_factory=lambda: ["top_k", "congestion"], min_length=1)
+    seeds: list[int] = Field(default_factory=lambda: [0, 1, 2], min_length=1, max_length=10)
+    horizon_ms: int = Field(default=900000, ge=60000, le=7200000, alias="horizonMs")
+    agent_policy: AgentPolicyOptions | None = Field(default=None, alias="agentPolicy")
+    requested_by: str = Field(default="evaluation-operator", alias="requestedBy")
+
+    @model_validator(mode="after")
+    def validate_matrix(self) -> "BenchmarkRequest":
+        if any(value < 1 or value > 100 for value in self.vehicle_counts):
+            raise ValueError("vehicleCounts must be between 1 and 100")
+        for name in (
+            "vehicle_counts",
+            "arrival_profiles",
+            "fleet_mixes",
+            "policies",
+            "seeds",
+        ):
+            values = getattr(self, name)
+            if len(values) != len(set(values)):
+                raise ValueError(f"{name} must not contain duplicates")
+        case_count = (
+            len(self.vehicle_counts)
+            * len(self.arrival_profiles)
+            * len(self.fleet_mixes)
+            * len(self.policies)
+            * len(self.seeds)
+        )
+        if case_count > 2000:
+            raise ValueError("benchmark matrix exceeds the 2000 case limit")
+        if "rl" not in self.policies and self.agent_policy is not None:
+            raise ValueError("agentPolicy requires the rl policy")
+        return self
+
+    @property
+    def case_count(self) -> int:
+        return (
+            len(self.vehicle_counts)
+            * len(self.arrival_profiles)
+            * len(self.fleet_mixes)
+            * len(self.policies)
+            * len(self.seeds)
+        )
+
+
+class DatasetExportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    name: str = Field(default="仓储调度评测数据", min_length=2)
+    include_audit: bool = Field(default=True, alias="includeAudit")
+    include_incidents: bool = Field(default=True, alias="includeIncidents")
+    include_evidence_text: bool = Field(default=False, alias="includeEvidenceText")
+    requested_by: str = Field(default="data-steward", alias="requestedBy")
+
+
 class SimulationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 

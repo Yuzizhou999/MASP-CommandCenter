@@ -11,14 +11,17 @@ from fastapi.staticfiles import StaticFiles
 
 from .approvals import ApprovalStore
 from .audit import AuditStore
+from .benchmark import BenchmarkRunner
 from .contracts import (
     ApprovalDecision,
     ApprovalRequest,
+    BenchmarkRequest,
     ChatRequest,
     ChatResponse,
     ComparisonRequest,
     ComparisonResult,
     DispatchIntent,
+    DatasetExportRequest,
     FaultInjectionRequest,
     IncidentRecord,
     IncidentWhatIfRequest,
@@ -26,6 +29,7 @@ from .contracts import (
     SimulationSummary,
     new_id,
 )
+from .dataset_exports import DatasetExporter
 from .engine_adapter import EngineVersionError, MaspAdapter
 from .intent_store import IntentStore
 from .incidents import IncidentService, IncidentStore
@@ -58,6 +62,15 @@ incident_service = IncidentService(
     audit=audit,
 )
 scenario_drafts = ScenarioDraftStore(settings.data_dir, engine, audit)
+benchmarks = BenchmarkRunner(settings.data_dir, engine, audit)
+dataset_exports = DatasetExporter(
+    settings.data_dir,
+    engine=engine,
+    audit=audit,
+    approvals=approvals,
+    intents=intents,
+    incidents=incident_store,
+)
 
 app = FastAPI(
     title="保利智仓·灵枢 API",
@@ -94,6 +107,67 @@ def health() -> dict[str, Any]:
 @app.get("/api/v1/agent-policy")
 def agent_policy_status() -> dict[str, Any]:
     return engine.agent_model_status().model_dump(by_alias=True, mode="json")
+
+
+@app.post("/api/v1/evaluations/benchmarks")
+async def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(benchmarks.run, request)
+    except (ValueError, KeyError, EngineVersionError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/v1/evaluations/benchmarks")
+def list_benchmarks() -> list[dict[str, Any]]:
+    return benchmarks.list()
+
+
+@app.get("/api/v1/evaluations/benchmarks/{benchmark_id}")
+def benchmark_detail(benchmark_id: str) -> dict[str, Any]:
+    try:
+        return benchmarks.get(benchmark_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/v1/dataset-exports")
+async def create_dataset_export(request: DatasetExportRequest) -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(dataset_exports.create, request)
+    except (ValueError, KeyError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/v1/dataset-exports")
+def list_dataset_exports() -> list[dict[str, Any]]:
+    return dataset_exports.list()
+
+
+@app.get("/api/v1/dataset-exports/{export_id}")
+def dataset_export_detail(export_id: str) -> dict[str, Any]:
+    try:
+        return dataset_exports.get(export_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/v1/dataset-exports/{export_id}/download")
+def download_dataset_export(export_id: str) -> FileResponse:
+    try:
+        path = dataset_exports.bundle_path(export_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return FileResponse(
+        path,
+        media_type="application/zip",
+        filename=f"{export_id}.zip",
+    )
 
 
 @app.get("/api/v1/scenarios")

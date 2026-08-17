@@ -199,7 +199,7 @@ class MaspAdapter:
     def _agent_policy_evidence(
         planning_summary: dict[str, Any],
         prepared: dict[str, Any],
-        evidence_path: Path,
+        evidence_path: Path | None,
     ) -> AgentPolicyEvidence:
         cycles = list(planning_summary.get("cycles", []))
         agent_candidate_count = 0
@@ -274,7 +274,7 @@ class MaspAdapter:
             decisionCycleCount=decision_cycle_count,
             fallbackReasons=list(dict.fromkeys(reasons)),
             notes=notes,
-            evidencePath=str(evidence_path),
+            evidencePath=str(evidence_path) if evidence_path is not None else None,
         )
 
     def _require_engine(self) -> None:
@@ -447,6 +447,14 @@ class MaspAdapter:
             "endTimeMs": stream.end_time_ms,
             "tasks": [dict(item) for item in stream.tasks],
             "events": [dict(item) for item in stream.events],
+        }
+
+    def benchmark_source(self, scenario_id: str) -> dict[str, Any]:
+        """Return only immutable inputs approved for generated benchmark cases."""
+        assets = self._assets()
+        return {
+            "scenario": deepcopy(self.load_scenario(scenario_id)),
+            "nodes": deepcopy(assets["model"].get("nodes", [])),
         }
 
     def scenarios(self) -> list[dict[str, Any]]:
@@ -679,6 +687,61 @@ class MaspAdapter:
             raise ValueError("调度意图未通过校验，不能进入仿真。")
         with self._simulation_lock:
             return self._simulate_locked(request)
+
+    def evaluate_scenario_document(
+        self,
+        scenario: dict[str, Any],
+        *,
+        policy: str,
+        seed: int,
+        agent_policy: AgentPolicyOptions | None = None,
+    ) -> dict[str, Any]:
+        """Evaluate an isolated generated scenario without adding it to normal runs."""
+        self._require_engine()
+        document = deepcopy(scenario)
+        document["seed"] = int(seed)
+        prepared_agent = (
+            self._prepare_agent_policy(agent_policy, seed) if policy == "rl" else None
+        )
+        started = time.perf_counter()
+        with self._simulation_lock:
+            runtime = self._run_scenario(
+                document,
+                policy=policy,
+                resource_block=None,
+                agent_runtime=prepared_agent,
+            )
+        planning = runtime.planning_result()
+        planning_summary = planning.summary()
+        result = runtime.result()
+        metrics = result["metrics"]
+        agent_evidence = (
+            self._agent_policy_evidence(planning_summary, prepared_agent, None)
+            if prepared_agent is not None
+            else None
+        )
+        return {
+            "status": "COMPLETED",
+            "policy": policy,
+            "seed": seed,
+            "durationMs": round((time.perf_counter() - started) * 1000, 3),
+            "metrics": metrics,
+            "planning": planning_summary,
+            "safety": {
+                "conflictFree": metrics.get("reservationConflictRejections", 0) == 0,
+                "reservationConflictRejections": metrics.get(
+                    "reservationConflictRejections", 0
+                ),
+                "unplannedTaskCount": len(planning.unplanned_task_ids),
+                "simulationOnly": True,
+            },
+            "agentPolicy": (
+                agent_evidence.model_dump(by_alias=True, mode="json")
+                if agent_evidence is not None
+                else None
+            ),
+            "resultDigest": result.get("eventDigestSha256"),
+        }
 
     def _simulate_locked(self, request: SimulationRequest) -> SimulationSummary:
         started = time.perf_counter()

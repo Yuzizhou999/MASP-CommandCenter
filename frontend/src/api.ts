@@ -3,9 +3,14 @@ import type {
   AgentPolicyOptions,
   Approval,
   AuditEvent,
+  BenchmarkReport,
+  BenchmarkRequest,
+  BenchmarkSummary,
   ChatResponse,
   Comparison,
   DispatchIntent,
+  DatasetExportManifest,
+  DatasetExportRequest,
   Health,
   Incident,
   IncidentReport,
@@ -143,4 +148,22 @@ export const api = {
     request<Record<string, unknown>>(`/api/v1/scenario-drafts/${encodeURIComponent(packageId)}/compile?requestedBy=demo-operator`, { method: 'POST' }),
   publishScenarioDraft: (packageId: string) =>
     request<ScenarioDraftSummary>(`/api/v1/scenario-drafts/${encodeURIComponent(packageId)}/publish?requestedBy=demo-supervisor`, { method: 'POST' }),
+  benchmarks: () => request<BenchmarkSummary[]>("/api/v1/evaluations/benchmarks"),
+  runBenchmark: (options: BenchmarkRequest) =>
+    request<BenchmarkReport>("/api/v1/evaluations/benchmarks", {
+      method: "POST",
+      body: JSON.stringify(options),
+    }),
+  benchmarkDetail: (benchmarkId: string) =>
+    request<BenchmarkReport>(`/api/v1/evaluations/benchmarks/${encodeURIComponent(benchmarkId)}`),
+  datasetExports: () => request<DatasetExportManifest[]>("/api/v1/dataset-exports"),
+  createDatasetExport: (options: DatasetExportRequest) =>
+    request<DatasetExportManifest>("/api/v1/dataset-exports", {
+      method: "POST",
+      body: JSON.stringify(options),
+    }),
+  datasetExportDetail: (exportId: string) =>
+    request<DatasetExportManifest>(`/api/v1/dataset-exports/${encodeURIComponent(exportId)}`),
+  datasetExportDownloadUrl: (exportId: string) =>
+    `/api/v1/dataset-exports/${encodeURIComponent(exportId)}/download`,
 };

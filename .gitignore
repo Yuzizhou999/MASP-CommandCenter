@@ -17,3 +17,5 @@ data/audit.jsonl
 data/approvals.json
 data/committed-intents.json
 data/incidents.json
+data/evaluations/
+data/dataset-exports/
