@@ -27,7 +27,7 @@ E:\project\MASP                 MASP 核心调度与数字孪生引擎
 E:\project\MASP-CommandCenter   灵枢应用、智能体、治理、前端和比赛材料
 ```
 
-所有 MASP 调用都集中在 `command_center/engine_adapter.py`。灵枢不会修改 MASP 源文件，`engine.lock.json` 固定允许使用的 MASP 提交。开发环境可显式允许脏工作区，生产环境必须提交匹配且工作区干净。
+所有 MASP 调用都集中在 `command_center/engine_adapter.py`。场景包编译和任务流生成扩展位于`command_center/masp/`，由比赛仓库独立维护；原MASP仓库不承载比赛新增代码。`engine.lock.json`固定允许使用的原MASP提交，开发环境可显式允许脏工作区，生产环境必须提交匹配且工作区干净。
 
 ## 技术架构
 

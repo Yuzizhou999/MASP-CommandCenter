@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://masp.local/schemas/task-stream-generation.schema.json",
+  "title": "MASP task stream generation settings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["streamId", "seed", "endTimeMs", "maxTasks", "arrival", "odPairs"],
+  "properties": {
+    "streamId": {"type": "string", "minLength": 1, "maxLength": 96, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "seed": {"type": "integer", "minimum": 0},
+    "endTimeMs": {"type": "integer", "exclusiveMinimum": 0},
+    "maxTasks": {"type": "integer", "minimum": 1, "maximum": 100000},
+    "arrival": {"$ref": "#/$defs/arrival"},
+    "odPairs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/odPair"}},
+    "priorityDistribution": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/priority"}},
+    "serviceTimePolicy": {"$ref": "#/$defs/servicePolicy"},
+    "dueTimePolicy": {"$ref": "#/$defs/duePolicy"},
+    "events": {"type": "array", "items": {"$ref": "#/$defs/event"}}
+  },
+  "$defs": {
+    "fixedArrival": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "intervalMs"],
+      "properties": {"mode": {"const": "fixed_interval"}, "startTimeMs": {"type": "integer", "minimum": 0}, "intervalMs": {"type": "integer", "exclusiveMinimum": 0}}
+    },
+    "poissonArrival": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "meanIntervalMs"],
+      "properties": {"mode": {"const": "poisson"}, "startTimeMs": {"type": "integer", "minimum": 0}, "meanIntervalMs": {"type": "number", "exclusiveMinimum": 0}}
+    },
+    "window": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["startTimeMs", "endTimeMs", "mode", "intervalMs"], "properties": {"startTimeMs": {"type": "integer", "minimum": 0}, "endTimeMs": {"type": "integer", "exclusiveMinimum": 0}, "mode": {"const": "fixed_interval"}, "intervalMs": {"type": "integer", "exclusiveMinimum": 0}}},
+        {"type": "object", "additionalProperties": false, "required": ["startTimeMs", "endTimeMs", "mode", "meanIntervalMs"], "properties": {"startTimeMs": {"type": "integer", "minimum": 0}, "endTimeMs": {"type": "integer", "exclusiveMinimum": 0}, "mode": {"const": "poisson"}, "meanIntervalMs": {"type": "number", "exclusiveMinimum": 0}}}
+      ]
+    },
+    "arrival": {
+      "oneOf": [
+        {"$ref": "#/$defs/fixedArrival"},
+        {"$ref": "#/$defs/poissonArrival"},
+        {"type": "object", "additionalProperties": false, "required": ["mode", "windows"], "properties": {"mode": {"const": "time_windows"}, "windows": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/window"}}}}
+      ]
+    },
+    "odPair": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pickupNodeId", "dropoffNodeId", "requiredRobotGroup", "payloadType", "weight"],
+      "properties": {"pickupNodeId": {"type": "string", "minLength": 1}, "dropoffNodeId": {"type": "string", "minLength": 1}, "requiredRobotGroup": {"enum": ["fork", "jack"]}, "payloadType": {"type": "string", "minLength": 1}, "weight": {"type": "number", "exclusiveMinimum": 0}}
+    },
+    "priority": {
+      "type": "object", "additionalProperties": false, "required": ["priorityClass", "weight"],
+      "properties": {"priorityClass": {"type": "integer", "minimum": 0}, "weight": {"type": "number", "exclusiveMinimum": 0}}
+    },
+    "servicePolicy": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["mode"], "properties": {"mode": {"const": "workstation_defaults"}}},
+        {"type": "object", "additionalProperties": false, "required": ["mode", "pickupServiceMs", "dropoffServiceMs"], "properties": {"mode": {"const": "fixed"}, "pickupServiceMs": {"type": "integer", "exclusiveMinimum": 0}, "dropoffServiceMs": {"type": "integer", "exclusiveMinimum": 0}}}
+      ]
+    },
+    "duePolicy": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["mode"], "properties": {"mode": {"const": "none"}}},
+        {"type": "object", "additionalProperties": false, "required": ["mode", "offsetMs"], "properties": {"mode": {"const": "relative"}, "offsetMs": {"type": "integer", "minimum": 0}}},
+        {"type": "object", "additionalProperties": false, "required": ["mode", "minOffsetMs", "maxOffsetMs"], "properties": {"mode": {"const": "uniform_relative"}, "minOffsetMs": {"type": "integer", "minimum": 0}, "maxOffsetMs": {"type": "integer", "minimum": 0}}}
+      ]
+    },
+    "event": {
+      "type": "object", "additionalProperties": false, "required": ["eventId", "atMs", "type"],
+      "properties": {"eventId": {"type": "string", "minLength": 1}, "atMs": {"type": "integer", "minimum": 0}, "type": {"type": "string", "minLength": 1}, "payload": {"type": "object"}}
+    }
+  }
+}

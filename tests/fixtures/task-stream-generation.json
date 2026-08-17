@@ -1,0 +1,23 @@
+{
+  "streamId": "fixture-stream",
+  "seed": 2026,
+  "endTimeMs": 180000,
+  "maxTasks": 12,
+  "arrival": {
+    "mode": "time_windows",
+    "windows": [
+      {"startTimeMs": 0, "endTimeMs": 60000, "mode": "fixed_interval", "intervalMs": 15000},
+      {"startTimeMs": 60000, "endTimeMs": 180000, "mode": "poisson", "meanIntervalMs": 20000}
+    ]
+  },
+  "odPairs": [
+    {"pickupNodeId": "fork:AP1123", "dropoffNodeId": "fork:AP1119", "requiredRobotGroup": "fork", "payloadType": "pallet", "weight": 1},
+    {"pickupNodeId": "jack:AP146", "dropoffNodeId": "jack:AP189", "requiredRobotGroup": "jack", "payloadType": "shelf", "weight": 1}
+  ],
+  "priorityDistribution": [
+    {"priorityClass": 0, "weight": 4},
+    {"priorityClass": 1, "weight": 1}
+  ],
+  "serviceTimePolicy": {"mode": "workstation_defaults"},
+  "dueTimePolicy": {"mode": "uniform_relative", "minOffsetMs": 60000, "maxOffsetMs": 180000}
+}

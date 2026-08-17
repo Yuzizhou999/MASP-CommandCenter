@@ -131,14 +131,16 @@ class MaspAdapter:
             sys.path.insert(0, root_text)
         from masp.domain import TransportTask, Vehicle
         from masp.online import OnlineDispatchRuntime
-        from masp.scenario_package import (
+        from .masp.scenario_package import (
             ScenarioPackage,
             compile_scenario_package,
             package_from_assets,
             validate_scenario_package_document,
         )
-        from masp.task_stream import generate_task_stream
-        from masp.task_stream import validate_task_stream_generation_document
+        from .masp.task_stream import (
+            generate_task_stream,
+            validate_task_stream_generation_document,
+        )
         from masp.topology import MapTopology
 
         self._modules = {
@@ -160,7 +162,7 @@ class MaspAdapter:
         modules = self._engine_modules()
         modules["validate_scenario_package_document"](
             document,
-            self.root / "schemas" / "scenario-package.schema.json",
+            self.settings.root / "schemas" / "scenario-package.schema.json",
         )
         package = modules["ScenarioPackage"].from_dict(document)
         return package.validate().to_dict()
@@ -173,7 +175,7 @@ class MaspAdapter:
         modules = self._engine_modules()
         modules["validate_scenario_package_document"](
             document,
-            self.root / "schemas" / "scenario-package.schema.json",
+            self.settings.root / "schemas" / "scenario-package.schema.json",
         )
         package = modules["ScenarioPackage"].from_dict(document)
         compiled = modules["compile_scenario_package"](
@@ -242,11 +244,11 @@ class MaspAdapter:
         modules = self._engine_modules()
         modules["validate_task_stream_generation_document"](
             generation,
-            self.root / "schemas" / "task-stream-generation.schema.json",
+            self.settings.root / "schemas" / "task-stream-generation.schema.json",
         )
         modules["validate_scenario_package_document"](
             document,
-            self.root / "schemas" / "scenario-package.schema.json",
+            self.settings.root / "schemas" / "scenario-package.schema.json",
         )
         package = modules["ScenarioPackage"].from_dict(document)
         stream = modules["generate_task_stream"](package.warehouse_scene, generation)

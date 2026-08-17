@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://masp.local/schemas/scenario-package.schema.json",
+  "title": "MASP editable warehouse scenario package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "packageId", "version", "status", "warehouseScene", "taskStream"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "packageId": {"type": "string", "minLength": 1, "maxLength": 128},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "status": {"enum": ["draft", "published", "archived"]},
+    "metadata": {"type": "object"},
+    "warehouseScene": {"$ref": "#/$defs/warehouseScene"},
+    "taskStream": {"$ref": "#/$defs/taskStream"}
+  },
+  "$defs": {
+    "group": {"enum": ["fork", "jack"]},
+    "point": {
+      "type": "array",
+      "prefixItems": [{"type": "number"}, {"type": "number"}],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minX", "maxX", "minY", "maxY"],
+      "properties": {
+        "minX": {"type": "number"}, "maxX": {"type": "number"},
+        "minY": {"type": "number"}, "maxY": {"type": "number"}
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "x", "y", "allowedRobotGroups", "waitAllowedByGroup"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "type": {"enum": ["LM", "AP", "PP", "CP"]},
+        "x": {"type": "number"}, "y": {"type": "number"},
+        "allowedRobotGroups": {"type": "array", "items": {"$ref": "#/$defs/group"}, "minItems": 1, "uniqueItems": true},
+        "aliases": {"type": "object"}, "positionsByGroup": {"type": "object", "additionalProperties": {"$ref": "#/$defs/point"}}, "headings": {"type": "object"},
+        "propertiesByGroup": {"type": "object"},
+        "waitAllowedByGroup": {"type": "object", "additionalProperties": {"type": "boolean"}},
+        "capacity": {"type": "integer", "minimum": 1}
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "startNodeId", "endNodeId", "controlPoints", "robotGroup"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "name": {"type": "string"},
+        "startNodeId": {"type": "string", "minLength": 1}, "endNodeId": {"type": "string", "minLength": 1},
+        "controlPoints": {"type": "array", "prefixItems": [{"$ref": "#/$defs/point"}, {"$ref": "#/$defs/point"}, {"$ref": "#/$defs/point"}, {"$ref": "#/$defs/point"}], "minItems": 4, "maxItems": 4},
+        "lengthM": {"type": "number", "exclusiveMinimum": 0}, "motionDirection": {"type": "integer", "enum": [0, 1]}, "moveStyle": {"type": "integer", "minimum": 0},
+        "maxSpeedMps": {"type": ["number", "null"], "exclusiveMinimum": 0}, "loadedMaxSpeedMps": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "robotGroup": {"$ref": "#/$defs/group"}
+      }
+    },
+    "workstation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "nodeId", "capabilities", "allowedRobotGroups", "pickupServiceMs", "dropoffServiceMs"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "nodeId": {"type": "string", "minLength": 1},
+        "capabilities": {"type": "array", "items": {"enum": ["pickup", "dropoff"]}, "minItems": 1, "uniqueItems": true},
+        "allowedRobotGroups": {"type": "array", "items": {"$ref": "#/$defs/group"}, "minItems": 1, "uniqueItems": true},
+        "capacity": {"type": "integer", "minimum": 1}, "pickupServiceMs": {"type": "integer", "exclusiveMinimum": 0}, "dropoffServiceMs": {"type": "integer", "exclusiveMinimum": 0},
+        "blocksTransitDuringService": {"type": "boolean"}, "propertiesByGroup": {"type": "object"}
+      }
+    },
+    "vehicle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["vehicleId", "robotGroup", "initialNodeId", "initialHeadingRad", "initialLoadState"],
+      "properties": {
+        "vehicleId": {"type": "string", "minLength": 1}, "robotGroup": {"$ref": "#/$defs/group"}, "initialNodeId": {"type": "string", "minLength": 1},
+        "initialHeadingRad": {"type": "number"}, "initialLoadState": {"const": "empty"}, "capabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "zone": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "memberNodeIds", "recoveryNodeIds"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "memberNodeIds": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": true},
+        "memberEdgeIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "entryEdgeIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "exitEdgeIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "capacity": {"const": 1}, "passingAllowed": {"const": false}, "directionalMode": {"const": "single_direction_at_a_time"},
+        "recoveryNodeIds": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": true}
+      }
+    },
+    "recovery": {
+      "type": "object", "additionalProperties": false,
+      "required": ["nodeId", "allowedRobotGroups"],
+      "properties": {"nodeId": {"type": "string", "minLength": 1}, "allowedRobotGroups": {"type": "array", "items": {"$ref": "#/$defs/group"}, "minItems": 1, "uniqueItems": true}}
+    },
+    "warehouseScene": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sceneId", "name", "bounds", "robotProfiles", "nodes", "edges", "workstations", "vehicles", "recoveryNodes", "trafficZones", "safety"],
+      "properties": {
+        "sceneId": {"type": "string", "minLength": 1}, "name": {"type": "string", "minLength": 1}, "bounds": {"$ref": "#/$defs/bounds"}, "robotProfiles": {"type": "object", "required": ["fork", "jack"]},
+        "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/node"}}, "edges": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/edge"}}, "workstations": {"type": "array", "items": {"$ref": "#/$defs/workstation"}}, "vehicles": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/vehicle"}}, "recoveryNodes": {"type": "array", "items": {"$ref": "#/$defs/recovery"}}, "trafficZones": {"type": "array", "items": {"$ref": "#/$defs/zone"}},
+        "safety": {"type": "object", "additionalProperties": false, "required": ["footprintMarginM", "conflictSampleSpacingM", "provisional"], "properties": {"footprintMarginM": {"type": "number", "minimum": 0}, "conflictSampleSpacingM": {"type": "number", "exclusiveMinimum": 0}, "localizationErrorM": {"type": ["number", "null"], "minimum": 0}, "communicationLatencyMs": {"type": ["number", "null"], "minimum": 0}, "provisional": {"type": "boolean"}}}
+      }
+    },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["taskId", "releaseTimeMs", "pickupNodeId", "dropoffNodeId", "requiredRobotGroup", "payloadType"],
+      "properties": {"taskId": {"type": "string", "minLength": 1}, "releaseTimeMs": {"type": "integer", "minimum": 0}, "pickupNodeId": {"type": "string", "minLength": 1}, "dropoffNodeId": {"type": "string", "minLength": 1}, "requiredRobotGroup": {"$ref": "#/$defs/group"}, "payloadType": {"type": "string", "minLength": 1}, "payloadId": {"type": ["string", "null"]}, "pickupServiceMs": {"type": ["integer", "null"], "exclusiveMinimum": 0}, "dropoffServiceMs": {"type": ["integer", "null"], "exclusiveMinimum": 0}, "priorityClass": {"type": "integer", "minimum": 0}, "dueTimeMs": {"type": ["integer", "null"], "minimum": 0}}
+    },
+    "taskStream": {
+      "type": "object", "additionalProperties": false,
+      "required": ["streamId", "seed", "endTimeMs", "tasks", "events"],
+      "properties": {
+        "streamId": {"type": "string", "minLength": 1},
+        "seed": {"type": "integer", "minimum": 0},
+        "endTimeMs": {"type": "integer", "exclusiveMinimum": 0},
+        "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/task"}},
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["eventId", "atMs", "type"],
+            "properties": {
+              "eventId": {"type": "string", "minLength": 1},
+              "atMs": {"type": "integer", "minimum": 0},
+              "type": {"type": "string", "minLength": 1},
+              "payload": {"type": "object"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
