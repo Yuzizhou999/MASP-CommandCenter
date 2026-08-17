@@ -41,6 +41,10 @@ class MaspAdapter:
         self.settings.runs_dir.mkdir(parents=True, exist_ok=True)
         self._assert_layout()
 
+    @staticmethod
+    def _schema_path(name: str) -> Path:
+        return Path(__file__).resolve().parents[1] / "schemas" / name
+
     def _assert_layout(self) -> None:
         required = (
             self.root / "masp" / "online.py",
@@ -162,7 +166,7 @@ class MaspAdapter:
         modules = self._engine_modules()
         modules["validate_scenario_package_document"](
             document,
-            self.settings.root / "schemas" / "scenario-package.schema.json",
+            self._schema_path("scenario-package.schema.json"),
         )
         package = modules["ScenarioPackage"].from_dict(document)
         return package.validate().to_dict()
@@ -175,7 +179,7 @@ class MaspAdapter:
         modules = self._engine_modules()
         modules["validate_scenario_package_document"](
             document,
-            self.settings.root / "schemas" / "scenario-package.schema.json",
+            self._schema_path("scenario-package.schema.json"),
         )
         package = modules["ScenarioPackage"].from_dict(document)
         compiled = modules["compile_scenario_package"](
@@ -244,11 +248,11 @@ class MaspAdapter:
         modules = self._engine_modules()
         modules["validate_task_stream_generation_document"](
             generation,
-            self.settings.root / "schemas" / "task-stream-generation.schema.json",
+            self._schema_path("task-stream-generation.schema.json"),
         )
         modules["validate_scenario_package_document"](
             document,
-            self.settings.root / "schemas" / "scenario-package.schema.json",
+            self._schema_path("scenario-package.schema.json"),
         )
         package = modules["ScenarioPackage"].from_dict(document)
         stream = modules["generate_task_stream"](package.warehouse_scene, generation)
