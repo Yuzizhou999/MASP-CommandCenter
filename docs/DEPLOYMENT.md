@@ -2,7 +2,7 @@
 
 ## 1. 交付形态
 
-比赛交付采用 Windows 离线演示包。包内包含 CommandCenter 后端、前端生产资源、知识文件、Schema、锁定版本的 MASP 引擎和文件摘要清单。完整包还包含 `wheelhouse/`，安装和演示不依赖 npm，也不需要访问 Python 软件源。
+比赛交付采用 Windows 离线演示包。包内包含 CommandCenter 后端、前端生产资源、知识文件、Schema、群车策略 checkpoint、锁定版本的 MASP 引擎和文件摘要清单。完整包还包含基础依赖及 PyTorch、Gymnasium、NumPy 的 `wheelhouse/`，安装和演示不依赖 npm，也不需要访问 Python 软件源。
 
 DeepSeek 不是启动前提。默认启动方式会清空当前进程中的 `DEEPSEEK_API_KEY`，意图解析和异常诊断使用确定性降级，地图、仿真、SIPP、预约校验、审批和审计均可正常演示。
 

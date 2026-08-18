@@ -79,12 +79,13 @@ function Copy-FilteredTree {
     }
 }
 
-foreach ($FileName in @("README.md", "engine.lock.json", "pyproject.toml", "requirements.txt")) {
+foreach ($FileName in @("README.md", "engine.lock.json", "pyproject.toml", "requirements.txt", "requirements-agent.txt")) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot $FileName) -Destination (Join-Path $PackageRoot $FileName)
 }
 foreach ($DirectoryName in @("command_center", "evals", "knowledge", "schemas")) {
     Copy-FilteredTree (Join-Path $ProjectRoot $DirectoryName) (Join-Path $PackageRoot $DirectoryName)
 }
+Copy-FilteredTree (Join-Path $ProjectRoot "models") (Join-Path $PackageRoot "models")
 New-Item -ItemType Directory -Path (Join-Path $PackageRoot "frontend") -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $FrontendRoot "dist") -Destination (Join-Path $PackageRoot "frontend\dist") -Recurse
 
@@ -156,7 +157,7 @@ $EngineManifestJson = $EngineManifest | ConvertTo-Json -Depth 100
 if (-not $SkipWheelhouse) {
     $Wheelhouse = Join-Path $PackageRoot "wheelhouse"
     New-Item -ItemType Directory -Path $Wheelhouse -Force | Out-Null
-    & python -m pip download --disable-pip-version-check --dest $Wheelhouse -r (Join-Path $ProjectRoot "requirements.txt") | Out-Host
+    & python -m pip download --disable-pip-version-check --dest $Wheelhouse -r (Join-Path $ProjectRoot "requirements-agent.txt") | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "下载离线 Python 依赖失败。"
     }

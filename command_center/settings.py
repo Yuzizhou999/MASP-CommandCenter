@@ -31,9 +31,10 @@ class Settings:
     deepseek_model: str
     deepseek_timeout_seconds: float
     agent_model_id: str = "masp-ppo-priority"
-    agent_model_version: str = "unconfigured"
+    agent_model_version: str = "1.0.0"
     agent_checkpoint: Path | None = None
     agent_device: str = "cpu"
+    agent_torch_threads: int = 1
     root: Path = ROOT
 
     @property
@@ -60,6 +61,10 @@ class Settings:
             if not checkpoint.is_absolute():
                 checkpoint = ROOT / checkpoint
             checkpoint = checkpoint.resolve()
+        else:
+            bundled_checkpoint = ROOT / "models" / "ppo-priority-v1.pt"
+            if bundled_checkpoint.is_file():
+                checkpoint = bundled_checkpoint.resolve()
         return cls(
             app_env=os.getenv("APP_ENV", "development").strip().lower(),
             host=os.getenv("APP_HOST", "127.0.0.1"),
@@ -82,8 +87,11 @@ class Settings:
                 "MASP_AGENT_MODEL_ID", "masp-ppo-priority"
             ).strip(),
             agent_model_version=os.getenv(
-                "MASP_AGENT_MODEL_VERSION", "unconfigured"
+                "MASP_AGENT_MODEL_VERSION", "1.0.0"
             ).strip(),
             agent_checkpoint=checkpoint,
             agent_device=os.getenv("MASP_AGENT_DEVICE", "cpu").strip().lower(),
+            agent_torch_threads=max(
+                1, min(16, int(os.getenv("MASP_AGENT_TORCH_THREADS", "1")))
+            ),
         )

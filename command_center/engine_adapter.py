@@ -231,6 +231,16 @@ class MaspAdapter:
                 root_text = str(self.root)
                 if root_text not in sys.path:
                     sys.path.insert(0, root_text)
+                import torch
+
+                torch.set_num_threads(self.settings.agent_torch_threads)
+                try:
+                    torch.set_num_interop_threads(
+                        self.settings.agent_torch_threads
+                    )
+                except RuntimeError:
+                    # PyTorch only permits setting inter-op threads before work starts.
+                    pass
                 from masp.rl_priority import load_checkpoint
 
                 payload = load_checkpoint(
@@ -268,6 +278,21 @@ class MaspAdapter:
             "fallbackReasons": reasons,
             "checkpointMetadata": metadata,
             "seed": seed,
+        }
+
+    def validate_agent_model(self) -> dict[str, Any]:
+        """Validate the registered checkpoint without running a simulation."""
+        prepared = self._prepare_agent_policy(
+            AgentPolicyOptions(allowDeviation=True), seed=0
+        )
+        return {
+            "ok": bool(prepared["deviationEnabled"]),
+            "mode": "LEARNED" if prepared["deviationEnabled"] else "BASELINE",
+            "modelId": prepared["modelId"],
+            "modelVersion": prepared["modelVersion"],
+            "checkpointSha256": prepared["checkpointSha256"],
+            "checkpointMetadata": prepared["checkpointMetadata"],
+            "fallbackReasons": prepared["fallbackReasons"],
         }
 
     @staticmethod

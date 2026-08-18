@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "modelId": "masp-ppo-priority",
+  "modelVersion": "1.0.0",
+  "checkpoint": "ppo-priority-v1.pt",
+  "checkpointVersion": 2,
+  "sha256": "959deb0d0079b101dce6aa74332c58a408d87601f897143e2b235b2264319cb7",
+  "sizeBytes": 411663,
+  "engineCommit": "a9550ee54e5159bd2931cde8c9383e27537d1899",
+  "trainedAt": "2026-08-18T17:21:18+08:00",
+  "training": {
+    "method": "sipp_oracle_bc_ppo",
+    "stateSource": "rolling",
+    "seed": 0,
+    "capturedCaseCount": 525,
+    "trainingCaseCount": 96,
+    "optimizationCaseCount": 102,
+    "validationCaseCount": 32,
+    "behaviorCloneEpochs": 30,
+    "ppoSteps": 128,
+    "priorityPrefixCount": 2
+  },
+  "validation": {
+    "oraclePrefixMatchRate": 0.5625,
+    "meanReward": -48.498125,
+    "meanRewardDeltaVsBaseline": 0.39125
+  },
+  "runtimeValidation": {
+    "benchmarkId": "benchmark-466ad3ec7235",
+    "caseCount": 3,
+    "completedCaseCount": 3,
+    "reservationConflictCaseCount": 0,
+    "planningTimeoutCaseCount": 1,
+    "strictSafetyGatePassed": false,
+    "meanCompletedTaskCount": 8.0,
+    "meanCompletedDropoffsPerHour": 32.0
+  },
+  "contract": {
+    "observationVersion": 1,
+    "actionMode": "local_priority_prefix",
+    "rewardVersion": 2,
+    "candidateCount": 3
+  },
+  "scope": "模型仅输出局部冲突分量内的车辆优先级候选，不直接生成路径、预约或设备控制指令。",
+  "safetyBoundary": "所有学习候选必须通过 Top-K guardian、连续时间 SIPP、资源预约和计划校验；不兼容、超时或不可行时由规则策略接管。",
+  "limitations": "本次离线验证用于证明训练、加载、推理和安全接管链路可复现，不表示学习策略整体性能优于 Top-K，也不代表真实仓储生产效果。当前 CPU 三种子运行有 1 个用例出现超过 1 秒的规划周期，严格安全门槛未通过。"
+}

@@ -106,6 +106,7 @@ def run_delivery_check(smoke_run: bool = False) -> dict[str, Any]:
     )
     frontend_ready = (root / "frontend" / "dist" / "index.html").is_file()
     scenarios = engine.scenarios() if engine_status["allowed"] else []
+    agent_policy = engine.validate_agent_model()
     checks: dict[str, Any] = {
         "manifest": manifest,
         "engine": {"ok": bool(engine_status["allowed"]), **engine_status},
@@ -115,6 +116,7 @@ def run_delivery_check(smoke_run: bool = False) -> dict[str, Any]:
             "mode": provider_status["mode"],
             "model": provider_status["model"],
         },
+        "agentPolicy": agent_policy,
         "scenarios": {"ok": bool(scenarios), "count": len(scenarios)},
     }
 

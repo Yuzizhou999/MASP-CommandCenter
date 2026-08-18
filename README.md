@@ -115,22 +115,31 @@ DEEPSEEK_TIMEOUT_SECONDS=30
 
 ## 配置群车策略模型
 
-学习策略使用服务端登记的 MASP Actor-Critic/PPO checkpoint，浏览器不能提交文件路径。启用模型推理时先安装额外依赖：
+学习策略使用服务端登记的 MASP Actor-Critic/PPO checkpoint，浏览器不能提交文件路径。源码环境启用模型推理时先安装额外依赖：
 
 ```powershell
 pip install -r requirements-agent.txt
 ```
 
-再在 `.env` 中配置：
+仓库内置的 `models/ppo-priority-v1.pt` 会被自动发现；只有替换模型或版本信息时才需要在 `.env` 中显式配置：
 
 ```dotenv
 MASP_AGENT_MODEL_ID=masp-ppo-priority
 MASP_AGENT_MODEL_VERSION=1.0.0
 MASP_AGENT_CHECKPOINT=models/ppo-priority-v1.pt
 MASP_AGENT_DEVICE=cpu
+MASP_AGENT_TORCH_THREADS=1
 ```
 
 checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先级前缀元数据。运行前校验失败时不会加载学习策略，界面会显示规则基线及具体降级原因。
+
+使用锁定 MASP 引擎重新训练可执行：
+
+```powershell
+.\scripts\train-agent-policy.ps1
+```
+
+脚本从 `engine.lock.json` 指定的提交创建临时只读训练副本，训练产物和日志写入 `data/model-training/`，不会改动原 MASP 工作区。正式登记模型的训练信息和文件摘要见 `models/ppo-priority-v1.json`。
 
 ## 比赛演示流程
 
