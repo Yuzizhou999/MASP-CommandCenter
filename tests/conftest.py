@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,7 @@ from command_center.settings import Settings
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-ENGINE_ROOT = PROJECT_ROOT.parent / "MASP"
+ENGINE_ROOT = Path(os.getenv("MASP_TEST_ENGINE_ROOT", PROJECT_ROOT.parent / "MASP"))
 
 
 @pytest.fixture()

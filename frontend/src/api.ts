@@ -15,6 +15,8 @@ import type {
   Incident,
   IncidentReport,
   MapModel,
+  ModelSafetyEvaluationReport,
+  ModelSafetyEvaluationSummary,
   PlanExplanationReport,
   RunDetail,
   ScenarioMeta,
@@ -185,6 +187,17 @@ export const api = {
     }),
   benchmarkDetail: (benchmarkId: string) =>
     request<BenchmarkReport>(`/api/v1/evaluations/benchmarks/${encodeURIComponent(benchmarkId)}`),
+  modelSafetyEvaluations: () =>
+    request<ModelSafetyEvaluationSummary[]>("/api/v1/evaluations/model-safety"),
+  runModelSafetyEvaluation: (suiteName: string) =>
+    request<ModelSafetyEvaluationReport>("/api/v1/evaluations/model-safety", {
+      method: "POST",
+      body: JSON.stringify({ suiteName, requestedBy: "model-evaluator" }),
+    }),
+  modelSafetyEvaluationDetail: (evaluationId: string) =>
+    request<ModelSafetyEvaluationReport>(
+      `/api/v1/evaluations/model-safety/${encodeURIComponent(evaluationId)}`,
+    ),
   datasetExports: () => request<DatasetExportManifest[]>("/api/v1/dataset-exports"),
   createDatasetExport: (options: DatasetExportRequest) =>
     request<DatasetExportManifest>("/api/v1/dataset-exports", {

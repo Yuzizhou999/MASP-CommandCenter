@@ -328,6 +328,7 @@ p {
 }
 
 .benchmark-report,
+.model-evaluation,
 .dataset-export {
   grid-column: 1 / -1;
 }
@@ -531,6 +532,78 @@ p {
 
 .dataset-layout > .evaluation-form {
   border-right: 1px solid #e6e8eb;
+}
+
+.model-evaluation-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, .48fr) minmax(0, 1.52fr);
+  min-height: 360px;
+}
+
+.model-evaluation-controls,
+.model-evaluation-report {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+}
+
+.model-evaluation-controls {
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border-right: 1px solid #e6e8eb;
+}
+
+.model-evaluation-note,
+.model-evaluation-warning {
+  color: #616161;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.model-evaluation-warning {
+  margin: 0;
+  padding: 10px 16px;
+  color: #6d4600;
+  background: #fff4ce;
+  border-top: 1px solid #f0d58c;
+}
+
+.model-evaluation-history {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid #e6e8eb;
+}
+
+.model-evaluation-history > strong {
+  color: #424242;
+  font-size: 11px;
+}
+
+.model-evaluation-history .evaluation-list-row {
+  min-height: 52px;
+}
+
+.model-evaluation-metrics {
+  border-top: 0;
+}
+
+.model-evaluation-table {
+  max-height: 390px;
+}
+
+.model-evaluation-table table {
+  min-width: 760px;
+}
+
+.model-evaluation-table td:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.model-evaluation-table td:first-child small {
+  color: #616161;
+  white-space: nowrap;
 }
 
 .dataset-result-heading {
@@ -2171,7 +2244,10 @@ p {
   .benchmark-config,
   .benchmark-history,
   .benchmark-report,
+  .model-evaluation,
   .dataset-export { grid-column: 1; }
+  .model-evaluation-layout { grid-template-columns: 1fr; }
+  .model-evaluation-controls { border-right: 0; border-bottom: 1px solid #e6e8eb; }
   .evaluation-inline-fields,
   .dataset-layout { grid-template-columns: 1fr; }
   .dataset-layout > .evaluation-form { border-right: 0; border-bottom: 1px solid #e6e8eb; }
@@ -2187,5 +2263,6 @@ p {
 @media (min-width: 761px) and (max-width: 1380px) {
   .evaluation-workspace { grid-template-columns: minmax(320px, .8fr) minmax(420px, 1.2fr); }
   .benchmark-report,
+  .model-evaluation,
   .dataset-export { grid-column: 1 / -1; }
 }

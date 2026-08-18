@@ -18,6 +18,7 @@ import {
   ArrowDownload20Regular,
   ArrowSync20Regular,
   Database20Regular,
+  BrainCircuit20Regular,
   Play20Regular,
   ShieldCheckmark20Regular,
 } from "@fluentui/react-icons";
@@ -27,6 +28,8 @@ import type {
   BenchmarkRequest,
   BenchmarkSummary,
   DatasetExportManifest,
+  ModelSafetyEvaluationReport,
+  ModelSafetyEvaluationSummary,
 } from "../types";
 
 interface EvaluationCenterProps {
@@ -58,6 +61,13 @@ const policyOptions = [
 const arrivalLabels: Record<string, string> = { low: "低", medium: "中", high: "高" };
 const fleetLabels: Record<string, string> = { mixed: "混合", fork: "叉车", jack: "顶升车" };
 const policyLabels = Object.fromEntries(policyOptions.map((item) => [item.value, item.label]));
+const executionLabels: Record<string, string> = {
+  DEEPSEEK_API: "DeepSeek API",
+  DETERMINISTIC_FALLBACK: "确定性降级",
+  BOUNDARY_CHECK: "边界检查",
+  KNOWLEDGE_RETRIEVAL: "知识检索",
+  EVALUATOR_ERROR: "评测异常",
+};
 
 const formatNumber = (value?: number | null, digits = 1) =>
   typeof value === "number" ? value.toLocaleString("zh-CN", { maximumFractionDigits: digits }) : "-";
@@ -77,10 +87,12 @@ function toggleValue<T>(current: T[], value: T, checked: boolean): T[] {
 export function EvaluationCenter({ onNotice, onError }: EvaluationCenterProps) {
   const [benchmarks, setBenchmarks] = useState<BenchmarkSummary[]>([]);
   const [selectedReport, setSelectedReport] = useState<BenchmarkReport | null>(null);
+  const [modelEvaluations, setModelEvaluations] = useState<ModelSafetyEvaluationSummary[]>([]);
+  const [selectedModelReport, setSelectedModelReport] = useState<ModelSafetyEvaluationReport | null>(null);
   const [exports, setExports] = useState<DatasetExportManifest[]>([]);
   const [selectedExport, setSelectedExport] = useState<DatasetExportManifest | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"benchmark" | "dataset" | "report" | null>(null);
+  const [busy, setBusy] = useState<"benchmark" | "model" | "model-report" | "dataset" | "report" | null>(null);
   const [suiteName, setSuiteName] = useState("仓储群车高负载基准");
   const [vehicleCounts, setVehicleCounts] = useState<number[]>([14]);
   const [arrivalProfiles, setArrivalProfiles] = useState<string[]>(["medium", "high"]);
@@ -88,6 +100,7 @@ export function EvaluationCenter({ onNotice, onError }: EvaluationCenterProps) {
   const [policies, setPolicies] = useState<string[]>(["top_k", "rl"]);
   const [seedText, setSeedText] = useState("0,1,2");
   const [horizonMs, setHorizonMs] = useState(900000);
+  const [modelSuiteName, setModelSuiteName] = useState("大模型调度安全回归");
   const [datasetName, setDatasetName] = useState("仓储调度评测数据");
   const [includeAudit, setIncludeAudit] = useState(true);
   const [includeIncidents, setIncludeIncidents] = useState(true);
@@ -101,20 +114,31 @@ export function EvaluationCenter({ onNotice, onError }: EvaluationCenterProps) {
   const configValid = Boolean(suiteName.trim()) && caseCount > 0 && caseCount <= 2000 && seeds.length <= 10;
 
   const loadLists = async () => {
-    const [nextBenchmarks, nextExports] = await Promise.all([api.benchmarks(), api.datasetExports()]);
+    const [nextBenchmarks, nextModelEvaluations, nextExports] = await Promise.all([
+      api.benchmarks(),
+      api.modelSafetyEvaluations(),
+      api.datasetExports(),
+    ]);
     setBenchmarks(nextBenchmarks);
+    setModelEvaluations(nextModelEvaluations);
     setExports(nextExports);
     setSelectedExport((current) => current || nextExports[0] || null);
-    return nextBenchmarks;
+    return { nextBenchmarks, nextModelEvaluations };
   };
 
   useEffect(() => {
     let active = true;
     loadLists()
-      .then(async (nextBenchmarks) => {
-        if (!active || !nextBenchmarks[0]) return;
-        const report = await api.benchmarkDetail(nextBenchmarks[0].benchmarkId);
-        if (active) setSelectedReport(report);
+      .then(async ({ nextBenchmarks, nextModelEvaluations }) => {
+        if (!active) return;
+        const [report, modelReport] = await Promise.all([
+          nextBenchmarks[0] ? api.benchmarkDetail(nextBenchmarks[0].benchmarkId) : null,
+          nextModelEvaluations[0] ? api.modelSafetyEvaluationDetail(nextModelEvaluations[0].evaluationId) : null,
+        ]);
+        if (active) {
+          setSelectedReport(report);
+          setSelectedModelReport(modelReport);
+        }
       })
       .catch((reason) => onError(reason instanceof Error ? reason.message : "评测资产加载失败"))
       .finally(() => { if (active) setLoading(false); });
@@ -156,6 +180,35 @@ export function EvaluationCenter({ onNotice, onError }: EvaluationCenterProps) {
       setSelectedReport(await api.benchmarkDetail(benchmarkId));
     } catch (reason) {
       onError(reason instanceof Error ? reason.message : "评测报告加载失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runModelEvaluation = async () => {
+    if (!modelSuiteName.trim()) return;
+    setBusy("model");
+    try {
+      const report = await api.runModelSafetyEvaluation(modelSuiteName.trim());
+      setSelectedModelReport(report);
+      setModelEvaluations(await api.modelSafetyEvaluations());
+      onNotice(
+        `模型安全评测完成：${report.passedCaseCount}/${report.coverage.caseCount} 通过，` +
+        `${report.liveProviderEvaluated ? "包含 DeepSeek 实测" : "本次为离线降级与边界验证"}`,
+      );
+    } catch (reason) {
+      onError(reason instanceof Error ? reason.message : "模型安全评测失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openModelReport = async (evaluationId: string) => {
+    setBusy("model-report");
+    try {
+      setSelectedModelReport(await api.modelSafetyEvaluationDetail(evaluationId));
+    } catch (reason) {
+      onError(reason instanceof Error ? reason.message : "模型安全报告加载失败");
     } finally {
       setBusy(null);
     }
@@ -236,6 +289,38 @@ export function EvaluationCenter({ onNotice, onError }: EvaluationCenterProps) {
           <div className="table-scroll evaluation-table"><Table size="small" aria-label="评测聚合统计"><TableHeader><TableRow><TableHeaderCell>车辆/负载/车型</TableHeaderCell><TableHeaderCell>策略</TableHeaderCell><TableHeaderCell>成功</TableHeaderCell><TableHeaderCell>完成任务 均值[95%CI]</TableHeaderCell><TableHeaderCell>吞吐 均值[95%CI]</TableHeaderCell><TableHeaderCell>平均周期</TableHeaderCell><TableHeaderCell>冲突拒绝</TableHeaderCell></TableRow></TableHeader><TableBody>{selectedReport.aggregates.map((row) => <TableRow key={`${row.vehicleCount}-${row.arrivalProfile}-${row.fleetMix}-${row.policy}`}><TableCell>{row.vehicleCount} / {arrivalLabels[row.arrivalProfile] || row.arrivalProfile} / {fleetLabels[row.fleetMix] || row.fleetMix}</TableCell><TableCell>{policyLabels[row.policy] || row.policy}</TableCell><TableCell className="mono">{row.successfulCaseCount}/{row.caseCount}</TableCell><TableCell className="mono">{formatInterval(row.metrics.completedTaskCount)}</TableCell><TableCell className="mono">{formatInterval(row.metrics.completedDropoffsPerHour)}</TableCell><TableCell className="mono">{formatSeconds(row.metrics.meanTaskCycleTimeMs?.mean)}</TableCell><TableCell className="mono">{formatNumber(row.metrics.reservationConflictRejections?.mean)}</TableCell></TableRow>)}</TableBody></Table></div>
           {selectedReport.failureCases.length > 0 && <div className="failure-summary"><strong>失败案例</strong>{selectedReport.failureCases.slice(0, 8).map((row) => <span key={row.caseId}><code>{row.caseId}</code>{row.error || "未返回错误说明"}</span>)}</div>}
         </> : <div className="evaluation-empty">选择历史评测或运行新的矩阵。</div>}
+      </section>
+
+      <section className="data-panel model-evaluation">
+        <div className="panel-heading panel-heading-actions">
+          <div><h2>大模型安全评测</h2><p>意图、参数、知识、提示注入、证据、动作授权和降级韧性</p></div>
+          {selectedModelReport && <Badge appearance="tint" color={selectedModelReport.safetyGate.passed ? "success" : "danger"} icon={<ShieldCheckmark20Regular />}>{selectedModelReport.safetyGate.passed ? "关键用例通过" : "关键用例失败"}</Badge>}
+        </div>
+        <div className="model-evaluation-layout">
+          <div className="model-evaluation-controls">
+            <Field label="评测名称"><Input value={modelSuiteName} onChange={(_, data) => setModelSuiteName(data.value)} /></Field>
+            <p className="model-evaluation-note">运行仓库内固定测试集。配置 DeepSeek 时执行真实调用；未配置或调用失败时记录为确定性降级，边界恶意输出始终由后端固定向量验证。</p>
+            <Button appearance="primary" icon={<BrainCircuit20Regular />} disabled={!modelSuiteName.trim() || Boolean(busy)} onClick={() => void runModelEvaluation()}>{busy === "model" ? "正在核对模型边界" : "运行模型安全评测"}</Button>
+            <div className="model-evaluation-history">
+              <strong>历史报告</strong>
+              {modelEvaluations.map((row) => <button type="button" key={row.evaluationId} className={selectedModelReport?.evaluationId === row.evaluationId ? "evaluation-list-row selected-row" : "evaluation-list-row"} onClick={() => void openModelReport(row.evaluationId)}><span><strong>{row.suiteName}</strong><small>{new Date(row.createdAt).toLocaleString("zh-CN", { hour12: false })}</small></span><span><Badge appearance="tint" color={row.safetyGate.passed ? "success" : "danger"}>{row.passedCaseCount}/{row.coverage.caseCount}</Badge><small>{row.liveProviderEvaluated ? "DeepSeek 实测" : "离线边界验证"}</small></span></button>)}
+              {modelEvaluations.length === 0 && <div className="evaluation-empty">尚无模型安全评测记录</div>}
+            </div>
+          </div>
+          <div className="model-evaluation-report">
+            {selectedModelReport ? <>
+              <div className="evaluation-metrics model-evaluation-metrics">
+                <div><span>通过用例</span><strong className="mono">{selectedModelReport.passedCaseCount}/{selectedModelReport.coverage.caseCount}</strong></div>
+                <div><span>关键失败</span><strong className="mono">{selectedModelReport.safetyGate.criticalFailureCount}</strong></div>
+                <div><span>DeepSeek 实测</span><strong className="mono">{selectedModelReport.liveProviderCaseCount}</strong></div>
+                <div><span>降级用例</span><strong className="mono">{selectedModelReport.fallbackCaseCount}</strong></div>
+              </div>
+              <div className="coverage-line"><span>测试集</span><strong className="mono">{selectedModelReport.suiteId} · SHA-256 {selectedModelReport.suiteSha256.slice(0, 16)}...</strong><Badge appearance="outline">{selectedModelReport.provider.model}</Badge></div>
+              <div className="table-scroll model-evaluation-table"><Table size="small" aria-label="大模型安全评测明细"><TableHeader><TableRow><TableHeaderCell>用例</TableHeaderCell><TableHeaderCell>类别</TableHeaderCell><TableHeaderCell>执行方式</TableHeaderCell><TableHeaderCell>结果</TableHeaderCell><TableHeaderCell>耗时</TableHeaderCell></TableRow></TableHeader><TableBody>{selectedModelReport.cases.map((row) => <TableRow key={row.caseId}><TableCell><strong className="mono">{row.caseId}</strong><small>{row.title}</small></TableCell><TableCell>{row.category}</TableCell><TableCell>{executionLabels[row.executionMode] || row.executionMode}</TableCell><TableCell><Badge appearance="tint" color={row.passed ? "success" : "danger"}>{row.passed ? "通过" : "失败"}</Badge></TableCell><TableCell className="mono">{formatNumber(row.latencyMs, 2)} ms</TableCell></TableRow>)}</TableBody></Table></div>
+              {!selectedModelReport.liveProviderEvaluated && <p className="model-evaluation-warning">本报告未包含成功的 DeepSeek API 返回，不能表述为真实模型效果评测；安全边界与离线降级结果仍可重复核验。</p>}
+            </> : <div className="evaluation-empty">运行模型安全评测后显示逐项证据。</div>}
+          </div>
+        </div>
       </section>
 
       <section className="data-panel dataset-export">

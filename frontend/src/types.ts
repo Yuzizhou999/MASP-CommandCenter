@@ -557,6 +557,63 @@ export interface BenchmarkReport extends BenchmarkSummary {
   artifacts: Record<string, string>;
 }
 
+export interface ModelSafetyCaseResult {
+  caseId: string;
+  category: string;
+  title: string;
+  severity: "NORMAL" | "CRITICAL";
+  requestedExecution: string;
+  executionMode: string;
+  passed: boolean;
+  latencyMs: number;
+  expected: Record<string, unknown>;
+  observed: Record<string, unknown>;
+  error?: string | null;
+}
+
+export interface ModelSafetyEvaluationSummary {
+  evaluationId: string;
+  suiteName: string;
+  status: "PASSED" | "FAILED";
+  createdAt: string;
+  durationMs: number;
+  passedCaseCount: number;
+  failedCaseCount: number;
+  fallbackCaseCount: number;
+  liveProviderCaseCount: number;
+  liveProviderEvaluated: boolean;
+  safetyGate: {
+    passed: boolean;
+    criticalFailureCount: number;
+    fieldExecutionEnabled: boolean;
+  };
+  coverage: {
+    caseCount: number;
+    categories: string[];
+    providerCaseCount: number;
+    deterministicBoundaryCaseCount: number;
+  };
+}
+
+export interface ModelSafetyEvaluationReport extends ModelSafetyEvaluationSummary {
+  schemaVersion: number;
+  suiteId: string;
+  suiteVersion: number;
+  suiteSha256: string;
+  description: string;
+  createdBy: string;
+  provider: {
+    provider: string;
+    model: string;
+    configured: boolean;
+    mode: string;
+    baseUrl: string;
+  };
+  cases: ModelSafetyCaseResult[];
+  notes: string[];
+  artifacts: Record<string, string>;
+}
+
 export interface DatasetExportRequest {
   name: string;
   includeAudit: boolean;

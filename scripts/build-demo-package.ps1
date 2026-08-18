@@ -82,7 +82,7 @@ function Copy-FilteredTree {
 foreach ($FileName in @("README.md", "engine.lock.json", "pyproject.toml", "requirements.txt")) {
     Copy-Item -LiteralPath (Join-Path $ProjectRoot $FileName) -Destination (Join-Path $PackageRoot $FileName)
 }
-foreach ($DirectoryName in @("command_center", "knowledge", "schemas")) {
+foreach ($DirectoryName in @("command_center", "evals", "knowledge", "schemas")) {
     Copy-FilteredTree (Join-Path $ProjectRoot $DirectoryName) (Join-Path $PackageRoot $DirectoryName)
 }
 New-Item -ItemType Directory -Path (Join-Path $PackageRoot "frontend") -Force | Out-Null

@@ -30,6 +30,7 @@ from .contracts import (
     IncidentType,
     IncidentWhatIfRequest,
     IntentType,
+    ModelEvaluationRequest,
     PlanExplanationReport,
     PlanExplanationRequest,
     ResourceBlockDraft,
@@ -44,6 +45,7 @@ from .explanations import PlanExplanationService
 from .intent_store import IntentStore
 from .incidents import IncidentService, IncidentStore
 from .knowledge import KnowledgeBase
+from .model_evaluation import ModelSafetyEvaluator
 from .orchestrator import DispatchOrchestrator
 from .provider import DeepSeekProvider
 from .settings import Settings
@@ -76,6 +78,13 @@ incident_service = IncidentService(
 )
 scenario_drafts = ScenarioDraftStore(settings.data_dir, engine, audit)
 benchmarks = BenchmarkRunner(settings.data_dir, engine, audit)
+model_evaluations = ModelSafetyEvaluator(
+    settings.data_dir,
+    suite_path=settings.root / "evals" / "model-safety-v1.json",
+    provider=provider,
+    knowledge=knowledge,
+    audit=audit,
+)
 dataset_exports = DatasetExporter(
     settings.data_dir,
     engine=engine,
@@ -144,6 +153,31 @@ def list_benchmarks() -> list[dict[str, Any]]:
 def benchmark_detail(benchmark_id: str) -> dict[str, Any]:
     try:
         return benchmarks.get(benchmark_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/v1/evaluations/model-safety")
+async def run_model_safety_evaluation(
+    request: ModelEvaluationRequest,
+) -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(model_evaluations.run, request)
+    except (ValueError, KeyError, OSError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/v1/evaluations/model-safety")
+def list_model_safety_evaluations() -> list[dict[str, Any]]:
+    return model_evaluations.list()
+
+
+@app.get("/api/v1/evaluations/model-safety/{evaluation_id}")
+def model_safety_evaluation_detail(evaluation_id: str) -> dict[str, Any]:
+    try:
+        return model_evaluations.get(evaluation_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:

@@ -285,6 +285,15 @@ class BenchmarkRequest(BaseModel):
         )
 
 
+class ModelEvaluationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    suite_name: str = Field(
+        default="大模型调度安全回归", min_length=2, max_length=80, alias="suiteName"
+    )
+    requested_by: str = Field(default="model-evaluator", alias="requestedBy")
+
+
 class DatasetExportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 

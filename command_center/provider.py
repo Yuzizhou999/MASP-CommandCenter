@@ -19,6 +19,7 @@ from .contracts import (
     TaskDraft,
 )
 from .diagnosis import allowed_actions_for, deterministic_diagnosis
+from .model_safety import enforce_intent_authority, enforce_plan_evidence
 from .settings import Settings
 
 
@@ -144,8 +145,14 @@ class DeepSeekProvider:
             if resolved_resource_block is not None:
                 parsed["intentType"] = IntentType.BLOCK_RESOURCE.value
                 parsed["resourceBlock"] = resolved_resource_block
+            intent = DispatchIntent.model_validate(parsed)
+            enforce_intent_authority(
+                intent,
+                resolved_task=resolved_task,
+                resolved_resource_block=resolved_resource_block,
+            )
             return ParseResult(
-                intent=DispatchIntent.model_validate(parsed),
+                intent=intent,
                 model=self.settings.deepseek_model,
                 fallback_used=False,
             )
@@ -272,12 +279,10 @@ class DeepSeekProvider:
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
             narrative = PlanExplanationNarrative.model_validate(json.loads(content))
-            allowed_ids = {row.evidence_id for row in deterministic.evidence}
-            if not narrative.findings or any(
-                not set(row.evidence_ids).issubset(allowed_ids)
-                for row in narrative.findings
-            ):
-                raise ValueError("plan explanation cited unknown evidence")
+            enforce_plan_evidence(
+                narrative.findings,
+                (row.evidence_id for row in deterministic.evidence),
+            )
             return deterministic.model_copy(
                 update={
                     "summary": narrative.summary,

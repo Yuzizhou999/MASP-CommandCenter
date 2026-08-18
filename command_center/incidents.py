@@ -23,6 +23,7 @@ from .contracts import (
 from .diagnosis import allowed_actions_for, deterministic_diagnosis
 from .engine_adapter import MaspAdapter
 from .knowledge import KnowledgeBase
+from .model_safety import diagnosis_violation
 from .provider import DeepSeekProvider
 
 
@@ -663,38 +664,16 @@ class IncidentService:
     def _validate_diagnosis(
         incident: IncidentRecord, diagnosis: DiagnosisReport
     ) -> DiagnosisReport:
-        evidence_ids = {row.evidence_id for row in incident.evidence}
-        referenced = {
-            evidence_id
-            for row in diagnosis.root_cause_candidates
-            for evidence_id in row.evidence_ids
-        }
-        referenced.update(
-            evidence_id
-            for row in diagnosis.recommendations
-            for evidence_id in row.evidence_ids
+        violation = diagnosis_violation(
+            diagnosis,
+            evidence_ids=(row.evidence_id for row in incident.evidence),
+            vehicle_ids=incident.vehicle_ids,
+            task_ids=incident.task_ids,
+            allowed_actions=allowed_actions_for(incident),
         )
-        if not referenced.issubset(evidence_ids):
+        if violation is not None:
             return IncidentService._fallback_diagnosis(
-                incident, model=f"{diagnosis.model}:invalid-evidence"
-            )
-        if not set(diagnosis.affected_vehicle_ids).issubset(set(incident.vehicle_ids)):
-            return IncidentService._fallback_diagnosis(
-                incident, model=f"{diagnosis.model}:invalid-vehicle"
-            )
-        if not set(diagnosis.affected_task_ids).issubset(set(incident.task_ids)):
-            return IncidentService._fallback_diagnosis(
-                incident, model=f"{diagnosis.model}:invalid-task"
-            )
-        if any(
-            row.action_code not in allowed_actions_for(incident)
-            or row.risk_level.value != "R3_HIGH"
-            or not row.requires_simulation
-            or not row.requires_approval
-            for row in diagnosis.recommendations
-        ):
-            return IncidentService._fallback_diagnosis(
-                incident, model=f"{diagnosis.model}:invalid-action"
+                incident, model=f"{diagnosis.model}:{violation}"
             )
         return diagnosis
 
