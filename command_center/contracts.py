@@ -214,7 +214,7 @@ class BenchmarkRequest(BaseModel):
 
     suite_name: str = Field(default="仓储群车高负载基准", min_length=2, alias="suiteName")
     base_scenario_id: str = Field(
-        default="rhpp-high-volume-long-distance", alias="baseScenarioId"
+        default="rhpp-long-distance-conflict", alias="baseScenarioId"
     )
     vehicle_counts: list[int] = Field(
         default_factory=lambda: [14], min_length=1, max_length=4, alias="vehicleCounts"

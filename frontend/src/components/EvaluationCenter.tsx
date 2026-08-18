@@ -153,7 +153,7 @@ export function EvaluationCenter({ onNotice, onError }: EvaluationCenterProps) {
     try {
       const request: BenchmarkRequest = {
         suiteName: suiteName.trim(),
-        baseScenarioId: "rhpp-high-volume-long-distance",
+        baseScenarioId: "rhpp-long-distance-conflict",
         vehicleCounts,
         arrivalProfiles: arrivalProfiles as BenchmarkRequest["arrivalProfiles"],
         fleetMixes: fleetMixes as BenchmarkRequest["fleetMixes"],

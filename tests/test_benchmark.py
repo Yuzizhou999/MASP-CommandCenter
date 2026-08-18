@@ -15,7 +15,7 @@ from command_center.intent_store import IntentStore
 
 def test_benchmark_factory_scales_to_100_unique_vehicles(isolated_settings) -> None:
     engine = MaspAdapter(isolated_settings)
-    factory = BenchmarkScenarioFactory(engine, "rhpp-high-volume-long-distance")
+    factory = BenchmarkScenarioFactory(engine, "rhpp-long-distance-conflict")
 
     first = factory.build(
         vehicle_count=100,
