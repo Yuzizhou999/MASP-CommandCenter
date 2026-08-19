@@ -2,7 +2,7 @@
 
 面向多车型智能仓储的 AI 调度指挥中心。系统使用 DeepSeek 将自然语言请求转换为结构化调度意图，再由 MASP 数字孪生完成路径规划、资源预约、安全校验、What-if 仿真和指标计算。
 
-当前版本是比赛演示与验证系统，只允许在 `simulation` 环境提交意图，不连接真实 WMS、RCS 或车辆控制器。
+当前版本是仿真验证系统，只允许在 `simulation` 环境提交意图，不连接真实 WMS、RCS 或车辆控制器。
 
 ## 核心能力
 
@@ -31,10 +31,10 @@
 
 ```text
 E:\project\MASP                 MASP 核心调度与数字孪生引擎
-E:\project\MASP-CommandCenter   灵枢应用、智能体、治理、前端和比赛材料
+E:\project\MASP-CommandCenter   灵枢应用、智能体、治理和前端
 ```
 
-所有 MASP 调用都集中在 `command_center/engine_adapter.py`。场景包编译和任务流生成扩展位于`command_center/masp/`，由比赛仓库独立维护；原MASP仓库不承载比赛新增代码。`engine.lock.json`固定允许使用的原MASP提交，开发环境可显式允许脏工作区，生产环境必须提交匹配且工作区干净。
+所有 MASP 调用都集中在 `command_center/engine_adapter.py`。场景包编译和任务流生成扩展位于 `command_center/masp/`，由本仓库独立维护。`engine.lock.json` 固定允许使用的 MASP 提交，开发环境可显式允许脏工作区，生产环境必须提交匹配且工作区干净。
 
 ## 技术架构
 
@@ -46,7 +46,7 @@ E:\project\MASP-CommandCenter   灵枢应用、智能体、治理、前端和比
 | 治理 | 风险分级、审批、世界版本、审计、仿真态提交 |
 | 数字孪生 | MASP 在线调度、路径规划、资源预约、事件回放 |
 | 数据与评测 | 可重复矩阵评测、统计汇总、安全门槛、脱敏质检 |
-| 存储 | JSON/JSONL 演示存储，运行证据按 run 和 benchmark 独立落盘 |
+| 存储 | JSON/JSONL 本地存储，运行结果按 run 和 benchmark 独立落盘 |
 
 大模型只负责理解和解释。路径、资源预约、冲突判断、方案指标全部来自 MASP 确定性引擎。故障诊断中的每条根因与建议必须引用真实 `EV-*` 证据，虚构证据、车辆、任务或越权动作会使整份 AI 报告降级为规则诊断。
 
@@ -82,23 +82,6 @@ Copy-Item .env.example .env
 ```powershell
 .\scripts\check.ps1
 ```
-
-## 生成离线演示包
-
-正式打包前需先提交代码。以下命令会构建前端、从 `engine.lock.json` 指定的提交导出干净 MASP 引擎、下载本机 Python 版本对应的离线依赖，并生成带摘要清单的 ZIP：
-
-```powershell
-.\scripts\delivery-check.ps1
-```
-
-产物位于 `.delivery/`，不会进入 Git。解压后在目标 Windows 电脑执行：
-
-```powershell
-.\scripts\install-demo.ps1
-.\scripts\start-demo.ps1
-```
-
-离线包默认不调用 DeepSeek，意图解析和诊断自动使用确定性降级；需要联网调用时使用 `start-demo.ps1 -OnlineAI`，并由现场人员在服务端环境中配置密钥。详细要求见[部署说明](docs/DEPLOYMENT.md)、[演示操作手册](docs/DEMO_OPERATIONS.md)和[交付检查表](docs/DELIVERY_CHECKLIST.md)。
 
 ## 配置 DeepSeek
 
@@ -141,18 +124,15 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 
 脚本从 `engine.lock.json` 指定的提交创建临时只读训练副本，训练产物和日志写入 `data/model-training/`，不会改动原 MASP 工作区。正式登记模型的训练信息和文件摘要见 `models/ppo-priority-v1.json`。
 
-## 比赛演示流程
+## 基本使用流程
 
 1. 选择一个已发布场景运行规则基线，展示多车型调度和资源预约回放。
 2. 点击“注入紧急任务”，检查大模型形成的结构化任务草案和 MASP 世界快照依据。
 3. 运行数字孪生，将候选方案与基线加入方案比较。
 4. 点击“推演通道封闭”，展示 R3 风险识别和封锁资源高亮。
 5. 仿真完成后提交主管审批，在审批页批准，再提交到仿真环境。
-6. 打开运营审计，核对意图、仿真、审批、提交的完整证据链。
-7. 导出运营报告，说明全部数值来自仿真，不冒充真实生产收益。
-8. 进入“异常诊断”，使用一键演示注入车辆故障、工位停用或等待环，完成证据诊断、至少两个处置分支推演和 R3 送审，再跳转方案页比较。
-9. 进入“评测中心”，选择车辆规模、任务负载、车型、策略和种子，运行同口径评测并核对安全门槛与置信区间。
-10. 生成脱敏评测数据资产包，检查训练/验证/测试集划分和质量报告后下载 ZIP。
+6. 在异常诊断页注入车辆故障、工位停用或等待环，比较处置分支并按需送审。
+7. 在评测中心选择车辆规模、任务负载、策略和随机种子，运行可重复评测。
 
 ## 主要 API
 
@@ -186,7 +166,7 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 
 启动后可在 [http://127.0.0.1:8877/docs](http://127.0.0.1:8877/docs) 查看完整 OpenAPI 文档。
 
-## 运行证据
+## 运行数据
 
 每次仿真写入 `runs/<runId>/`：
 
@@ -199,20 +179,14 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 - `agent-policy-evidence.json`：模型版本、推理与接管计数、逐轮候选和安全边界；
 - `incident-context.json`：故障分支、冻结窗口、人工转运和已知限制。
 
-每次矩阵评测写入 `data/evaluations/<benchmarkId>/`，保存原始请求、逐用例输入、逐用例结果以及 JSON/Markdown 报告。每次数据导出写入 `data/dataset-exports/<exportId>/`，包含 `manifest.json`、`quality-report.json`、`dataset.jsonl` 和可下载 ZIP。运行产物默认不进入 Git。
-
-这些目录默认不进入 Git，避免把运行数据和源代码混在一起。
+矩阵评测写入 `data/evaluations/<benchmarkId>/`，数据导出写入 `data/dataset-exports/<exportId>/`。`data/` 和 `runs/` 都是可再生成的本地运行目录，不进入 Git。
 
 ## 文档
 
-- [参赛作品说明](docs/COMPETITION_SUBMISSION.md)
 - [模型卡](docs/MODEL_CARD.md)
-- [数据卡](docs/DATA_CARD.md)
 - [评测方法](docs/EVALUATION.md)
 - [安全与权益说明](docs/SECURITY_AND_RIGHTS.md)
 - [部署说明](docs/DEPLOYMENT.md)
-- [演示操作手册](docs/DEMO_OPERATIONS.md)
-- [交付检查表](docs/DELIVERY_CHECKLIST.md)
 
 ## 当前安全边界
 
@@ -221,4 +195,4 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 - 大模型不能生成路径、资源预约或安全停车解除指令；
 - R3 操作没有已批准且意图匹配的审批单时无法提交；
 - 世界状态版本变化后，旧意图必须重新仿真；
-- 所有比赛指标必须能追溯到 MASP 原始运行文件。
+- 所有仿真指标必须能追溯到 MASP 原始运行文件。

@@ -41,7 +41,7 @@ class IntentStore:
             "approvalId": approval.approval_id if approval is not None else None,
             "actor": actor,
             "committedAt": utc_now().isoformat(),
-            "notice": "该提交仅写入比赛仿真环境，不会向真实车辆下发指令。",
+            "notice": "该提交仅写入仿真环境，不会向真实车辆下发指令。",
         }
         with self._lock:
             rows: list[dict[str, Any]] = []

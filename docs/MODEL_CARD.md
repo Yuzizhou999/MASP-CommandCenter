@@ -54,7 +54,7 @@
 
 ## 已知限制
 
-- 本地解析器只覆盖比赛核心中文表达，不是通用中文语义系统；
+- 本地解析器只覆盖当前核心中文表达，不是通用中文语义系统；
 - 当前知识检索是本地关键词匹配，不含向量模型和重排序；
 - 当前会话不做长期记忆；
 - 省略站点、车型或封锁资源时，确定性参数解析器会进入澄清轮次；模型不会获得用默认实体补齐的权限；
@@ -73,7 +73,7 @@
 
 群车策略采用 MASP Actor-Critic/PPO 优先级网络。观测由候选车辆与任务特征、候选路径 token、资源关系、候选掩码和优先级等待时间组成，动作是冲突分量内候选顺序的合法排列。模型只读调度快照并提出一个或多个顺序，不写入车辆状态、路径或预约表。
 
-比赛版本内置 `models/ppo-priority-v1.pt`，后端自动登记该 checkpoint，也允许部署人员通过环境变量替换；客户端不能提交文件路径。加载前校验 checkpoint 版本以及 `observation_version`、`action_mode`、`reward_version`、`priority_prefix_count` 等元数据。运行时记录模型 ID、版本、文件摘要、推理次数与耗时、学习候选数、采用数、规则降级和 guardian 覆盖次数。
+当前版本内置 `models/ppo-priority-v1.pt`，后端自动登记该 checkpoint，也允许部署人员通过环境变量替换；客户端不能提交文件路径。加载前校验 checkpoint 版本以及 `observation_version`、`action_mode`、`reward_version`、`priority_prefix_count` 等元数据。运行时记录模型 ID、版本、文件摘要、推理次数与耗时、学习候选数、采用数、规则降级和 guardian 覆盖次数。
 
 学习候选与规则候选使用同一套 MASP 评估器。连续时间 SIPP、运动学约束和资源预约是硬约束，Top-K guardian 保留确定性拥堵候选并按统一业务评分选优。未配置权重、元数据不兼容、推理异常、超时、非法排列或候选不可行时，系统使用规则基线，并在 `agent-policy-evidence.json` 中记录原因。没有通过校验的 checkpoint 不得标记为已启用模型。
 

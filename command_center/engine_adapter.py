@@ -164,7 +164,7 @@ class MaspAdapter:
             "source": "git-worktree",
             "bundleVerified": False,
             "warning": (
-                "开发模式正在使用包含未提交修改的MASP工作区，比赛发布前必须固定干净版本。"
+                "开发模式正在使用包含未提交修改的 MASP 工作区，发布前必须固定干净版本。"
                 if dirty and allowed
                 else None
             ),
