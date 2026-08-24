@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import httpx
 import pytest
 from pydantic import ValidationError
 
@@ -10,14 +11,18 @@ from command_center.provider import DeepSeekProvider
 
 
 class _JsonResponse:
-    def __init__(self, content: str) -> None:
+    def __init__(self, content: str, usage: dict | None = None) -> None:
         self.content = content
+        self.usage = usage or {}
 
     def raise_for_status(self) -> None:
         return None
 
     def json(self):
-        return {"choices": [{"message": {"content": self.content}}]}
+        return {
+            "choices": [{"message": {"content": self.content}}],
+            "usage": self.usage,
+        }
 
 
 def test_resource_block_rejects_invalid_time_window() -> None:
@@ -98,3 +103,80 @@ def test_provider_rejects_ungrounded_model_task(isolated_settings, monkeypatch) 
     assert result.fallback_used is True
     assert result.intent is None
     assert result.clarification is not None
+
+
+def test_provider_retries_transient_failure_and_records_token_cost(
+    isolated_settings, monkeypatch
+) -> None:
+    configured = replace(
+        isolated_settings,
+        deepseek_api_key="test-key",
+        deepseek_max_retries=1,
+    )
+    responses = [
+        httpx.ConnectError("temporary network failure"),
+        _JsonResponse(
+            '{"intentType":"QUERY_STATUS","query":"status"}',
+            {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120},
+        ),
+    ]
+
+    def post(*args, **kwargs):
+        response = responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    monkeypatch.setattr("command_center.provider.httpx.post", post)
+    provider = DeepSeekProvider(configured)
+
+    result = provider.parse_intent(
+        "当前状态怎么样？",
+        world_revision=9,
+        requested_by="tester",
+    )
+    telemetry = provider.telemetry()
+
+    assert result.fallback_used is False
+    assert telemetry["requestCount"] == 1
+    assert telemetry["attemptCount"] == 2
+    assert telemetry["retryCount"] == 1
+    assert telemetry["successCount"] == 1
+    assert telemetry["totalTokens"] == 120
+    assert telemetry["estimatedCostUsd"] > 0
+
+
+def test_provider_circuit_breaker_skips_calls_while_open(
+    isolated_settings, monkeypatch
+) -> None:
+    configured = replace(
+        isolated_settings,
+        deepseek_api_key="test-key",
+        deepseek_max_retries=0,
+        deepseek_circuit_failure_threshold=1,
+    )
+    call_count = 0
+
+    def fail(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        raise httpx.ConnectError("provider unavailable")
+
+    monkeypatch.setattr("command_center.provider.httpx.post", fail)
+    provider = DeepSeekProvider(configured)
+
+    first = provider.parse_intent(
+        "当前状态怎么样？",
+        world_revision=9,
+        requested_by="tester",
+    )
+    second = provider.parse_intent(
+        "当前状态怎么样？",
+        world_revision=10,
+        requested_by="tester",
+    )
+
+    assert first.fallback_used is True
+    assert second.fallback_used is True
+    assert call_count == 1
+    assert provider.telemetry()["circuitOpen"] is True

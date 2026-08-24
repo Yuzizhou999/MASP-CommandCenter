@@ -387,6 +387,20 @@ class ChatRequest(BaseModel):
     )
 
 
+class AgentRunCreateRequest(ChatRequest):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    timeout_seconds: int = Field(default=60, ge=5, le=300, alias="timeoutSeconds")
+
+
+class AgentRunResumeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    approved: bool
+    decided_by: str = Field(default="demo-supervisor", alias="decidedBy")
+    reason: str = Field(default="已核对 Agent 草案和风险边界", min_length=2)
+
+
 class EvidenceItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -428,6 +442,57 @@ class AgentTraceStep(BaseModel):
     tool_name: str | None = Field(default=None, alias="toolName")
     read_only: bool | None = Field(default=None, alias="readOnly")
     duration_ms: float = Field(default=0, ge=0, alias="durationMs")
+
+
+class AgentRunEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    event_id: int = Field(ge=1, alias="eventId")
+    event_type: str = Field(alias="eventType")
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now, alias="createdAt")
+
+
+class AgentRunEvaluation(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    passed: bool
+    score: float = Field(ge=0, le=1)
+    checks: dict[str, bool] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+
+
+class AgentRunRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    run_id: str = Field(alias="runId")
+    status: Literal[
+        "QUEUED",
+        "RUNNING",
+        "WAITING_APPROVAL",
+        "COMPLETED",
+        "REJECTED",
+        "CANCELLED",
+        "TIMED_OUT",
+        "FAILED",
+    ]
+    request: AgentRunCreateRequest
+    idempotency_key: str | None = Field(default=None, alias="idempotencyKey")
+    attempt: int = Field(default=0, ge=0)
+    recovered: bool = False
+    cancel_requested: bool = Field(default=False, alias="cancelRequested")
+    trace_steps: list[AgentTraceStep] = Field(default_factory=list, alias="traceSteps")
+    response: "ChatResponse | None" = None
+    approval: dict[str, Any] | None = None
+    evaluation: AgentRunEvaluation | None = None
+    provider_usage: dict[str, Any] = Field(default_factory=dict, alias="providerUsage")
+    error: str | None = None
+    events: list[AgentRunEvent] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now, alias="createdAt")
+    updated_at: datetime = Field(default_factory=utc_now, alias="updatedAt")
+    deadline_at: datetime = Field(alias="deadlineAt")
+    started_at: datetime | None = Field(default=None, alias="startedAt")
+    completed_at: datetime | None = Field(default=None, alias="completedAt")
 
 
 class AgentExecutionTrace(BaseModel):
@@ -477,6 +542,9 @@ class ChatResponse(BaseModel):
     fallback_used: bool = Field(alias="fallbackUsed")
     suggested_actions: list[str] = Field(default_factory=list, alias="suggestedActions")
     agent_trace: AgentExecutionTrace | None = Field(default=None, alias="agentTrace")
+
+
+AgentRunRecord.model_rebuild()
 
 
 class PlanExplanationRequest(BaseModel):

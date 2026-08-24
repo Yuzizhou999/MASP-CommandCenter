@@ -11,19 +11,23 @@ import {
 import {
   Bot24Regular,
   CheckmarkCircle20Regular,
+  DismissCircle20Regular,
   DocumentSearch20Regular,
   Play20Regular,
   Send20Regular,
   ShieldLock20Regular,
 } from "@fluentui/react-icons";
-import type { Approval, ChatResponse, DispatchIntent, SimulationSummary } from "../types";
+import type { AgentRunRecord, Approval, ChatResponse, DispatchIntent, SimulationSummary } from "../types";
 
 interface AssistantPanelProps {
   response?: ChatResponse | null;
+  agentRun?: AgentRunRecord | null;
   run?: SimulationSummary | null;
   approval?: Approval | null;
   busy?: string | null;
   onSend: (message: string) => Promise<void>;
+  onAgentApproval: (approved: boolean) => Promise<void>;
+  onAgentCancel: () => Promise<void>;
   onSimulate: (intent: DispatchIntent) => Promise<void>;
   onCreateApproval: (intent: DispatchIntent, runId: string) => Promise<void>;
   onCommit: (intent: DispatchIntent, approvalId?: string) => Promise<void>;
@@ -43,21 +47,38 @@ const riskLabel: Record<string, string> = {
   R4_FORBIDDEN: "禁止",
 };
 
+const runStatusLabel: Record<string, string> = {
+  QUEUED: "等待执行",
+  RUNNING: "实时执行",
+  WAITING_APPROVAL: "等待主管确认",
+  COMPLETED: "运行完成",
+  REJECTED: "主管拒绝",
+  CANCELLED: "已取消",
+  TIMED_OUT: "执行超时",
+  FAILED: "运行失败",
+};
+
 export function AssistantPanel({
   response,
+  agentRun,
   run,
   approval,
   busy,
   onSend,
+  onAgentApproval,
+  onAgentCancel,
   onSimulate,
   onCreateApproval,
   onCommit,
 }: AssistantPanelProps) {
   const [message, setMessage] = useState("");
+  const agentActive = Boolean(
+    agentRun && ["QUEUED", "RUNNING", "WAITING_APPROVAL"].includes(agentRun.status),
+  );
 
   const submit = async (value = message) => {
     const normalized = value.trim();
-    if (!normalized || busy) return;
+    if (!normalized || busy || agentActive) return;
     setMessage("");
     await onSend(normalized);
   };
@@ -73,12 +94,18 @@ export function AssistantPanel({
         <span className="assistant-icon"><Bot24Regular /></span>
         <div>
           <h2>灵枢 AI 调度助手</h2>
-          <p>{response ? `${response.model}${response.fallbackUsed ? "，本地降级" : ""}` : "等待调度指令"}</p>
+          <p>
+            {response
+              ? `${response.model}${response.fallbackUsed ? "，本地降级" : ""}`
+              : agentRun
+                ? `${runStatusLabel[agentRun.status]} · SSE 实时轨迹`
+                : "等待调度指令"}
+          </p>
         </div>
       </div>
 
       <div className="assistant-conversation">
-        {!response && (
+        {!response && !agentRun && (
           <div className="assistant-empty">
             <p>用自然语言描述任务或异常，系统会先生成结构化意图，再交给 MASP 校验与仿真。</p>
             <div className="example-list">
@@ -91,9 +118,111 @@ export function AssistantPanel({
           </div>
         )}
 
+        {!response && agentRun && (
+          <div className="assistant-response agent-runtime-live">
+            <div className="agent-runtime-bar">
+              <Badge
+                appearance="filled"
+                color={
+                  agentRun.status === "WAITING_APPROVAL"
+                    ? "warning"
+                    : ["FAILED", "TIMED_OUT", "REJECTED"].includes(agentRun.status)
+                      ? "danger"
+                      : agentRun.status === "COMPLETED"
+                        ? "success"
+                        : "informative"
+                }
+              >
+                {runStatusLabel[agentRun.status]}
+              </Badge>
+              <code>{agentRun.runId}</code>
+              <span>第 {agentRun.attempt} 次执行</span>
+            </div>
+            <p className="response-copy">
+              {agentRun.status === "WAITING_APPROVAL"
+                ? "确定性安全校验已完成。高风险草案在检查点暂停，批准后才会完成本轮 Agent 决策。"
+                : agentRun.error || "Agent 正在按有界状态机执行，步骤会实时写入并推送到这里。"}
+            </p>
+
+            {agentRun.traceSteps.length > 0 && (
+              <ol className="agent-trace-list agent-trace-live-list" aria-label="实时 Agent 轨迹">
+                {agentRun.traceSteps.map((step) => (
+                  <li key={step.stepId} className={`agent-trace-step agent-trace-${step.status.toLowerCase()}`}>
+                    <span className="agent-step-index mono">{step.sequence}</span>
+                    <div>
+                      <div className="agent-step-heading">
+                        <strong>{step.title}</strong>
+                        {step.toolName && <code>{step.toolName}</code>}
+                        {step.readOnly && <span>只读</span>}
+                      </div>
+                      <p>{step.detail}</p>
+                      <small className="mono">{step.state} · {step.durationMs.toFixed(1)} ms</small>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            {agentRun.approval && agentRun.status === "WAITING_APPROVAL" && (
+              <div className="agent-approval-gate">
+                <div>
+                  <strong>人工审批检查点</strong>
+                  <span>{riskLabel[agentRun.approval.validation.riskLevel]} · {agentRun.approval.intent.intentType}</span>
+                </div>
+                <div className="assistant-actions">
+                  <Button
+                    appearance="primary"
+                    icon={<CheckmarkCircle20Regular />}
+                    disabled={Boolean(busy)}
+                    onClick={() => void onAgentApproval(true)}
+                  >
+                    批准并继续
+                  </Button>
+                  <Button
+                    appearance="secondary"
+                    icon={<DismissCircle20Regular />}
+                    disabled={Boolean(busy)}
+                    onClick={() => void onAgentApproval(false)}
+                  >
+                    拒绝草案
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {agentRun.status === "RUNNING" && (
+              <div className="assistant-actions">
+                <Button
+                  appearance="subtle"
+                  icon={<DismissCircle20Regular />}
+                  onClick={() => void onAgentCancel()}
+                >
+                  取消运行
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         {response && (
           <div className="assistant-response">
             <p className="response-copy">{response.message}</p>
+            {agentRun?.evaluation && (
+              <div className="agent-runtime-bar">
+                <Badge
+                  appearance="outline"
+                  color={agentRun.evaluation.passed ? "success" : "danger"}
+                >
+                  轨迹评测 {Math.round(agentRun.evaluation.score * 100)}%
+                </Badge>
+                <span className="mono">
+                  Token {Number(agentRun.providerUsage.totalTokens || 0).toLocaleString("zh-CN")}
+                </span>
+                <span className="mono">
+                  ${Number(agentRun.providerUsage.estimatedCostUsd || 0).toFixed(6)}
+                </span>
+              </div>
+            )}
             {response.clarification && (
               <div className="clarification-box" role="status">
                 <strong>需要补充信息</strong>
@@ -252,7 +381,7 @@ export function AssistantPanel({
           appearance="primary"
           icon={<Send20Regular />}
           aria-label="发送调度请求"
-          disabled={!message.trim() || Boolean(busy)}
+          disabled={!message.trim() || Boolean(busy) || agentActive}
           onClick={() => void submit()}
         />
       </div>

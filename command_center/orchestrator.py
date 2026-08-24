@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from time import perf_counter
+from typing import Callable
 
 from .agent_memory import AgentMemoryStore
 from .agent_observability import AgentObservabilityStore
@@ -11,7 +12,10 @@ from .clarifications import ClarificationResolver, ClarificationStore
 from .contracts import (
     ChatRequest,
     ChatResponse,
+    DispatchIntent,
+    IntentValidation,
     IntentType,
+    AgentTraceStep,
     new_id,
 )
 from .engine_adapter import MaspAdapter
@@ -45,9 +49,15 @@ class DispatchOrchestrator:
             ClarificationStore(engine.settings.data_dir / "clarifications.json"), engine
         )
 
-    def chat(self, request: ChatRequest) -> ChatResponse:
+    def chat(
+        self,
+        request: ChatRequest,
+        *,
+        on_step: Callable[[AgentTraceStep], None] | None = None,
+        approval_gate: Callable[[DispatchIntent, IntentValidation], None] | None = None,
+    ) -> ChatResponse:
         trace_id = new_id("trace")
-        run = BoundedAgentRun()
+        run = BoundedAgentRun(on_step=on_step)
         tools = DispatchAgentTools(
             engine=self.engine,
             knowledge=self.knowledge,
@@ -199,6 +209,8 @@ class DispatchOrchestrator:
             {"intent": parsed.intent.model_dump(by_alias=True, mode="json")},
         )
         validation = tools.validation_value(validation_result)
+        if validation.valid and validation.approval_required and approval_gate:
+            approval_gate(parsed.intent, validation)
 
         intent_type = parsed.intent.intent_type
         memory_reference = prior_memory is not None and any(

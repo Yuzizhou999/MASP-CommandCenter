@@ -30,6 +30,11 @@ class Settings:
     deepseek_base_url: str
     deepseek_model: str
     deepseek_timeout_seconds: float
+    deepseek_max_retries: int = 2
+    deepseek_circuit_failure_threshold: int = 3
+    deepseek_circuit_reset_seconds: float = 30
+    deepseek_input_cost_per_million: float = 0.27
+    deepseek_output_cost_per_million: float = 1.10
     agent_model_id: str = "masp-ppo-priority"
     agent_model_version: str = "1.0.0"
     agent_checkpoint: Path | None = None
@@ -82,6 +87,22 @@ class Settings:
             deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
             deepseek_timeout_seconds=float(
                 os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "30")
+            ),
+            deepseek_max_retries=max(
+                0, min(5, int(os.getenv("DEEPSEEK_MAX_RETRIES", "2")))
+            ),
+            deepseek_circuit_failure_threshold=max(
+                1,
+                int(os.getenv("DEEPSEEK_CIRCUIT_FAILURE_THRESHOLD", "3")),
+            ),
+            deepseek_circuit_reset_seconds=max(
+                1, float(os.getenv("DEEPSEEK_CIRCUIT_RESET_SECONDS", "30"))
+            ),
+            deepseek_input_cost_per_million=max(
+                0, float(os.getenv("DEEPSEEK_INPUT_COST_PER_MILLION", "0.27"))
+            ),
+            deepseek_output_cost_per_million=max(
+                0, float(os.getenv("DEEPSEEK_OUTPUT_COST_PER_MILLION", "1.10"))
             ),
             agent_model_id=os.getenv(
                 "MASP_AGENT_MODEL_ID", "masp-ppo-priority"

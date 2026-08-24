@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 from time import perf_counter
-from typing import Any
+from typing import Any, Callable
 
 from .agent_tools import AgentToolResult, DispatchAgentTools
 from .contracts import AgentExecutionTrace, AgentTraceStep
@@ -36,13 +36,19 @@ _TRANSITIONS: dict[AgentState | None, set[AgentState]] = {
 
 
 class BoundedAgentRun:
-    def __init__(self, *, max_steps: int = 16) -> None:
+    def __init__(
+        self,
+        *,
+        max_steps: int = 16,
+        on_step: Callable[[AgentTraceStep], None] | None = None,
+    ) -> None:
         self.max_steps = max_steps
         self.current_state: AgentState | None = None
         self.steps: list[AgentTraceStep] = []
         self.strategy = "DETERMINISTIC_POLICY"
         self.planner_model = "deterministic-tool-policy"
         self._started = perf_counter()
+        self._on_step = on_step
 
     def set_planner(self, *, strategy: str, model: str) -> None:
         if strategy not in {"MODEL_TOOL_CALLING", "DETERMINISTIC_POLICY"}:
@@ -137,15 +143,16 @@ class BoundedAgentRun:
     ) -> None:
         if len(self.steps) >= self.max_steps:
             raise RuntimeError(f"Agent 超过最大执行步数 {self.max_steps}")
-        self.steps.append(
-            AgentTraceStep(
-                sequence=len(self.steps) + 1,
-                state=state.value,
-                status=status,
-                title=title,
-                detail=detail,
-                toolName=tool_name,
-                readOnly=read_only,
-                durationMs=round(max(0, duration_ms), 3),
-            )
+        step = AgentTraceStep(
+            sequence=len(self.steps) + 1,
+            state=state.value,
+            status=status,
+            title=title,
+            detail=detail,
+            toolName=tool_name,
+            readOnly=read_only,
+            durationMs=round(max(0, duration_ms), 3),
         )
+        self.steps.append(step)
+        if self._on_step is not None:
+            self._on_step(step)

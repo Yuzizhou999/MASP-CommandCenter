@@ -240,6 +240,68 @@ export interface ChatResponse {
   agentTrace?: AgentExecutionTrace | null;
 }
 
+export type AgentRunStatus =
+  | "QUEUED"
+  | "RUNNING"
+  | "WAITING_APPROVAL"
+  | "COMPLETED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "TIMED_OUT"
+  | "FAILED";
+
+export interface AgentRunEvent {
+  eventId: number;
+  eventType: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AgentRunEvaluation {
+  passed: boolean;
+  score: number;
+  checks: Record<string, boolean>;
+  notes: string[];
+}
+
+export interface AgentRunRecord {
+  runId: string;
+  status: AgentRunStatus;
+  request: {
+    message: string;
+    scenarioId: string;
+    requestedBy: string;
+    conversationId: string;
+    timeoutSeconds: number;
+  };
+  idempotencyKey?: string | null;
+  attempt: number;
+  recovered: boolean;
+  cancelRequested: boolean;
+  traceSteps: AgentTraceStep[];
+  response?: ChatResponse | null;
+  approval?: {
+    intent: DispatchIntent;
+    validation: Validation;
+    requestedAt: string;
+    decision?: {
+      approved: boolean;
+      decidedBy: string;
+      reason: string;
+      decidedAt: string;
+    } | null;
+  } | null;
+  evaluation?: AgentRunEvaluation | null;
+  providerUsage: Record<string, number | boolean | Record<string, number>>;
+  error?: string | null;
+  events: AgentRunEvent[];
+  createdAt: string;
+  updatedAt: string;
+  deadlineAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
 export interface AgentPolicyOptions {
   modelId?: string | null;
   candidateCount: number;

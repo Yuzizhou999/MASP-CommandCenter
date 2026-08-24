@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import json
 import re
+import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any
+from threading import RLock
+from typing import Any, Callable
 
 import httpx
 
@@ -77,6 +81,17 @@ class AgentToolPlan:
 class DeepSeekProvider:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        self._telemetry_lock = RLock()
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
+        self._run_context: ContextVar[str | None] = ContextVar(
+            "deepseek_run_id", default=None
+        )
+        self._control_context: ContextVar[Callable[[], None] | None] = ContextVar(
+            "deepseek_control", default=None
+        )
+        self._aggregate = self._empty_telemetry()
+        self._runs: dict[str, dict[str, Any]] = {}
 
     @property
     def configured(self) -> bool:
@@ -89,7 +104,142 @@ class DeepSeekProvider:
             "configured": self.configured,
             "mode": "api" if self.configured else "deterministic-fallback",
             "baseUrl": self.settings.deepseek_base_url,
+            "resilience": {
+                "maxRetries": self.settings.deepseek_max_retries,
+                "circuitFailureThreshold": self.settings.deepseek_circuit_failure_threshold,
+                "circuitResetSeconds": self.settings.deepseek_circuit_reset_seconds,
+            },
+            "telemetry": self.telemetry(),
         }
+
+    @staticmethod
+    def _empty_telemetry() -> dict[str, Any]:
+        return {
+            "requestCount": 0,
+            "attemptCount": 0,
+            "successCount": 0,
+            "failureCount": 0,
+            "retryCount": 0,
+            "fallbackCount": 0,
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "totalTokens": 0,
+            "estimatedCostUsd": 0.0,
+        }
+
+    @contextmanager
+    def telemetry_scope(
+        self,
+        run_id: str,
+        *,
+        control: Callable[[], None] | None = None,
+    ):
+        token = self._run_context.set(run_id)
+        control_token = self._control_context.set(control)
+        with self._telemetry_lock:
+            self._runs[run_id] = self._empty_telemetry()
+        try:
+            yield
+        finally:
+            self._control_context.reset(control_token)
+            self._run_context.reset(token)
+
+    def telemetry(self, run_id: str | None = None) -> dict[str, Any]:
+        with self._telemetry_lock:
+            source = self._runs.get(run_id, {}) if run_id else self._aggregate
+            result = dict(source)
+            result["circuitOpen"] = time.monotonic() < self._circuit_open_until
+            result["pricingUsdPerMillionTokens"] = {
+                "input": self.settings.deepseek_input_cost_per_million,
+                "output": self.settings.deepseek_output_cost_per_million,
+            }
+            return result
+
+    def _increment(self, key: str, value: int | float = 1) -> None:
+        with self._telemetry_lock:
+            targets = [self._aggregate]
+            run_id = self._run_context.get()
+            if run_id:
+                targets.append(self._runs.setdefault(run_id, self._empty_telemetry()))
+            for target in targets:
+                target[key] = target.get(key, 0) + value
+                if key == "estimatedCostUsd":
+                    target[key] = round(float(target[key]), 8)
+
+    def _mark_fallback(self) -> None:
+        self._increment("fallbackCount")
+
+    def _post(self, *, payload: dict[str, Any]):
+        with self._telemetry_lock:
+            circuit_open = time.monotonic() < self._circuit_open_until
+        if circuit_open:
+            self._increment("failureCount")
+            raise ValueError("DeepSeek circuit breaker is open")
+
+        self._increment("requestCount")
+        last_error: httpx.HTTPError | None = None
+        for attempt in range(self.settings.deepseek_max_retries + 1):
+            control = self._control_context.get()
+            if control is not None:
+                control()
+            self._increment("attemptCount")
+            if attempt:
+                self._increment("retryCount")
+                time.sleep(min(0.2 * (2 ** (attempt - 1)), 1.0))
+            try:
+                response = httpx.post(
+                    f"{self.settings.deepseek_base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.settings.deepseek_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                    timeout=self.settings.deepseek_timeout_seconds,
+                )
+                response.raise_for_status()
+                usage = response.json().get("usage") or {}
+                prompt_tokens = int(usage.get("prompt_tokens") or 0)
+                completion_tokens = int(usage.get("completion_tokens") or 0)
+                total_tokens = int(
+                    usage.get("total_tokens") or prompt_tokens + completion_tokens
+                )
+                self._increment("promptTokens", prompt_tokens)
+                self._increment("completionTokens", completion_tokens)
+                self._increment("totalTokens", total_tokens)
+                self._increment(
+                    "estimatedCostUsd",
+                    (
+                        prompt_tokens * self.settings.deepseek_input_cost_per_million
+                        + completion_tokens
+                        * self.settings.deepseek_output_cost_per_million
+                    )
+                    / 1_000_000,
+                )
+                self._increment("successCount")
+                with self._telemetry_lock:
+                    self._consecutive_failures = 0
+                return response
+            except httpx.HTTPStatusError as error:
+                last_error = error
+                status_code = error.response.status_code
+                if status_code not in {408, 429} and status_code < 500:
+                    break
+            except httpx.HTTPError as error:
+                last_error = error
+
+        self._increment("failureCount")
+        with self._telemetry_lock:
+            self._consecutive_failures += 1
+            if (
+                self._consecutive_failures
+                >= self.settings.deepseek_circuit_failure_threshold
+            ):
+                self._circuit_open_until = (
+                    time.monotonic() + self.settings.deepseek_circuit_reset_seconds
+                )
+        if last_error is not None:
+            raise last_error
+        raise ValueError("DeepSeek request failed")
 
     def plan_context_tools(
         self,
@@ -115,6 +265,7 @@ class DeepSeekProvider:
             model="deterministic-tool-policy",
         )
         if not self.configured:
+            self._mark_fallback()
             return fallback
 
         allowed_names = {
@@ -123,13 +274,8 @@ class DeepSeekProvider:
             if item.get("type") == "function"
         }
         try:
-            response = httpx.post(
-                f"{self.settings.deepseek_base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.settings.deepseek_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
+            response = self._post(
+                payload={
                     "model": self.settings.deepseek_model,
                     "temperature": 0,
                     "messages": [
@@ -148,10 +294,8 @@ class DeepSeekProvider:
                     ],
                     "tools": tool_definitions,
                     "tool_choice": "auto",
-                },
-                timeout=self.settings.deepseek_timeout_seconds,
+                }
             )
-            response.raise_for_status()
             message = response.json()["choices"][0]["message"]
             raw_calls = message.get("tool_calls") or []
             calls: list[PlannedToolCall] = []
@@ -204,6 +348,7 @@ class DeepSeekProvider:
                 model=self.settings.deepseek_model,
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            self._mark_fallback()
             return fallback
 
     def parse_intent(
@@ -217,6 +362,7 @@ class DeepSeekProvider:
         context_evidence: list[EvidenceItem] | None = None,
     ) -> ParseResult:
         if not self.configured:
+            self._mark_fallback()
             return self._fallback_result(
                 text,
                 world_revision=world_revision,
@@ -228,13 +374,8 @@ class DeepSeekProvider:
 
         try:
             schema = DispatchIntent.model_json_schema(by_alias=True)
-            response = httpx.post(
-                f"{self.settings.deepseek_base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.settings.deepseek_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
+            response = self._post(
+                payload={
                     "model": self.settings.deepseek_model,
                     "temperature": 0,
                     "response_format": {"type": "json_object"},
@@ -265,10 +406,8 @@ class DeepSeekProvider:
                             ),
                         },
                     ],
-                },
-                timeout=self.settings.deepseek_timeout_seconds,
+                }
             )
-            response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
             parsed = json.loads(content)
             parsed["basedOnWorldRevision"] = world_revision
@@ -295,6 +434,7 @@ class DeepSeekProvider:
                 fallback_used=False,
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            self._mark_fallback()
             return self._fallback_result(
                 text,
                 world_revision=world_revision,
@@ -306,6 +446,7 @@ class DeepSeekProvider:
 
     def diagnose_incident(self, incident: IncidentRecord) -> DiagnosisReport:
         if not self.configured:
+            self._mark_fallback()
             return deterministic_diagnosis(incident)
         try:
             schema = DiagnosisReport.model_json_schema(by_alias=True)
@@ -337,13 +478,8 @@ class DeepSeekProvider:
                 "allowedActions": sorted(allowed_actions_for(incident)),
                 "schema": schema,
             }
-            response = httpx.post(
-                f"{self.settings.deepseek_base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.settings.deepseek_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
+            response = self._post(
+                payload={
                     "model": self.settings.deepseek_model,
                     "temperature": 0,
                     "response_format": {"type": "json_object"},
@@ -354,16 +490,15 @@ class DeepSeekProvider:
                             "content": json.dumps(payload, ensure_ascii=False),
                         },
                     ],
-                },
-                timeout=self.settings.deepseek_timeout_seconds,
+                }
             )
-            response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
             parsed = json.loads(content)
             parsed["model"] = self.settings.deepseek_model
             parsed["fallbackUsed"] = False
             return DiagnosisReport.model_validate(parsed)
         except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            self._mark_fallback()
             return deterministic_diagnosis(
                 incident,
                 model=f"{self.settings.deepseek_model}:fallback",
@@ -373,16 +508,12 @@ class DeepSeekProvider:
         self, deterministic: PlanExplanationReport
     ) -> PlanExplanationReport:
         if not self.configured:
+            self._mark_fallback()
             return deterministic
         try:
             schema = PlanExplanationNarrative.model_json_schema(by_alias=True)
-            response = httpx.post(
-                f"{self.settings.deepseek_base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.settings.deepseek_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
+            response = self._post(
+                payload={
                     "model": self.settings.deepseek_model,
                     "temperature": 0,
                     "response_format": {"type": "json_object"},
@@ -411,10 +542,8 @@ class DeepSeekProvider:
                             ),
                         },
                     ],
-                },
-                timeout=self.settings.deepseek_timeout_seconds,
+                }
             )
-            response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
             narrative = PlanExplanationNarrative.model_validate(json.loads(content))
             enforce_plan_evidence(
@@ -431,6 +560,7 @@ class DeepSeekProvider:
                 }
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            self._mark_fallback()
             return deterministic.model_copy(
                 update={"model": f"{self.settings.deepseek_model}:fallback"}
             )

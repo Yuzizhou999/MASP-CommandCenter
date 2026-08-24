@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import {
   Badge,
@@ -46,6 +46,7 @@ import { ScenarioDesigner } from "./components/ScenarioDesigner";
 import { WarehouseMap } from "./components/WarehouseMap";
 import type {
   Approval,
+  AgentRunRecord,
   AuditEvent,
   ChatResponse,
   Comparison,
@@ -75,6 +76,7 @@ const viewItems: Array<{ id: View; label: string; icon: ReactElement }> = [
 ];
 
 const formatCount = (value?: number) => (typeof value === "number" ? value.toLocaleString("zh-CN") : "-");
+const terminalAgentRunStatuses = new Set(["COMPLETED", "REJECTED", "CANCELLED", "TIMED_OUT", "FAILED"]);
 
 export default function App() {
   const [view, setView] = useState<View>("command");
@@ -97,6 +99,8 @@ export default function App() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [chatResponse, setChatResponse] = useState<ChatResponse | null>(null);
+  const [agentRun, setAgentRun] = useState<AgentRunRecord | null>(null);
+  const stopAgentWatch = useRef<(() => void) | null>(null);
   const [conversationId] = useState(() => `conversation-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`);
   const [planExplanation, setPlanExplanation] = useState<PlanExplanationReport | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -178,6 +182,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => () => stopAgentWatch.current?.(), []);
+
   useEffect(() => {
     if (loading || !selectedScenario) return;
     let active = true;
@@ -238,24 +244,95 @@ export default function App() {
     }
   };
 
+  const syncAgentRun = useCallback(async (runId: string) => {
+    const current = await api.agentRun(runId);
+    setAgentRun(current);
+    if (current.status === "WAITING_APPROVAL") {
+      setBusy(null);
+      setNotice("高风险草案已暂停，等待主管确认");
+    } else if (terminalAgentRunStatuses.has(current.status)) {
+      stopAgentWatch.current?.();
+      stopAgentWatch.current = null;
+      setBusy(null);
+      if (current.response) {
+        setChatResponse(current.response);
+        setNotice(
+          current.response.state === "CLARIFICATION_REQUIRED"
+            ? "参数尚不完整，请在对话中补充缺失信息"
+            : current.response.fallbackUsed
+              ? "DeepSeek 不可用，已使用确定性本地解析"
+              : "Agent run 已完成并通过轨迹评测",
+        );
+        setAudit(await api.audit());
+      } else if (current.error) {
+        setError(current.error);
+      }
+    } else {
+      setBusy("chat");
+    }
+    return current;
+  }, []);
+
+  const watchAgentRun = useCallback((runId: string) => {
+    stopAgentWatch.current?.();
+    stopAgentWatch.current = api.watchAgentRun(
+      runId,
+      () => { void syncAgentRun(runId).catch(() => undefined); },
+      () => { void syncAgentRun(runId).catch(() => undefined); },
+    );
+  }, [syncAgentRun]);
+
   const handleChat = async (message: string) => {
     setBusy("chat");
     setError(null);
+    setChatResponse(null);
     try {
-      const response = await api.chat(message, selectedScenario, conversationId);
-      setChatResponse(response);
-      setNotice(
-        response.state === "CLARIFICATION_REQUIRED"
-          ? "参数尚不完整，请在对话中补充缺失信息"
-          : response.fallbackUsed
-            ? "DeepSeek 不可用，已使用确定性本地解析"
-            : "DeepSeek 已生成结构化调度意图",
+      const idempotencyKey = `ui-${crypto.randomUUID()}`;
+      const created = await api.createAgentRun(
+        message,
+        selectedScenario,
+        conversationId,
+        idempotencyKey,
       );
-      setAudit(await api.audit());
+      setAgentRun(created);
+      watchAgentRun(created.runId);
+      await syncAgentRun(created.runId);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "调度请求解析失败");
-    } finally {
       setBusy(null);
+    }
+  };
+
+  const handleAgentApproval = async (approved: boolean) => {
+    if (!agentRun) return;
+    setBusy("agent-approval");
+    setError(null);
+    try {
+      const resumed = await api.resumeAgentRun(agentRun.runId, approved);
+      setAgentRun(resumed);
+      if (approved) {
+        setNotice("主管已批准，Agent 从检查点继续执行");
+        watchAgentRun(agentRun.runId);
+      } else {
+        setBusy(null);
+        setNotice("主管已拒绝高风险草案");
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Agent 审批失败");
+      setBusy(null);
+    }
+  };
+
+  const handleAgentCancel = async () => {
+    if (!agentRun) return;
+    setError(null);
+    try {
+      const cancelled = await api.cancelAgentRun(agentRun.runId);
+      setAgentRun(cancelled);
+      setBusy(null);
+      setNotice("Agent run 已取消");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "取消 Agent run 失败");
     }
   };
 
@@ -793,10 +870,13 @@ export default function App() {
             />
             <AssistantPanel
               response={chatResponse}
+              agentRun={agentRun}
               run={currentIntentRun}
               approval={currentApproval}
               busy={busy}
               onSend={handleChat}
+              onAgentApproval={handleAgentApproval}
+              onAgentCancel={handleAgentCancel}
               onSimulate={handleSimulate}
               onCreateApproval={handleCreateApproval}
               onCommit={handleCommit}

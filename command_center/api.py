@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from .agent_run_manager import AgentRunManager, TERMINAL_AGENT_RUN_STATUSES
 from .approvals import ApprovalStore
 from .audit import AuditStore
 from .benchmark import BenchmarkRunner
@@ -17,6 +20,9 @@ from .contracts import (
     ApprovalDecision,
     ApprovalRequest,
     AgentConversationMemory,
+    AgentRunCreateRequest,
+    AgentRunRecord,
+    AgentRunResumeRequest,
     BenchmarkRequest,
     ChatRequest,
     ChatResponse,
@@ -69,6 +75,11 @@ orchestrator = DispatchOrchestrator(
     audit=audit,
     clarifications=clarification_resolver,
 )
+agent_runs = AgentRunManager(
+    settings.data_dir / "agent-runs.json",
+    orchestrator=orchestrator,
+    provider=provider,
+)
 incident_store = IncidentStore(settings.data_dir / "incidents.json")
 incident_service = IncidentService(
     store=incident_store,
@@ -100,10 +111,20 @@ plan_explanations = PlanExplanationService(
     audit=audit,
 )
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    agent_runs.start()
+    try:
+        yield
+    finally:
+        agent_runs.shutdown()
+
+
 app = FastAPI(
     title="保利智仓·灵枢 API",
     version="0.1.0",
     description="大模型调度智能体、MASP数字孪生和确定性安全边界。",
+    lifespan=lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
@@ -111,8 +132,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT"],
     allow_headers=["*"],
 )
-
-
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     status = engine.engine_status()
@@ -351,6 +370,102 @@ def chat(request: ChatRequest) -> ChatResponse:
         return orchestrator.chat(request)
     except (ValueError, KeyError, EngineVersionError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/agent/runs",
+    response_model=AgentRunRecord,
+    response_model_by_alias=True,
+    status_code=202,
+)
+def create_agent_run(
+    request: AgentRunCreateRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> AgentRunRecord:
+    try:
+        return agent_runs.create(request, idempotency_key=idempotency_key)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get(
+    "/api/v1/agent/runs/{run_id}",
+    response_model=AgentRunRecord,
+    response_model_by_alias=True,
+)
+def get_agent_run(run_id: str) -> AgentRunRecord:
+    try:
+        return agent_runs.get(run_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/api/v1/agent/runs/{run_id}/events")
+async def stream_agent_run_events(
+    run_id: str,
+    last_event_id: int | None = Header(default=None, alias="Last-Event-ID"),
+) -> StreamingResponse:
+    try:
+        agent_runs.get(run_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    async def event_stream():
+        cursor = last_event_id or 0
+        idle_cycles = 0
+        while True:
+            events = agent_runs.events_after(run_id, cursor)
+            for event in events:
+                cursor = int(event["eventId"])
+                yield (
+                    f"id: {cursor}\n"
+                    "event: agent_run\n"
+                    f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                )
+            record = agent_runs.get(run_id)
+            if record.status in TERMINAL_AGENT_RUN_STATUSES and not events:
+                break
+            idle_cycles += 1
+            if idle_cycles % 60 == 0:
+                yield ": keep-alive\n\n"
+            await asyncio.sleep(0.25)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post(
+    "/api/v1/agent/runs/{run_id}/resume",
+    response_model=AgentRunRecord,
+    response_model_by_alias=True,
+)
+def resume_agent_run(
+    run_id: str, decision: AgentRunResumeRequest
+) -> AgentRunRecord:
+    try:
+        return agent_runs.resume(run_id, decision)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/agent/runs/{run_id}/cancel",
+    response_model=AgentRunRecord,
+    response_model_by_alias=True,
+)
+def cancel_agent_run(run_id: str) -> AgentRunRecord:
+    try:
+        return agent_runs.cancel(run_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @app.get("/api/v1/agent/tools")

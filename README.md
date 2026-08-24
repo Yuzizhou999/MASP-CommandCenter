@@ -12,6 +12,8 @@
 - BM25 与字符特征向量混合检索，证据包含稳定 chunk ID、相关度和检索方法；
 - 结构化会话记忆，只保存已确认实体、最近意图、风险和工具轨迹；
 - Agent 完成率、工具规划率、降级率、P95 延迟和工具分布观测；
+- 可恢复异步 Agent run、SSE 实时轨迹、幂等请求、取消/超时和人工审批检查点；
+- DeepSeek 重试与熔断、Token/成本统计和逐条轨迹评测；
 - 缺失站点、车型或资源时进入多轮澄清，不使用默认实体补齐；
 - DeepSeek API 调用，未配置密钥或 API 异常时自动使用确定性本地解析；
 - 可从场景包自动生成或在画布手工配置路网、工位、车辆和任务流；
@@ -148,6 +150,11 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 | `GET` | `/api/v1/map` | MASP 统一路网 |
 | `GET` | `/api/v1/agent-policy` | 群车策略模型登记与权重状态 |
 | `POST` | `/api/v1/agent/chat` | 自然语言到结构化意图 |
+| `POST` | `/api/v1/agent/runs` | 创建可恢复的异步 Agent run |
+| `GET` | `/api/v1/agent/runs/{runId}` | 查询状态、轨迹、成本和评测 |
+| `GET` | `/api/v1/agent/runs/{runId}/events` | 订阅 SSE 实时运行事件 |
+| `POST` | `/api/v1/agent/runs/{runId}/resume` | 审批并恢复暂停的 Agent run |
+| `POST` | `/api/v1/agent/runs/{runId}/cancel` | 取消运行中的 Agent run |
 | `GET` | `/api/v1/agent/tools` | 查看 Agent 工具目录、权限和输入 Schema |
 | `GET` | `/api/v1/agent/memory/{conversationId}` | 查看服务端确认的结构化会话记忆 |
 | `GET` | `/api/v1/agent/metrics` | 查看 Agent 聚合运行指标和最近轨迹摘要 |
@@ -192,6 +199,8 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 矩阵评测写入 `data/evaluations/<benchmarkId>/`，数据导出写入 `data/dataset-exports/<exportId>/`。`data/` 和 `runs/` 都是可再生成的本地运行目录，不进入 Git。
 
 Agent 会话记忆写入 `data/agent-memories.json`，不保存模型自由文本；匿名化运行指标追加到 `data/agent-metrics.jsonl`，不包含用户提示词和模型回复。
+
+可恢复 Agent 运行写入 `data/agent-runs.json`。运行请求、步骤、审批决定、终态结果和轨迹评测用于进程重启恢复与 SSE 重连；该文件属于本地运行数据，不进入 Git。
 
 ## 文档
 

@@ -1,6 +1,8 @@
 import type {
   AgentModelStatus,
   AgentMetricsSummary,
+  AgentRunEvent,
+  AgentRunRecord,
   AgentPolicyOptions,
   Approval,
   AuditEvent,
@@ -58,6 +60,55 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ message, scenarioId, conversationId, requestedBy: "demo-operator" }),
     }),
+  createAgentRun: (
+    message: string,
+    scenarioId: string,
+    conversationId: string,
+    idempotencyKey: string,
+  ) => request<AgentRunRecord>("/api/v1/agent/runs", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({
+      message,
+      scenarioId,
+      conversationId,
+      requestedBy: "demo-operator",
+      timeoutSeconds: 60,
+    }),
+  }),
+  agentRun: (runId: string) =>
+    request<AgentRunRecord>(`/api/v1/agent/runs/${encodeURIComponent(runId)}`),
+  watchAgentRun: (
+    runId: string,
+    onEvent: (event: AgentRunEvent) => void,
+    onError: () => void,
+  ) => {
+    const source = new EventSource(
+      `/api/v1/agent/runs/${encodeURIComponent(runId)}/events`,
+    );
+    source.addEventListener("agent_run", (rawEvent) => {
+      onEvent(JSON.parse((rawEvent as MessageEvent<string>).data) as AgentRunEvent);
+    });
+    source.onerror = onError;
+    return () => source.close();
+  },
+  resumeAgentRun: (runId: string, approved: boolean) =>
+    request<AgentRunRecord>(
+      `/api/v1/agent/runs/${encodeURIComponent(runId)}/resume`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          approved,
+          decidedBy: "demo-supervisor",
+          reason: approved ? "已核对 Agent 草案和风险边界" : "当前风险不可接受",
+        }),
+      },
+    ),
+  cancelAgentRun: (runId: string) =>
+    request<AgentRunRecord>(
+      `/api/v1/agent/runs/${encodeURIComponent(runId)}/cancel`,
+      { method: "POST" },
+    ),
   simulate: (
     scenarioId: string,
     label: string,
