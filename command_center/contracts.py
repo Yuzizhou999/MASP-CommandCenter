@@ -391,6 +391,9 @@ class AgentRunCreateRequest(ChatRequest):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     timeout_seconds: int = Field(default=60, ge=5, le=300, alias="timeoutSeconds")
+    execution_mode: Literal["ADVISORY", "GOAL_EXECUTION"] = Field(
+        default="ADVISORY", alias="executionMode"
+    )
 
 
 class AgentRunResumeRequest(BaseModel):
@@ -462,6 +465,50 @@ class AgentRunEvaluation(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class AgentWorkflowRecommendation(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    decision: Literal["PROCEED", "BLOCK"]
+    reasons: list[str] = Field(default_factory=list)
+    safety_checks: dict[str, bool] = Field(
+        default_factory=dict, alias="safetyChecks"
+    )
+
+
+class AgentWorkflowStep(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    sequence: int = Field(ge=1)
+    action: Literal["SIMULATE", "REQUEST_APPROVAL", "COMMIT"]
+    status: Literal["RUNNING", "COMPLETED", "BLOCKED", "FAILED"]
+    title: str
+    detail: str
+    output_ref: str | None = Field(default=None, alias="outputRef")
+    duration_ms: float = Field(default=0, ge=0, alias="durationMs")
+
+
+class AgentGoalWorkflow(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    phase: Literal[
+        "PENDING",
+        "NOT_APPLICABLE",
+        "SIMULATING",
+        "WAITING_APPROVAL",
+        "COMMITTING",
+        "COMPLETED",
+        "BLOCKED",
+    ] = "PENDING"
+    intent_id: str | None = Field(default=None, alias="intentId")
+    simulation: dict[str, Any] | None = None
+    recommendation: AgentWorkflowRecommendation | None = None
+    approval_request: ApprovalRequest | None = Field(
+        default=None, alias="approvalRequest"
+    )
+    commitment: dict[str, Any] | None = None
+    steps: list[AgentWorkflowStep] = Field(default_factory=list)
+
+
 class AgentRunRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -485,6 +532,7 @@ class AgentRunRecord(BaseModel):
     response: "ChatResponse | None" = None
     approval: dict[str, Any] | None = None
     evaluation: AgentRunEvaluation | None = None
+    workflow: AgentGoalWorkflow | None = None
     provider_usage: dict[str, Any] = Field(default_factory=dict, alias="providerUsage")
     error: str | None = None
     events: list[AgentRunEvent] = Field(default_factory=list)

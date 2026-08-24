@@ -5,6 +5,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Condition, RLock
+from time import perf_counter
 from typing import Any, Callable
 
 from .contracts import (
@@ -13,12 +14,19 @@ from .contracts import (
     AgentRunRecord,
     AgentRunResumeRequest,
     AgentTraceStep,
+    AgentWorkflowStep,
+    ApprovalDecision,
+    ApprovalRequest,
     ChatRequest,
     ChatResponse,
     DispatchIntent,
+    IntentType,
     IntentValidation,
+    SimulationRequest,
+    SimulationSummary,
     new_id,
 )
+from .dispatch_workflow import DispatchWorkflowService
 from .orchestrator import DispatchOrchestrator
 from .provider import DeepSeekProvider
 
@@ -65,11 +73,13 @@ class AgentRunManager:
         *,
         orchestrator: DispatchOrchestrator,
         provider: DeepSeekProvider,
+        workflow: DispatchWorkflowService | None = None,
         max_workers: int = 4,
     ) -> None:
         self.path = path
         self.orchestrator = orchestrator
         self.provider = provider
+        self.workflow = workflow
         self._lock = RLock()
         self._conditions: dict[str, Condition] = {}
         self._max_workers = max_workers
@@ -137,6 +147,7 @@ class AgentRunManager:
                 "response": None,
                 "approval": None,
                 "evaluation": None,
+                "workflow": None,
                 "providerUsage": {},
                 "error": None,
                 "events": [],
@@ -185,6 +196,12 @@ class AgentRunManager:
                 "decidedAt": _iso(),
             }
             row["approval"] = approval
+            paused_at = approval.get("requestedAt")
+            if paused_at:
+                paused_duration = _utc_now() - datetime.fromisoformat(paused_at)
+                row["deadlineAt"] = _iso(
+                    datetime.fromisoformat(row["deadlineAt"]) + paused_duration
+                )
             self._append_event(
                 row,
                 "approval_decided",
@@ -252,7 +269,7 @@ class AgentRunManager:
                 if status not in {"QUEUED", "RUNNING", "WAITING_APPROVAL"}:
                     continue
                 deadline = datetime.fromisoformat(row["deadlineAt"])
-                if now >= deadline:
+                if status != "WAITING_APPROVAL" and now >= deadline:
                     self._set_terminal(row, "TIMED_OUT", "Agent run 在服务恢复前已超时")
                     changed = True
                     continue
@@ -308,19 +325,77 @@ class AgentRunManager:
                 requestedBy=record.request.requested_by,
                 conversationId=record.request.conversation_id,
             )
-            with self.provider.telemetry_scope(
-                run_id,
-                control=lambda: self._check_control(run_id),
-            ):
-                response = self.orchestrator.chat(
-                    request,
-                    on_step=lambda step: self._record_step(run_id, step),
-                    approval_gate=lambda intent, validation: self._await_approval(
-                        run_id, intent, validation
-                    ),
-                )
-            usage = self.provider.telemetry(run_id)
-            evaluation = self._evaluate(response, record.request.timeout_seconds)
+            goal_execution = (
+                record.request.execution_mode == "GOAL_EXECUTION"
+                and self.workflow is not None
+            )
+            if goal_execution and record.response is not None and record.workflow:
+                response = record.response
+                usage = record.provider_usage
+
+                def reuse_checkpoint(row: dict[str, Any]) -> None:
+                    trace = response.agent_trace
+                    row["traceSteps"] = (
+                        [
+                            step.model_dump(by_alias=True, mode="json")
+                            for step in trace.steps
+                        ]
+                        if trace is not None
+                        else []
+                    )
+                    self._append_event(
+                        row,
+                        "workflow_checkpoint_reused",
+                        {"intentId": response.intent.intent_id if response.intent else None},
+                    )
+
+                self._update(run_id, reuse_checkpoint)
+            else:
+                with self.provider.telemetry_scope(
+                    run_id,
+                    control=lambda: self._check_control(run_id),
+                ):
+                    response = self.orchestrator.chat(
+                        request,
+                        on_step=lambda step: self._record_step(run_id, step),
+                        approval_gate=(
+                            None
+                            if goal_execution
+                            else lambda intent, validation: self._await_advisory_approval(
+                                run_id, intent, validation
+                            )
+                        ),
+                    )
+                usage = self.provider.telemetry(run_id)
+                if goal_execution:
+
+                    def save_checkpoint(row: dict[str, Any]) -> None:
+                        row["response"] = response.model_dump(
+                            by_alias=True, mode="json"
+                        )
+                        row["providerUsage"] = usage
+                        self._append_event(
+                            row,
+                            "workflow_checkpoint_saved",
+                            {
+                                "intentId": (
+                                    response.intent.intent_id
+                                    if response.intent is not None
+                                    else None
+                                )
+                            },
+                        )
+
+                    self._update(run_id, save_checkpoint)
+            if goal_execution:
+                self._execute_goal_workflow(run_id, response)
+            workflow_record = self.get(run_id).workflow
+            workflow_phase = workflow_record.phase if workflow_record else None
+            evaluation = self._evaluate(
+                response,
+                record.request.timeout_seconds,
+                workflow_phase=workflow_phase,
+            )
 
             def complete(row: dict[str, Any]) -> None:
                 if row["status"] == "CANCELLED":
@@ -357,6 +432,313 @@ class AgentRunManager:
             with self._lock:
                 self._conditions.pop(run_id, None)
 
+    def _execute_goal_workflow(
+        self, run_id: str, response: ChatResponse
+    ) -> None:
+        if self.workflow is None:
+            return
+        intent = response.intent
+        validation = response.validation
+        actionable = bool(
+            response.state == "READY"
+            and intent is not None
+            and validation is not None
+            and validation.valid
+            and intent.intent_type in {IntentType.CREATE_TASK, IntentType.BLOCK_RESOURCE}
+        )
+        if not actionable or intent is None or validation is None:
+            reason = (
+                "请求需要补充参数，未进入目标执行"
+                if response.state == "CLARIFICATION_REQUIRED"
+                else "当前意图属于只读或不可执行类型"
+            )
+
+            def skip(row: dict[str, Any]) -> None:
+                row["workflow"] = {
+                    "phase": "NOT_APPLICABLE",
+                    "intentId": intent.intent_id if intent else None,
+                    "simulation": None,
+                    "recommendation": None,
+                    "approvalRequest": None,
+                    "commitment": None,
+                    "steps": [],
+                }
+                self._append_event(
+                    row, "workflow_skipped", {"reason": reason}
+                )
+
+            self._update(run_id, skip)
+            return
+
+        current = self.get(run_id)
+        existing = current.workflow
+        if existing is not None and existing.intent_id != intent.intent_id:
+            existing = None
+        summary: SimulationSummary
+        recommendation = None
+        if existing is not None and existing.simulation is not None:
+            summary = SimulationSummary.model_validate(existing.simulation)
+            recommendation = existing.recommendation
+            self._record_workflow_event(
+                run_id,
+                "workflow_simulation_reused",
+                {"simulationRunId": summary.run_id},
+            )
+        else:
+            started = self._begin_workflow_step(
+                run_id,
+                intent_id=intent.intent_id,
+                action="SIMULATE",
+                phase="SIMULATING",
+                title="运行 MASP 数字孪生",
+                detail="使用确定性规划、资源预约和冲突检测评估调度意图",
+            )
+            self._check_control(run_id)
+            summary = self.workflow.simulate(
+                SimulationRequest(
+                    scenarioId=current.request.scenario_id,
+                    label=(
+                        "Agent 闭环 | 通道封闭"
+                        if intent.intent_type is IntentType.BLOCK_RESOURCE
+                        else "Agent 闭环 | 紧急插单"
+                    ),
+                    intent=intent,
+                )
+            )
+            recommendation = self.workflow.recommend(summary)
+
+            def save_simulation(row: dict[str, Any]) -> None:
+                workflow = self._workflow_payload(row, intent.intent_id)
+                workflow["simulation"] = summary.model_dump(
+                    by_alias=True, mode="json"
+                )
+                workflow["recommendation"] = recommendation.model_dump(
+                    by_alias=True, mode="json"
+                )
+                row["workflow"] = workflow
+
+            self._update(run_id, save_simulation)
+            self._finish_workflow_step(
+                run_id,
+                action="SIMULATE",
+                status="COMPLETED",
+                detail=(
+                    f"仿真 {summary.run_id} 完成，推进建议 {recommendation.decision}"
+                ),
+                output_ref=summary.run_id,
+                duration_ms=(perf_counter() - started) * 1000,
+            )
+
+        if recommendation is None:
+            recommendation = self.workflow.recommend(summary)
+        if recommendation.decision == "BLOCK":
+
+            def block(row: dict[str, Any]) -> None:
+                workflow = self._workflow_payload(row, intent.intent_id)
+                workflow["phase"] = "BLOCKED"
+                row["workflow"] = workflow
+                self._append_event(
+                    row,
+                    "workflow_blocked",
+                    {"reasons": recommendation.reasons},
+                )
+
+            self._update(run_id, block)
+            return
+
+        approval: ApprovalRequest | None = None
+        current = self.get(run_id)
+        if validation.approval_required:
+            if (
+                current.workflow is not None
+                and current.workflow.approval_request is not None
+            ):
+                approval = current.workflow.approval_request
+                self._record_workflow_event(
+                    run_id,
+                    "workflow_approval_reused",
+                    {"approvalId": approval.approval_id},
+                )
+            else:
+                started = self._begin_workflow_step(
+                    run_id,
+                    intent_id=intent.intent_id,
+                    action="REQUEST_APPROVAL",
+                    phase="WAITING_APPROVAL",
+                    title="创建仿真关联审批",
+                    detail="高风险意图必须关联已通过安全门槛的仿真结果",
+                )
+                approval = self.workflow.create_approval(
+                    intent,
+                    scenario_id=current.request.scenario_id,
+                    run_ids=[summary.run_id],
+                )
+
+                def save_approval(row: dict[str, Any]) -> None:
+                    workflow = self._workflow_payload(row, intent.intent_id)
+                    workflow["approvalRequest"] = approval.model_dump(
+                        by_alias=True, mode="json"
+                    )
+                    row["workflow"] = workflow
+
+                self._update(run_id, save_approval)
+                self._finish_workflow_step(
+                    run_id,
+                    action="REQUEST_APPROVAL",
+                    status="COMPLETED",
+                    detail=f"审批单 {approval.approval_id} 已创建",
+                    output_ref=approval.approval_id,
+                    duration_ms=(perf_counter() - started) * 1000,
+                )
+
+            decision = self._wait_for_approval(
+                run_id,
+                intent,
+                validation,
+                approval_request=approval,
+                simulation=summary,
+            )
+            decided = self.workflow.decide_approval(
+                approval.approval_id,
+                ApprovalDecision(
+                    approved=decision.approved,
+                    decidedBy=decision.decided_by,
+                    reason=decision.reason,
+                ),
+            )
+
+            def save_decision(row: dict[str, Any]) -> None:
+                workflow = self._workflow_payload(row, intent.intent_id)
+                workflow["approvalRequest"] = decided.model_dump(
+                    by_alias=True, mode="json"
+                )
+                row["workflow"] = workflow
+
+            self._update(run_id, save_decision)
+            if not decision.approved:
+                raise AgentRunRejected("主管拒绝了仿真后的高风险方案")
+
+        current = self.get(run_id)
+        if current.workflow is not None and current.workflow.commitment is not None:
+            self._record_workflow_event(
+                run_id,
+                "workflow_commit_reused",
+                {"commitId": current.workflow.commitment.get("commitId")},
+            )
+            return
+        started = self._begin_workflow_step(
+            run_id,
+            intent_id=intent.intent_id,
+            action="COMMIT",
+            phase="COMMITTING",
+            title="提交到仿真环境",
+            detail="写入仿真意图存储，不向 WMS、RCS 或真实车辆下发",
+        )
+        self._check_control(run_id)
+        commitment = self.workflow.commit(
+            intent,
+            scenario_id=current.request.scenario_id,
+            approval_id=approval.approval_id if approval is not None else None,
+        )
+
+        def save_commitment(row: dict[str, Any]) -> None:
+            workflow = self._workflow_payload(row, intent.intent_id)
+            workflow["phase"] = "COMPLETED"
+            workflow["commitment"] = commitment
+            row["workflow"] = workflow
+
+        self._update(run_id, save_commitment)
+        self._finish_workflow_step(
+            run_id,
+            action="COMMIT",
+            status="COMPLETED",
+            detail=f"仿真提交 {commitment['commitId']} 已完成",
+            output_ref=str(commitment["commitId"]),
+            duration_ms=(perf_counter() - started) * 1000,
+        )
+
+    def _begin_workflow_step(
+        self,
+        run_id: str,
+        *,
+        intent_id: str,
+        action: str,
+        phase: str,
+        title: str,
+        detail: str,
+    ) -> float:
+        started = perf_counter()
+
+        def update(row: dict[str, Any]) -> None:
+            workflow = self._workflow_payload(row, intent_id)
+            workflow["phase"] = phase
+            step = AgentWorkflowStep(
+                sequence=len(workflow["steps"]) + 1,
+                action=action,
+                status="RUNNING",
+                title=title,
+                detail=detail,
+            ).model_dump(by_alias=True, mode="json")
+            workflow["steps"].append(step)
+            row["workflow"] = workflow
+            self._append_event(row, "workflow_action_started", step)
+
+        self._update(run_id, update)
+        return started
+
+    def _finish_workflow_step(
+        self,
+        run_id: str,
+        *,
+        action: str,
+        status: str,
+        detail: str,
+        output_ref: str | None,
+        duration_ms: float,
+    ) -> None:
+        def update(row: dict[str, Any]) -> None:
+            workflow = self._workflow_payload(row, None)
+            for step in reversed(workflow["steps"]):
+                if step["action"] == action and step["status"] == "RUNNING":
+                    step.update(
+                        {
+                            "status": status,
+                            "detail": detail,
+                            "outputRef": output_ref,
+                            "durationMs": round(max(0, duration_ms), 3),
+                        }
+                    )
+                    self._append_event(row, "workflow_action_completed", step)
+                    break
+            row["workflow"] = workflow
+
+        self._update(run_id, update)
+
+    def _record_workflow_event(
+        self, run_id: str, event_type: str, payload: dict[str, Any]
+    ) -> None:
+        self._update(
+            run_id,
+            lambda row: self._append_event(row, event_type, payload),
+        )
+
+    @staticmethod
+    def _workflow_payload(
+        row: dict[str, Any], intent_id: str | None
+    ) -> dict[str, Any]:
+        return dict(
+            row.get("workflow")
+            or {
+                "phase": "PENDING",
+                "intentId": intent_id,
+                "simulation": None,
+                "recommendation": None,
+                "approvalRequest": None,
+                "commitment": None,
+                "steps": [],
+            }
+        )
+
     def _record_step(self, run_id: str, step: AgentTraceStep) -> None:
         self._check_control(run_id)
         serialized = step.model_dump(by_alias=True, mode="json")
@@ -367,12 +749,25 @@ class AgentRunManager:
 
         self._update(run_id, update)
 
-    def _await_approval(
+    def _await_advisory_approval(
         self,
         run_id: str,
         intent: DispatchIntent,
         validation: IntentValidation,
     ) -> None:
+        decision = self._wait_for_approval(run_id, intent, validation)
+        if not decision.approved:
+            raise AgentRunRejected("主管拒绝了高风险 Agent 草案")
+
+    def _wait_for_approval(
+        self,
+        run_id: str,
+        intent: DispatchIntent,
+        validation: IntentValidation,
+        *,
+        approval_request: ApprovalRequest | None = None,
+        simulation: SimulationSummary | None = None,
+    ) -> AgentRunResumeRequest:
         self._check_control(run_id)
 
         def pause(row: dict[str, Any]) -> None:
@@ -390,33 +785,46 @@ class AgentRunManager:
                 "validation": validation.model_dump(by_alias=True, mode="json"),
                 "requestedAt": existing.get("requestedAt") or _iso(),
                 "decision": existing.get("decision"),
+                "stage": (
+                    "POST_SIMULATION" if approval_request is not None else "INTENT_DRAFT"
+                ),
+                "approvalId": (
+                    approval_request.approval_id if approval_request is not None else None
+                ),
+                "simulationRunId": simulation.run_id if simulation is not None else None,
             }
+            if row.get("workflow") is not None and approval_request is not None:
+                row["workflow"]["phase"] = "WAITING_APPROVAL"
             self._append_event(
                 row,
                 "approval_required",
                 {
                     "intentId": intent.intent_id,
                     "riskLevel": validation.risk_level.value,
+                    "stage": row["approval"]["stage"],
+                    "approvalId": row["approval"]["approvalId"],
+                    "simulationRunId": row["approval"]["simulationRunId"],
                 },
             )
 
         record = self._update(run_id, pause)
         prior_decision = (record.approval or {}).get("decision") or {}
-        if prior_decision.get("approved") is True:
-            return
+        if prior_decision:
+            return self._parse_resume_decision(prior_decision)
 
         with self._lock:
             condition = self._conditions.setdefault(run_id, Condition())
         while True:
             with condition:
                 condition.wait(timeout=0.25)
-            self._check_control(run_id)
+            self._check_control(run_id, include_deadline=False)
             record = self.get(run_id)
             decision = (record.approval or {}).get("decision")
             if decision is None:
                 continue
-            if not decision.get("approved"):
-                raise AgentRunRejected("主管拒绝了高风险 Agent 草案")
+            parsed_decision = self._parse_resume_decision(decision)
+            if not parsed_decision.approved:
+                return parsed_decision
 
             def continue_run(row: dict[str, Any]) -> None:
                 row["status"] = "RUNNING"
@@ -427,23 +835,34 @@ class AgentRunManager:
                 )
 
             self._update(run_id, continue_run)
-            return
+            return parsed_decision
 
-    def _check_control(self, run_id: str) -> None:
+    @staticmethod
+    def _parse_resume_decision(payload: dict[str, Any]) -> AgentRunResumeRequest:
+        return AgentRunResumeRequest(
+            approved=bool(payload["approved"]),
+            decidedBy=str(payload["decidedBy"]),
+            reason=str(payload["reason"]),
+        )
+
+    def _check_control(self, run_id: str, *, include_deadline: bool = True) -> None:
         with self._lock:
             if self._stopping:
                 raise AgentRunStopping("Agent run manager is stopping")
         record = self.get(run_id)
         if record.cancel_requested or record.status == "CANCELLED":
             raise AgentRunCancelled("用户取消了 Agent run")
-        if _utc_now() >= record.deadline_at:
+        if include_deadline and _utc_now() >= record.deadline_at:
             raise AgentRunTimedOut(
                 f"Agent run 超过 {record.request.timeout_seconds} 秒执行时限"
             )
 
     @staticmethod
     def _evaluate(
-        response: ChatResponse, timeout_seconds: int
+        response: ChatResponse,
+        timeout_seconds: int,
+        *,
+        workflow_phase: str | None = None,
     ) -> AgentRunEvaluation:
         trace = response.agent_trace
         steps = trace.steps if trace else []
@@ -466,6 +885,12 @@ class AgentRunManager:
                 trace and trace.duration_ms <= timeout_seconds * 1000
             ),
         }
+        if workflow_phase is not None:
+            checks["goalWorkflowTerminal"] = workflow_phase in {
+                "COMPLETED",
+                "BLOCKED",
+                "NOT_APPLICABLE",
+            }
         passed_count = sum(checks.values())
         notes = [name for name, passed in checks.items() if not passed]
         return AgentRunEvaluation(
@@ -482,6 +907,24 @@ class AgentRunManager:
             if row["status"] in TERMINAL_AGENT_RUN_STATUSES:
                 if row["status"] == "CANCELLED":
                     return
+            workflow = row.get("workflow")
+            if workflow is not None and workflow.get("phase") not in {
+                "COMPLETED",
+                "BLOCKED",
+                "NOT_APPLICABLE",
+            }:
+                workflow["phase"] = "BLOCKED"
+                for step in reversed(workflow.get("steps", [])):
+                    if step.get("status") == "RUNNING":
+                        step.update(
+                            {
+                                "status": "FAILED",
+                                "detail": message,
+                            }
+                        )
+                        self._append_event(row, "workflow_action_failed", step)
+                        break
+                row["workflow"] = workflow
             self._set_terminal(row, status, message)
             row["providerUsage"] = usage
 

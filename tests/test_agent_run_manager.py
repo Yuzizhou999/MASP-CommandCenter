@@ -5,13 +5,17 @@ from pathlib import Path
 from time import monotonic, sleep
 
 from command_center.agent_run_manager import AgentRunManager
+from command_center.approvals import ApprovalStore
 from command_center.audit import AuditStore
 from command_center.contracts import (
+    AgentWorkflowRecommendation,
     AgentRunCreateRequest,
     AgentRunRecord,
     AgentRunResumeRequest,
 )
+from command_center.dispatch_workflow import DispatchWorkflowService
 from command_center.engine_adapter import MaspAdapter
+from command_center.intent_store import IntentStore
 from command_center.knowledge import KnowledgeBase
 from command_center.orchestrator import DispatchOrchestrator
 from command_center.provider import DeepSeekProvider
@@ -22,16 +26,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def _manager(isolated_settings) -> AgentRunManager:
     provider = DeepSeekProvider(isolated_settings)
+    engine = MaspAdapter(isolated_settings)
+    audit = AuditStore(isolated_settings.data_dir / "audit.jsonl")
     orchestrator = DispatchOrchestrator(
-        engine=MaspAdapter(isolated_settings),
+        engine=engine,
         provider=provider,
         knowledge=KnowledgeBase(PROJECT_ROOT / "knowledge"),
-        audit=AuditStore(isolated_settings.data_dir / "audit.jsonl"),
+        audit=audit,
+    )
+    workflow = DispatchWorkflowService(
+        engine=engine,
+        approvals=ApprovalStore(isolated_settings.data_dir / "approvals.json"),
+        intents=IntentStore(isolated_settings.data_dir / "committed-intents.json"),
+        audit=audit,
     )
     return AgentRunManager(
         isolated_settings.data_dir / "agent-runs.json",
         orchestrator=orchestrator,
         provider=provider,
+        workflow=workflow,
     )
 
 
@@ -199,3 +212,188 @@ def test_shutdown_releases_worker_without_losing_approval_checkpoint(
     assert completed.recovered is True
     assert completed.attempt == 2
     assert any(event.event_type == "approval_reused" for event in completed.events)
+
+
+def test_goal_execution_simulates_and_commits_low_risk_task(
+    isolated_settings,
+) -> None:
+    manager = _manager(isolated_settings)
+    created = manager.create(
+        AgentRunCreateRequest(
+            message="创建紧急叉车任务，从 AP1123 运到 AP2121",
+            scenarioId="interactive-multi-fleet",
+            conversationId="goal-low-risk",
+            timeoutSeconds=30,
+            executionMode="GOAL_EXECUTION",
+        )
+    )
+
+    completed = _wait_for(manager, created.run_id, {"COMPLETED", "FAILED"})
+
+    assert completed.status == "COMPLETED"
+    assert completed.workflow is not None
+    assert completed.workflow.phase == "COMPLETED"
+    assert completed.workflow.simulation is not None
+    assert completed.workflow.recommendation is not None
+    assert completed.workflow.recommendation.decision == "PROCEED"
+    assert completed.workflow.approval_request is None
+    assert completed.workflow.commitment is not None
+    assert [step.action for step in completed.workflow.steps] == [
+        "SIMULATE",
+        "COMMIT",
+    ]
+
+
+def test_goal_execution_pauses_after_simulation_and_approval_survives_restart(
+    isolated_settings,
+) -> None:
+    manager = _manager(isolated_settings)
+    created = manager.create(
+        AgentRunCreateRequest(
+            message="共享窄路需要检修，请封闭三分钟并评估任务影响",
+            scenarioId="interactive-multi-fleet",
+            conversationId="goal-high-risk",
+            timeoutSeconds=30,
+            executionMode="GOAL_EXECUTION",
+        )
+    )
+    waiting = _wait_for(manager, created.run_id, {"WAITING_APPROVAL", "FAILED"})
+
+    assert waiting.status == "WAITING_APPROVAL"
+    assert waiting.workflow is not None
+    assert waiting.workflow.simulation is not None
+    assert waiting.workflow.approval_request is not None
+    simulation_run_id = waiting.workflow.simulation["runId"]
+    approval_id = waiting.workflow.approval_request.approval_id
+    assert waiting.approval is not None
+    assert waiting.approval["stage"] == "POST_SIMULATION"
+
+    worker = manager._futures[created.run_id]
+    manager.shutdown()
+    worker.result(timeout=2)
+    restarted = _manager(isolated_settings)
+    restarted.start()
+    restarted.resume(
+        created.run_id,
+        AgentRunResumeRequest(
+            approved=True,
+            decidedBy="goal-supervisor",
+            reason="仿真结果满足安全要求",
+        ),
+    )
+    completed = _wait_for(restarted, created.run_id, {"COMPLETED", "FAILED"})
+
+    assert completed.status == "COMPLETED"
+    assert completed.workflow is not None
+    assert completed.workflow.phase == "COMPLETED"
+    assert completed.workflow.simulation["runId"] == simulation_run_id
+    assert completed.workflow.approval_request.approval_id == approval_id
+    assert completed.workflow.approval_request.status.value == "APPROVED"
+    assert completed.workflow.commitment is not None
+    assert len(IntentStore(isolated_settings.data_dir / "committed-intents.json").list()) == 1
+
+
+def test_waiting_approval_survives_restart_after_original_deadline(
+    isolated_settings,
+) -> None:
+    manager = _manager(isolated_settings)
+    created = manager.create(
+        AgentRunCreateRequest(
+            message="共享窄路需要检修，请封闭三分钟并评估任务影响",
+            scenarioId="interactive-multi-fleet",
+            conversationId="goal-expired-approval",
+            timeoutSeconds=30,
+            executionMode="GOAL_EXECUTION",
+        )
+    )
+    _wait_for(manager, created.run_id, {"WAITING_APPROVAL", "FAILED"})
+    worker = manager._futures[created.run_id]
+    manager.shutdown()
+    worker.result(timeout=2)
+
+    now = datetime.now(timezone.utc)
+    data = manager._read()
+    row = data["runs"][created.run_id]
+    row["approval"]["requestedAt"] = (now - timedelta(minutes=5)).isoformat()
+    row["deadlineAt"] = (now - timedelta(minutes=4)).isoformat()
+    manager._write(data)
+
+    restarted = _manager(isolated_settings)
+    restarted.start()
+    recovered = restarted.get(created.run_id)
+    assert recovered.status == "WAITING_APPROVAL"
+
+    restarted.resume(
+        created.run_id,
+        AgentRunResumeRequest(
+            approved=True,
+            decidedBy="late-supervisor",
+            reason="审批等待不计入执行时限",
+        ),
+    )
+    completed = _wait_for(restarted, created.run_id, {"COMPLETED", "FAILED"})
+
+    assert completed.status == "COMPLETED"
+    assert completed.deadline_at > now
+
+
+def test_goal_execution_blocks_commit_when_simulation_gate_fails(
+    isolated_settings, monkeypatch
+) -> None:
+    manager = _manager(isolated_settings)
+    monkeypatch.setattr(
+        manager.workflow,
+        "recommend",
+        lambda summary: AgentWorkflowRecommendation(
+            decision="BLOCK",
+            reasons=["测试安全门槛阻断"],
+            safetyChecks={"conflictFree": False},
+        ),
+    )
+    created = manager.create(
+        AgentRunCreateRequest(
+            message="创建紧急叉车任务，从 AP1123 运到 AP2121",
+            scenarioId="interactive-multi-fleet",
+            conversationId="goal-blocked",
+            timeoutSeconds=30,
+            executionMode="GOAL_EXECUTION",
+        )
+    )
+
+    completed = _wait_for(manager, created.run_id, {"COMPLETED", "FAILED"})
+
+    assert completed.status == "COMPLETED"
+    assert completed.workflow is not None
+    assert completed.workflow.phase == "BLOCKED"
+    assert completed.workflow.commitment is None
+    assert [step.action for step in completed.workflow.steps] == ["SIMULATE"]
+
+
+def test_goal_execution_marks_active_step_failed_when_workflow_raises(
+    isolated_settings, monkeypatch
+) -> None:
+    manager = _manager(isolated_settings)
+
+    def fail_simulation(request):
+        raise RuntimeError("数字孪生不可用")
+
+    monkeypatch.setattr(manager.workflow, "simulate", fail_simulation)
+    created = manager.create(
+        AgentRunCreateRequest(
+            message="创建紧急叉车任务，从 AP1123 运到 AP2121",
+            scenarioId="interactive-multi-fleet",
+            conversationId="goal-workflow-failure",
+            timeoutSeconds=30,
+            executionMode="GOAL_EXECUTION",
+        )
+    )
+
+    failed = _wait_for(manager, created.run_id, {"COMPLETED", "FAILED"})
+
+    assert failed.status == "FAILED"
+    assert failed.workflow is not None
+    assert failed.workflow.phase == "BLOCKED"
+    assert failed.workflow.steps[-1].action == "SIMULATE"
+    assert failed.workflow.steps[-1].status == "FAILED"
+    assert failed.workflow.steps[-1].detail == "数字孪生不可用"
+    assert any(event.event_type == "workflow_action_failed" for event in failed.events)

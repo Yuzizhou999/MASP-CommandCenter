@@ -17,7 +17,14 @@ import {
   Send20Regular,
   ShieldLock20Regular,
 } from "@fluentui/react-icons";
-import type { AgentRunRecord, Approval, ChatResponse, DispatchIntent, SimulationSummary } from "../types";
+import type {
+  AgentGoalWorkflow,
+  AgentRunRecord,
+  Approval,
+  ChatResponse,
+  DispatchIntent,
+  SimulationSummary,
+} from "../types";
 
 interface AssistantPanelProps {
   response?: ChatResponse | null;
@@ -58,6 +65,84 @@ const runStatusLabel: Record<string, string> = {
   FAILED: "运行失败",
 };
 
+const workflowPhaseLabel: Record<string, string> = {
+  PENDING: "准备执行",
+  NOT_APPLICABLE: "无需执行",
+  SIMULATING: "数字孪生运行中",
+  WAITING_APPROVAL: "等待审批",
+  COMMITTING: "提交仿真环境",
+  COMPLETED: "目标已完成",
+  BLOCKED: "安全门槛阻断",
+};
+
+function WorkflowProgress({ workflow }: { workflow: AgentGoalWorkflow }) {
+  const simulation = workflow.simulation;
+  const recommendation = workflow.recommendation;
+  return (
+    <section className="agent-workflow" aria-label="Agent 目标执行">
+      <div className="agent-workflow-heading">
+        <strong>目标执行</strong>
+        <Badge
+          appearance="outline"
+          color={
+            workflow.phase === "COMPLETED"
+              ? "success"
+              : workflow.phase === "BLOCKED"
+                ? "danger"
+                : workflow.phase === "WAITING_APPROVAL"
+                  ? "warning"
+                  : "informative"
+          }
+        >
+          {workflowPhaseLabel[workflow.phase]}
+        </Badge>
+      </div>
+
+      {workflow.steps.length > 0 && (
+        <ol className="agent-workflow-steps">
+          {workflow.steps.map((step) => (
+            <li key={`${step.sequence}-${step.action}`}>
+              <span className={`workflow-step-mark workflow-step-${step.status.toLowerCase()}`}>
+                {step.sequence}
+              </span>
+              <div>
+                <strong>{step.title}</strong>
+                <p>{step.detail}</p>
+                <small className="mono">
+                  {step.action} · {step.status} · {step.durationMs.toFixed(1)} ms
+                </small>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {simulation && (
+        <div className="workflow-simulation-summary">
+          <div><span>仿真</span><strong className="mono">{simulation.runId}</strong></div>
+          <div><span>完成任务</span><strong>{String(simulation.metrics.completedTaskCount ?? 0)}</strong></div>
+          <div><span>资源冲突</span><strong>{String(simulation.metrics.reservationConflictRejections ?? 0)}</strong></div>
+        </div>
+      )}
+
+      {recommendation && (
+        <div className={`workflow-recommendation workflow-${recommendation.decision.toLowerCase()}`}>
+          <strong>{recommendation.decision === "PROCEED" ? "建议推进" : "禁止推进"}</strong>
+          <span>{recommendation.reasons.join("；")}</span>
+        </div>
+      )}
+
+      {workflow.commitment && (
+        <div className="workflow-commitment">
+          <CheckmarkCircle20Regular />
+          <span>已提交到仿真环境</span>
+          <code>{String(workflow.commitment.commitId || "-")}</code>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function AssistantPanel({
   response,
   agentRun,
@@ -87,6 +172,7 @@ export function AssistantPanel({
   const validation = response?.validation;
   const actionable = intent && ["CREATE_TASK", "BLOCK_RESOURCE"].includes(intent.intentType);
   const approved = approval?.status === "APPROVED";
+  const goalManaged = agentRun?.request.executionMode === "GOAL_EXECUTION";
 
   return (
     <aside className="assistant-panel" aria-label="AI 调度助手">
@@ -140,9 +226,13 @@ export function AssistantPanel({
             </div>
             <p className="response-copy">
               {agentRun.status === "WAITING_APPROVAL"
-                ? "确定性安全校验已完成。高风险草案在检查点暂停，批准后才会完成本轮 Agent 决策。"
+                ? agentRun.approval?.stage === "POST_SIMULATION"
+                  ? "数字孪生和确定性推进门槛均已完成。高风险方案在仿真后暂停，批准后只提交到仿真环境。"
+                  : "确定性安全校验已完成。高风险草案在检查点暂停，批准后才会完成本轮 Agent 决策。"
                 : agentRun.error || "Agent 正在按有界状态机执行，步骤会实时写入并推送到这里。"}
             </p>
+
+            {agentRun.workflow && <WorkflowProgress workflow={agentRun.workflow} />}
 
             {agentRun.traceSteps.length > 0 && (
               <ol className="agent-trace-list agent-trace-live-list" aria-label="实时 Agent 轨迹">
@@ -167,7 +257,10 @@ export function AssistantPanel({
               <div className="agent-approval-gate">
                 <div>
                   <strong>人工审批检查点</strong>
-                  <span>{riskLabel[agentRun.approval.validation.riskLevel]} · {agentRun.approval.intent.intentType}</span>
+                  <span>
+                    {riskLabel[agentRun.approval.validation.riskLevel]} · {agentRun.approval.intent.intentType}
+                    {agentRun.approval.stage === "POST_SIMULATION" ? " · 仿真后" : ""}
+                  </span>
                 </div>
                 <div className="assistant-actions">
                   <Button
@@ -223,6 +316,7 @@ export function AssistantPanel({
                 </span>
               </div>
             )}
+            {agentRun?.workflow && <WorkflowProgress workflow={agentRun.workflow} />}
             {response.clarification && (
               <div className="clarification-box" role="status">
                 <strong>需要补充信息</strong>
@@ -324,7 +418,7 @@ export function AssistantPanel({
               </Accordion>
             )}
 
-            {actionable && validation?.valid && (
+            {actionable && validation?.valid && !goalManaged && (
               <div className="assistant-actions">
                 <Button
                   appearance="primary"

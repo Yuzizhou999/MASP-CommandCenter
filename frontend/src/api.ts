@@ -74,6 +74,7 @@ export const api = {
       conversationId,
       requestedBy: "demo-operator",
       timeoutSeconds: 60,
+      executionMode: "GOAL_EXECUTION",
     }),
   }),
   agentRun: (runId: string) =>

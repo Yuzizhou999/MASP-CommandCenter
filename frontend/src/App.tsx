@@ -247,9 +247,27 @@ export default function App() {
   const syncAgentRun = useCallback(async (runId: string) => {
     const current = await api.agentRun(runId);
     setAgentRun(current);
+    const workflowSimulation = current.workflow?.simulation;
+    if (workflowSimulation) {
+      setRuns((rows) => [
+        workflowSimulation,
+        ...rows.filter((row) => row.runId !== workflowSimulation.runId),
+      ]);
+    }
+    const workflowApproval = current.workflow?.approvalRequest;
+    if (workflowApproval) {
+      setApprovals((rows) => [
+        workflowApproval,
+        ...rows.filter((row) => row.approvalId !== workflowApproval.approvalId),
+      ]);
+    }
     if (current.status === "WAITING_APPROVAL") {
       setBusy(null);
-      setNotice("高风险草案已暂停，等待主管确认");
+      setNotice(
+        current.approval?.stage === "POST_SIMULATION"
+          ? "数字孪生已通过推进门槛，等待主管确认"
+          : "高风险草案已暂停，等待主管确认",
+      );
     } else if (terminalAgentRunStatuses.has(current.status)) {
       stopAgentWatch.current?.();
       stopAgentWatch.current = null;

@@ -44,10 +44,18 @@ class ApprovalStore:
         validation: IntentValidation,
         run_ids: list[str] | None = None,
     ) -> ApprovalRequest:
+        normalized_run_ids = sorted(set(run_ids or []))
+        with self._lock:
+            for current in self._items.values():
+                if (
+                    current.intent.intent_id == intent.intent_id
+                    and sorted(current.simulation_run_ids) == normalized_run_ids
+                ):
+                    return current
         request = ApprovalRequest(
             intent=intent,
             validation=validation,
-            simulationRunIds=run_ids or [],
+            simulationRunIds=normalized_run_ids,
             requestedBy=intent.requested_by,
         )
         with self._lock:

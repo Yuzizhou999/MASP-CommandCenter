@@ -264,6 +264,39 @@ export interface AgentRunEvaluation {
   notes: string[];
 }
 
+export interface AgentWorkflowRecommendation {
+  decision: "PROCEED" | "BLOCK";
+  reasons: string[];
+  safetyChecks: Record<string, boolean>;
+}
+
+export interface AgentWorkflowStep {
+  sequence: number;
+  action: "SIMULATE" | "REQUEST_APPROVAL" | "COMMIT";
+  status: "RUNNING" | "COMPLETED" | "BLOCKED" | "FAILED";
+  title: string;
+  detail: string;
+  outputRef?: string | null;
+  durationMs: number;
+}
+
+export interface AgentGoalWorkflow {
+  phase:
+    | "PENDING"
+    | "NOT_APPLICABLE"
+    | "SIMULATING"
+    | "WAITING_APPROVAL"
+    | "COMMITTING"
+    | "COMPLETED"
+    | "BLOCKED";
+  intentId?: string | null;
+  simulation?: SimulationSummary | null;
+  recommendation?: AgentWorkflowRecommendation | null;
+  approvalRequest?: Approval | null;
+  commitment?: Record<string, unknown> | null;
+  steps: AgentWorkflowStep[];
+}
+
 export interface AgentRunRecord {
   runId: string;
   status: AgentRunStatus;
@@ -273,6 +306,7 @@ export interface AgentRunRecord {
     requestedBy: string;
     conversationId: string;
     timeoutSeconds: number;
+    executionMode: "ADVISORY" | "GOAL_EXECUTION";
   };
   idempotencyKey?: string | null;
   attempt: number;
@@ -290,8 +324,12 @@ export interface AgentRunRecord {
       reason: string;
       decidedAt: string;
     } | null;
+    stage?: "INTENT_DRAFT" | "POST_SIMULATION";
+    approvalId?: string | null;
+    simulationRunId?: string | null;
   } | null;
   evaluation?: AgentRunEvaluation | null;
+  workflow?: AgentGoalWorkflow | null;
   providerUsage: Record<string, number | boolean | Record<string, number>>;
   error?: string | null;
   events: AgentRunEvent[];

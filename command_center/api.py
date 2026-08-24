@@ -47,6 +47,7 @@ from .contracts import (
     new_id,
 )
 from .dataset_exports import DatasetExporter
+from .dispatch_workflow import DispatchWorkflowService
 from .engine_adapter import EngineVersionError, MaspAdapter
 from .explanations import PlanExplanationService
 from .intent_store import IntentStore
@@ -75,10 +76,17 @@ orchestrator = DispatchOrchestrator(
     audit=audit,
     clarifications=clarification_resolver,
 )
+dispatch_workflow = DispatchWorkflowService(
+    engine=engine,
+    approvals=approvals,
+    intents=intents,
+    audit=audit,
+)
 agent_runs = AgentRunManager(
     settings.data_dir / "agent-runs.json",
     orchestrator=orchestrator,
     provider=provider,
+    workflow=dispatch_workflow,
 )
 incident_store = IncidentStore(settings.data_dir / "incidents.json")
 incident_service = IncidentService(
@@ -508,24 +516,10 @@ def validate_intent(
     response_model_by_alias=True,
 )
 async def simulate(request: SimulationRequest) -> SimulationSummary:
-    trace_id = new_id("trace")
     try:
-        summary = await asyncio.to_thread(engine.simulate, request)
+        return await asyncio.to_thread(dispatch_workflow.simulate, request)
     except (ValueError, KeyError, EngineVersionError) as error:
-        audit.append(
-            trace_id=trace_id,
-            event_type="SIMULATION_REJECTED",
-            actor=request.intent.requested_by if request.intent else "demo-operator",
-            payload={"error": str(error), "request": request.model_dump(by_alias=True, mode="json")},
-        )
         raise HTTPException(status_code=422, detail=str(error)) from error
-    audit.append(
-        trace_id=trace_id,
-        event_type="SIMULATION_COMPLETED",
-        actor=request.intent.requested_by if request.intent else "demo-operator",
-        payload=summary.model_dump(by_alias=True, mode="json"),
-    )
-    return summary
 
 
 @app.get("/api/v1/simulations", response_model=list[SimulationSummary], response_model_by_alias=True)
@@ -787,17 +781,16 @@ def create_approval(
     scenario_id: str = Query(default="interactive-multi-fleet", alias="scenarioId"),
     run_id: list[str] | None = Query(default=None, alias="runId"),
 ) -> ApprovalRequest:
-    validation = engine.validate_intent(intent, scenario_id)
-    if not validation.valid:
-        raise HTTPException(status_code=422, detail="意图未通过确定性校验。")
-    request = approvals.create(intent, validation, run_id or [])
-    audit.append(
-        trace_id=new_id("trace"),
-        event_type="APPROVAL_CREATED",
-        actor=intent.requested_by,
-        payload=request.model_dump(by_alias=True, mode="json"),
-    )
-    return request
+    try:
+        return dispatch_workflow.create_approval(
+            intent,
+            scenario_id=scenario_id,
+            run_ids=run_id or [],
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, EngineVersionError) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.get("/api/v1/approvals", response_model=list[ApprovalRequest], response_model_by_alias=True)
@@ -812,18 +805,11 @@ def list_approvals() -> list[ApprovalRequest]:
 )
 def decide_approval(approval_id: str, decision: ApprovalDecision) -> ApprovalRequest:
     try:
-        result = approvals.decide(approval_id, decision)
+        return dispatch_workflow.decide_approval(approval_id, decision)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    audit.append(
-        trace_id=new_id("trace"),
-        event_type="APPROVAL_DECIDED",
-        actor=decision.decided_by,
-        payload=result.model_dump(by_alias=True, mode="json"),
-    )
-    return result
 
 
 @app.post("/api/v1/intents/{intent_id}/commit")
@@ -835,33 +821,18 @@ def commit_intent(
 ) -> dict[str, Any]:
     if intent.intent_id != intent_id:
         raise HTTPException(status_code=422, detail="路径和请求体的intentId不一致。")
-    validation = engine.validate_intent(intent, scenario_id)
-    if not validation.valid:
-        raise HTTPException(status_code=422, detail="意图未通过确定性校验。")
-    approval = None
-    if validation.approval_required:
-        if approval_id is None:
-            raise HTTPException(status_code=403, detail="该意图需要主管审批。")
-        try:
-            approval = approvals.get(approval_id)
-        except KeyError as error:
-            raise HTTPException(status_code=404, detail=str(error)) from error
     try:
-        record = intents.commit(
+        return dispatch_workflow.commit(
             intent,
-            current_world_revision=engine.world_revision(scenario_id),
-            approval=approval,
-            actor=intent.requested_by,
+            scenario_id=scenario_id,
+            approval_id=approval_id,
         )
+    except PermissionError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    audit.append(
-        trace_id=new_id("trace"),
-        event_type="INTENT_SIMULATION_COMMITTED",
-        actor=intent.requested_by,
-        payload=record,
-    )
-    return record
 
 
 @app.get("/api/v1/intents/committed")

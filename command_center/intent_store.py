@@ -47,6 +47,9 @@ class IntentStore:
             rows: list[dict[str, Any]] = []
             if self.path.exists():
                 rows = json.loads(self.path.read_text(encoding="utf-8"))
+            for current in rows:
+                if current.get("intent", {}).get("intentId") == intent.intent_id:
+                    return current
             rows.append(record)
             self.path.write_text(
                 json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
