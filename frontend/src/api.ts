@@ -1,5 +1,6 @@
 import type {
   AgentModelStatus,
+  AgentMetricsSummary,
   AgentPolicyOptions,
   Approval,
   AuditEvent,
@@ -47,6 +48,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   health: () => request<Health>("/api/health"),
   agentPolicy: () => request<AgentModelStatus>("/api/v1/agent-policy"),
+  agentMetrics: () => request<AgentMetricsSummary>("/api/v1/agent/metrics"),
   scenarios: () => request<ScenarioMeta[]>("/api/v1/scenarios"),
   snapshot: (scenarioId: string) =>
     request<Snapshot>(`/api/v1/world/snapshot?scenarioId=${encodeURIComponent(scenarioId)}`),

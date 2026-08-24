@@ -24,6 +24,7 @@ import {
 } from "@fluentui/react-icons";
 import { api } from "../api";
 import type {
+  AgentMetricsSummary,
   BenchmarkReport,
   BenchmarkRequest,
   BenchmarkSummary,
@@ -75,6 +76,9 @@ const formatNumber = (value?: number | null, digits = 1) =>
 const formatSeconds = (value?: number | null) =>
   typeof value === "number" ? `${formatNumber(value / 1000)} s` : "-";
 
+const formatPercent = (value?: number | null) =>
+  typeof value === "number" ? `${(value * 100).toFixed(1)}%` : "-";
+
 const formatInterval = (metric?: { mean?: number | null; ci95Low?: number | null; ci95High?: number | null }) => {
   if (typeof metric?.mean !== "number") return "-";
   return `${formatNumber(metric.mean)} [${formatNumber(metric.ci95Low)}, ${formatNumber(metric.ci95High)}]`;
@@ -91,6 +95,7 @@ export function EvaluationCenter({ onNotice, onError }: EvaluationCenterProps) {
   const [selectedModelReport, setSelectedModelReport] = useState<ModelSafetyEvaluationReport | null>(null);
   const [exports, setExports] = useState<DatasetExportManifest[]>([]);
   const [selectedExport, setSelectedExport] = useState<DatasetExportManifest | null>(null);
+  const [agentMetrics, setAgentMetrics] = useState<AgentMetricsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"benchmark" | "model" | "model-report" | "dataset" | "report" | null>(null);
   const [suiteName, setSuiteName] = useState("仓储群车高负载基准");
@@ -114,14 +119,16 @@ export function EvaluationCenter({ onNotice, onError }: EvaluationCenterProps) {
   const configValid = Boolean(suiteName.trim()) && caseCount > 0 && caseCount <= 2000 && seeds.length <= 10;
 
   const loadLists = async () => {
-    const [nextBenchmarks, nextModelEvaluations, nextExports] = await Promise.all([
+    const [nextBenchmarks, nextModelEvaluations, nextExports, nextAgentMetrics] = await Promise.all([
       api.benchmarks(),
       api.modelSafetyEvaluations(),
       api.datasetExports(),
+      api.agentMetrics(),
     ]);
     setBenchmarks(nextBenchmarks);
     setModelEvaluations(nextModelEvaluations);
     setExports(nextExports);
+    setAgentMetrics(nextAgentMetrics);
     setSelectedExport((current) => current || nextExports[0] || null);
     return { nextBenchmarks, nextModelEvaluations };
   };
@@ -289,6 +296,35 @@ export function EvaluationCenter({ onNotice, onError }: EvaluationCenterProps) {
           <div className="table-scroll evaluation-table"><Table size="small" aria-label="评测聚合统计"><TableHeader><TableRow><TableHeaderCell>车辆/负载/车型</TableHeaderCell><TableHeaderCell>策略</TableHeaderCell><TableHeaderCell>成功</TableHeaderCell><TableHeaderCell>完成任务 均值[95%CI]</TableHeaderCell><TableHeaderCell>吞吐 均值[95%CI]</TableHeaderCell><TableHeaderCell>平均周期</TableHeaderCell><TableHeaderCell>冲突拒绝</TableHeaderCell></TableRow></TableHeader><TableBody>{selectedReport.aggregates.map((row) => <TableRow key={`${row.vehicleCount}-${row.arrivalProfile}-${row.fleetMix}-${row.policy}`}><TableCell>{row.vehicleCount} / {arrivalLabels[row.arrivalProfile] || row.arrivalProfile} / {fleetLabels[row.fleetMix] || row.fleetMix}</TableCell><TableCell>{policyLabels[row.policy] || row.policy}</TableCell><TableCell className="mono">{row.successfulCaseCount}/{row.caseCount}</TableCell><TableCell className="mono">{formatInterval(row.metrics.completedTaskCount)}</TableCell><TableCell className="mono">{formatInterval(row.metrics.completedDropoffsPerHour)}</TableCell><TableCell className="mono">{formatSeconds(row.metrics.meanTaskCycleTimeMs?.mean)}</TableCell><TableCell className="mono">{formatNumber(row.metrics.reservationConflictRejections?.mean)}</TableCell></TableRow>)}</TableBody></Table></div>
           {selectedReport.failureCases.length > 0 && <div className="failure-summary"><strong>失败案例</strong>{selectedReport.failureCases.slice(0, 8).map((row) => <span key={row.caseId}><code>{row.caseId}</code>{row.error || "未返回错误说明"}</span>)}</div>}
         </> : <div className="evaluation-empty">选择历史评测或运行新的矩阵。</div>}
+      </section>
+
+      <section className="data-panel agent-observability">
+        <div className="panel-heading panel-heading-actions">
+          <div><h2>Agent 运行观测</h2><p>工具轨迹、完成率、模型降级与安全拦截</p></div>
+          <Button
+            appearance="subtle"
+            icon={<ArrowSync20Regular />}
+            aria-label="刷新 Agent 运行指标"
+            onClick={() => void api.agentMetrics().then(setAgentMetrics).catch((reason) => onError(reason instanceof Error ? reason.message : "Agent 指标刷新失败"))}
+          />
+        </div>
+        {agentMetrics ? <>
+          <div className="agent-observability-metrics">
+            <div><span>请求总数</span><strong className="mono">{agentMetrics.requestCount}</strong></div>
+            <div><span>任务完成率</span><strong className="mono">{formatPercent(agentMetrics.taskCompletionRate)}</strong></div>
+            <div><span>模型工具规划</span><strong className="mono">{formatPercent(agentMetrics.modelToolPlanningRate)}</strong></div>
+            <div><span>模型降级率</span><strong className="mono">{formatPercent(agentMetrics.fallbackRate)}</strong></div>
+            <div><span>P95 延迟</span><strong className="mono">{formatNumber(agentMetrics.p95DurationMs)} ms</strong></div>
+            <div><span>平均执行步数</span><strong className="mono">{formatNumber(agentMetrics.averageStepCount)}</strong></div>
+          </div>
+          <div className="agent-tool-distribution">
+            <span>工具调用</span>
+            {Object.entries(agentMetrics.toolCallCounts).map(([name, count]) => (
+              <code key={name}>{name} · {count}</code>
+            ))}
+            {Object.keys(agentMetrics.toolCallCounts).length === 0 && <strong>暂无轨迹</strong>}
+          </div>
+        </> : <div className="evaluation-empty">尚无 Agent 运行指标</div>}
       </section>
 
       <section className="data-panel model-evaluation">

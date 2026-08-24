@@ -153,6 +153,9 @@ export interface Evidence {
   source: string;
   title: string;
   detail: string;
+  chunkId?: string | null;
+  score?: number | null;
+  retrievalMethod?: string | null;
 }
 
 export interface AgentTraceStep {
@@ -182,6 +185,39 @@ export interface AgentExecutionTrace {
   maxSteps: number;
   durationMs: number;
   steps: AgentTraceStep[];
+}
+
+export interface AgentMetricEvent {
+  traceId: string;
+  conversationId: string;
+  scenarioId: string;
+  createdAt: string;
+  status: "COMPLETED" | "CLARIFICATION_REQUIRED" | "FAILED";
+  strategy: "MODEL_TOOL_CALLING" | "DETERMINISTIC_POLICY";
+  plannerModel: string;
+  intentModel: string;
+  fallbackUsed: boolean;
+  durationMs: number;
+  stepCount: number;
+  toolNames: string[];
+  validationPassed?: boolean | null;
+  riskLevel?: string | null;
+}
+
+export interface AgentMetricsSummary {
+  generatedAt: string;
+  requestCount: number;
+  completedCount: number;
+  clarificationCount: number;
+  taskCompletionRate: number;
+  modelToolPlanningRate: number;
+  fallbackRate: number;
+  safetyBlockRate: number;
+  averageDurationMs: number;
+  p95DurationMs: number;
+  averageStepCount: number;
+  toolCallCounts: Record<string, number>;
+  recent: AgentMetricEvent[];
 }
 
 export interface ChatResponse {

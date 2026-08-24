@@ -333,8 +333,92 @@ p {
 
 .benchmark-report,
 .model-evaluation,
+.agent-observability,
 .dataset-export {
   grid-column: 1 / -1;
+}
+
+.agent-observability-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border-bottom: 1px solid #e6e8eb;
+}
+
+.agent-observability-metrics > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-right: 1px solid #e6e8eb;
+}
+
+.agent-observability-metrics > div:last-child {
+  border-right: 0;
+}
+
+.agent-observability-metrics span {
+  color: #616161;
+  font-size: 10px;
+}
+
+.agent-observability-metrics strong {
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.agent-tool-distribution {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-height: 48px;
+  padding: 9px 14px;
+}
+
+.agent-tool-distribution > span {
+  margin-right: 3px;
+  color: #616161;
+  font-size: 10px;
+}
+
+.agent-tool-distribution code {
+  padding: 3px 6px;
+  color: #0f548c;
+  background: #eef5fc;
+  border-radius: 3px;
+  font-size: 9px;
+}
+
+@media (max-width: 1240px) {
+  .agent-observability-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .agent-observability-metrics > div:nth-child(3n) {
+    border-right: 0;
+  }
+
+  .agent-observability-metrics > div:nth-child(-n + 3) {
+    border-bottom: 1px solid #e6e8eb;
+  }
+}
+
+@media (max-width: 760px) {
+  .agent-observability-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-observability-metrics > div:nth-child(3n) {
+    border-right: 1px solid #e6e8eb;
+  }
+
+  .agent-observability-metrics > div:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .agent-observability-metrics > div:nth-child(-n + 4) {
+    border-bottom: 1px solid #e6e8eb;
+  }
 }
 
 .evaluation-loading {
@@ -1537,7 +1621,14 @@ p {
   border-top: 1px solid #edf0f2;
 }
 
-.evidence-item span {
+.evidence-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.evidence-meta span {
   color: #0f6cbd;
   font-size: 10px;
 }

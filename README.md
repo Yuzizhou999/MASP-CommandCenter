@@ -9,6 +9,9 @@
 - 自然语言紧急插单、通道封锁、状态查询和报告生成；
 - 有界 Agent 状态机、DeepSeek 兼容 Tool Calling 和逐步执行轨迹；
 - 服务端工具白名单，模型只能选择只读上下文工具，安全校验不可跳过；
+- BM25 与字符特征向量混合检索，证据包含稳定 chunk ID、相关度和检索方法；
+- 结构化会话记忆，只保存已确认实体、最近意图、风险和工具轨迹；
+- Agent 完成率、工具规划率、降级率、P95 延迟和工具分布观测；
 - 缺失站点、车型或资源时进入多轮澄清，不使用默认实体补齐；
 - DeepSeek API 调用，未配置密钥或 API 异常时自动使用确定性本地解析；
 - 可从场景包自动生成或在画布手工配置路网、工位、车辆和任务流；
@@ -47,7 +50,7 @@ E:\project\MASP-CommandCenter   灵枢应用、智能体、治理和前端
 | 智能体 | 有界状态机、DeepSeek Tool Calling、Pydantic 强类型工具、本地确定性降级 |
 | 治理 | 风险分级、审批、世界版本、审计、仿真态提交 |
 | 数字孪生 | MASP 在线调度、路径规划、资源预约、事件回放 |
-| 数据与评测 | 可重复矩阵评测、统计汇总、安全门槛、脱敏质检 |
+| 数据与评测 | 混合知识检索、结构化记忆、Agent 观测、矩阵评测、安全门槛、脱敏质检 |
 | 存储 | JSON/JSONL 本地存储，运行结果按 run 和 benchmark 独立落盘 |
 
 大模型只负责理解和解释。路径、资源预约、冲突判断、方案指标全部来自 MASP 确定性引擎。故障诊断中的每条根因与建议必须引用真实 `EV-*` 证据，虚构证据、车辆、任务或越权动作会使整份 AI 报告降级为规则诊断。
@@ -146,6 +149,10 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 | `GET` | `/api/v1/agent-policy` | 群车策略模型登记与权重状态 |
 | `POST` | `/api/v1/agent/chat` | 自然语言到结构化意图 |
 | `GET` | `/api/v1/agent/tools` | 查看 Agent 工具目录、权限和输入 Schema |
+| `GET` | `/api/v1/agent/memory/{conversationId}` | 查看服务端确认的结构化会话记忆 |
+| `GET` | `/api/v1/agent/metrics` | 查看 Agent 聚合运行指标和最近轨迹摘要 |
+| `GET` | `/api/v1/knowledge/search` | 执行带分数和 chunk ID 的混合知识检索 |
+| `GET` | `/api/v1/knowledge/stats` | 查看知识片段数量和检索器版本 |
 | `POST` | `/api/v1/intents/validate` | 确定性校验和风险分级 |
 | `POST` | `/api/v1/simulations` | 运行数字孪生 |
 | `POST` | `/api/v1/simulations/compare` | 比较 2-4 个方案 |
@@ -183,6 +190,8 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 - `incident-context.json`：故障分支、冻结窗口、人工转运和已知限制。
 
 矩阵评测写入 `data/evaluations/<benchmarkId>/`，数据导出写入 `data/dataset-exports/<exportId>/`。`data/` 和 `runs/` 都是可再生成的本地运行目录，不进入 Git。
+
+Agent 会话记忆写入 `data/agent-memories.json`，不保存模型自由文本；匿名化运行指标追加到 `data/agent-metrics.jsonl`，不包含用户提示词和模型回复。
 
 ## 文档
 

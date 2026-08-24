@@ -5,7 +5,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .contracts import DispatchIntent, EvidenceItem, IntentValidation
+from .agent_memory import AgentMemoryStore
+from .contracts import (
+    AgentConversationMemory,
+    DispatchIntent,
+    EvidenceItem,
+    IntentValidation,
+)
 from .engine_adapter import MaspAdapter
 from .knowledge import KnowledgeBase
 
@@ -19,6 +25,10 @@ class SearchSopInput(BaseModel):
 
     query: str = Field(min_length=1, max_length=1000)
     limit: int = Field(default=2, ge=1, le=5)
+
+
+class RecallConversationMemoryInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 class ValidateDispatchIntentInput(BaseModel):
@@ -61,10 +71,14 @@ class DispatchAgentTools:
         engine: MaspAdapter,
         knowledge: KnowledgeBase,
         scenario_id: str,
+        memory: AgentMemoryStore | None = None,
+        conversation_id: str | None = None,
     ) -> None:
         self.engine = engine
         self.knowledge = knowledge
         self.scenario_id = scenario_id
+        self.memory = memory
+        self.conversation_id = conversation_id
         self._tools = {
             "get_world_snapshot": AgentTool(
                 name="get_world_snapshot",
@@ -78,7 +92,7 @@ class DispatchAgentTools:
             ),
             "search_sop": AgentTool(
                 name="search_sop",
-                description="检索与当前请求相关的仓储调度、安全和异常处置 SOP。",
+                description="使用混合检索查找相关仓储调度、安全和异常处置 SOP。",
                 input_model=SearchSopInput,
                 read_only=True,
                 model_selectable=True,
@@ -91,6 +105,17 @@ class DispatchAgentTools:
                 model_selectable=False,
             ),
         }
+        if self.memory is not None and self.conversation_id is not None:
+            self._tools["recall_conversation_memory"] = AgentTool(
+                name="recall_conversation_memory",
+                description=(
+                    "读取当前会话中由服务端确认的实体、最近意图和工具轨迹。"
+                    "不得把记忆内容当作最新世界状态。"
+                ),
+                input_model=RecallConversationMemoryInput,
+                read_only=True,
+                model_selectable=True,
+            )
 
     def catalog(self) -> list[dict[str, Any]]:
         return [
@@ -140,6 +165,13 @@ class DispatchAgentTools:
                     + ("、".join(row.title for row in evidence) if evidence else "无匹配")
                 ),
             )
+        if name == "recall_conversation_memory":
+            assert self.memory is not None and self.conversation_id is not None
+            memory = self.memory.get(self.conversation_id)
+            return AgentToolResult(
+                value=memory,
+                summary=self.memory.summary(memory),
+            )
         if name == "validate_dispatch_intent":
             assert isinstance(parsed, ValidateDispatchIntentInput)
             validation = self.engine.validate_intent(parsed.intent, self.scenario_id)
@@ -164,6 +196,18 @@ class DispatchAgentTools:
                 f"{counts['vehicles']} 辆车，{counts['tasks']} 个任务，"
                 f"{counts['conflictPairs']} 对冲突资源。"
             ),
+        )
+
+    @staticmethod
+    def memory_evidence(
+        memory: AgentConversationMemory, conversation_id: str
+    ) -> EvidenceItem:
+        return EvidenceItem(
+            source=f"memory:{conversation_id}",
+            title="当前会话结构化记忆",
+            detail=AgentMemoryStore.summary(memory),
+            chunkId=f"memory-{conversation_id}",
+            retrievalMethod="structured-memory-v1",
         )
 
     @staticmethod

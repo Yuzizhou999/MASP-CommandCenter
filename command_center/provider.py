@@ -11,6 +11,7 @@ from .contracts import (
     ClarificationRequest,
     DiagnosisReport,
     DispatchIntent,
+    EvidenceItem,
     IncidentRecord,
     IntentType,
     PlanExplanationNarrative,
@@ -94,15 +95,22 @@ class DeepSeekProvider:
         self,
         text: str,
         tool_definitions: list[dict[str, Any]],
+        *,
+        has_memory: bool = False,
     ) -> AgentToolPlan:
         """Let the model choose read-only context tools, with a deterministic fallback."""
+        fallback_calls = [
+            PlannedToolCall(name="get_world_snapshot", arguments={})
+        ]
+        if has_memory:
+            fallback_calls.append(
+                PlannedToolCall(name="recall_conversation_memory", arguments={})
+            )
+        fallback_calls.append(
+            PlannedToolCall(name="search_sop", arguments={"query": text, "limit": 2})
+        )
         fallback = AgentToolPlan(
-            calls=(
-                PlannedToolCall(name="get_world_snapshot", arguments={}),
-                PlannedToolCall(
-                    name="search_sop", arguments={"query": text, "limit": 2}
-                ),
-            ),
+            calls=tuple(fallback_calls),
             strategy="DETERMINISTIC_POLICY",
             model="deterministic-tool-policy",
         )
@@ -131,6 +139,8 @@ class DeepSeekProvider:
                                 "你是仓储调度 Agent 的只读上下文规划器。"
                                 "必须调用 get_world_snapshot；当请求涉及调度规则、"
                                 "安全、检修、异常或操作流程时调用 search_sop。"
+                                "当工具可用且请求引用之前、刚才或同一会话实体时，"
+                                "调用 recall_conversation_memory。"
                                 "只能使用提供的工具，不得请求写操作或车辆控制。"
                             ),
                         },
@@ -161,6 +171,8 @@ class DeepSeekProvider:
                     continue
                 if name == "get_world_snapshot":
                     arguments = {}
+                elif name == "recall_conversation_memory":
+                    arguments = {}
                 elif name == "search_sop":
                     query = arguments.get("query")
                     if not isinstance(query, str) or not query.strip():
@@ -177,6 +189,15 @@ class DeepSeekProvider:
                 return fallback
             if not any(call.name == "get_world_snapshot" for call in calls):
                 calls.insert(0, PlannedToolCall(name="get_world_snapshot", arguments={}))
+            if has_memory and not any(
+                call.name == "recall_conversation_memory" for call in calls
+            ):
+                calls.insert(
+                    1,
+                    PlannedToolCall(
+                        name="recall_conversation_memory", arguments={}
+                    ),
+                )
             return AgentToolPlan(
                 calls=tuple(calls),
                 strategy="MODEL_TOOL_CALLING",
@@ -193,6 +214,7 @@ class DeepSeekProvider:
         requested_by: str,
         resolved_task: dict[str, Any] | None = None,
         resolved_resource_block: dict[str, Any] | None = None,
+        context_evidence: list[EvidenceItem] | None = None,
     ) -> ParseResult:
         if not self.configured:
             return self._fallback_result(
@@ -229,6 +251,14 @@ class DeepSeekProvider:
                                         "task": resolved_task,
                                         "resourceBlock": resolved_resource_block,
                                     },
+                                    "retrievedContext": [
+                                        {
+                                            "source": row.source,
+                                            "title": row.title,
+                                            "detail": row.detail,
+                                        }
+                                        for row in (context_evidence or [])
+                                    ],
                                     "schema": schema,
                                 },
                                 ensure_ascii=False,

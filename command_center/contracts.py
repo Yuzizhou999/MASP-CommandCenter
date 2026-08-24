@@ -388,9 +388,14 @@ class ChatRequest(BaseModel):
 
 
 class EvidenceItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     source: str
     title: str
     detail: str
+    chunk_id: str | None = Field(default=None, alias="chunkId")
+    score: float | None = Field(default=None, ge=0, le=1)
+    retrieval_method: str | None = Field(default=None, alias="retrievalMethod")
 
 
 class ClarificationRequest(BaseModel):
@@ -434,6 +439,29 @@ class AgentExecutionTrace(BaseModel):
     max_steps: int = Field(ge=1, alias="maxSteps")
     duration_ms: float = Field(ge=0, alias="durationMs")
     steps: list[AgentTraceStep] = Field(default_factory=list)
+
+
+class AgentMemoryTurn(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    message: str
+    outcome: Literal["READY", "CLARIFICATION_REQUIRED"]
+    intent_type: str | None = Field(default=None, alias="intentType")
+    risk_level: str | None = Field(default=None, alias="riskLevel")
+    tool_names: list[str] = Field(default_factory=list, alias="toolNames")
+    created_at: datetime = Field(default_factory=utc_now, alias="createdAt")
+
+
+class AgentConversationMemory(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    conversation_id: str = Field(alias="conversationId")
+    scenario_id: str = Field(alias="scenarioId")
+    confirmed_entities: dict[str, list[str]] = Field(
+        default_factory=dict, alias="confirmedEntities"
+    )
+    turns: list[AgentMemoryTurn] = Field(default_factory=list)
+    updated_at: datetime = Field(default_factory=utc_now, alias="updatedAt")
 
 
 class ChatResponse(BaseModel):

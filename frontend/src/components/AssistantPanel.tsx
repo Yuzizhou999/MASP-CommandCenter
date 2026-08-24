@@ -181,7 +181,12 @@ export function AssistantPanel({
                     {response.evidence.map((item) => (
                       <div className="evidence-item" key={`${item.source}-${item.title}`}>
                         <strong>{item.title}</strong>
-                        <span className="mono">{item.source}</span>
+                        <div className="evidence-meta">
+                          <span className="mono">{item.source}</span>
+                          {item.chunkId && <span className="mono">{item.chunkId}</span>}
+                          {typeof item.score === "number" && <span>相关度 {(item.score * 100).toFixed(1)}%</span>}
+                          {item.retrievalMethod && <span className="mono">{item.retrievalMethod}</span>}
+                        </div>
                         <p>{item.detail}</p>
                       </div>
                     ))}

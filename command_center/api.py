@@ -16,6 +16,7 @@ from .clarifications import ClarificationResolver, ClarificationStore
 from .contracts import (
     ApprovalDecision,
     ApprovalRequest,
+    AgentConversationMemory,
     BenchmarkRequest,
     ChatRequest,
     ChatResponse,
@@ -357,6 +358,25 @@ def agent_tools() -> list[dict[str, Any]]:
     return orchestrator.tool_catalog()
 
 
+@app.get(
+    "/api/v1/agent/memory/{conversation_id}",
+    response_model=AgentConversationMemory,
+    response_model_by_alias=True,
+)
+def agent_memory(conversation_id: str) -> AgentConversationMemory:
+    memory = orchestrator.memory.get(conversation_id)
+    if memory is None:
+        raise HTTPException(status_code=404, detail="当前会话没有可召回记忆")
+    return memory
+
+
+@app.get("/api/v1/agent/metrics")
+def agent_metrics(
+    recent_limit: int = Query(default=20, ge=1, le=100, alias="recentLimit")
+) -> dict[str, Any]:
+    return orchestrator.observability.summary(recent_limit=recent_limit)
+
+
 @app.post("/api/v1/intents/validate")
 def validate_intent(
     intent: DispatchIntent,
@@ -436,7 +456,12 @@ def compare(request: ComparisonRequest) -> ComparisonResult:
 
 @app.get("/api/v1/knowledge/search")
 def search_knowledge(q: str = Query(min_length=1)) -> list[dict[str, Any]]:
-    return [row.model_dump(mode="json") for row in knowledge.search(q)]
+    return [row.model_dump(by_alias=True, mode="json") for row in knowledge.search(q)]
+
+
+@app.get("/api/v1/knowledge/stats")
+def knowledge_stats() -> dict[str, object]:
+    return knowledge.stats()
 
 
 @app.get(

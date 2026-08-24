@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from time import perf_counter
 
+from .agent_memory import AgentMemoryStore
+from .agent_observability import AgentObservabilityStore
 from .agent_runtime import AgentState, BoundedAgentRun
 from .agent_tools import DispatchAgentTools
 from .audit import AuditStore
@@ -26,11 +28,19 @@ class DispatchOrchestrator:
         knowledge: KnowledgeBase,
         audit: AuditStore,
         clarifications: ClarificationResolver | None = None,
+        memory: AgentMemoryStore | None = None,
+        observability: AgentObservabilityStore | None = None,
     ) -> None:
         self.engine = engine
         self.provider = provider
         self.knowledge = knowledge
         self.audit = audit
+        self.memory = memory or AgentMemoryStore(
+            engine.settings.data_dir / "agent-memories.json"
+        )
+        self.observability = observability or AgentObservabilityStore(
+            engine.settings.data_dir / "agent-metrics.jsonl"
+        )
         self.clarifications = clarifications or ClarificationResolver(
             ClarificationStore(engine.settings.data_dir / "clarifications.json"), engine
         )
@@ -42,7 +52,10 @@ class DispatchOrchestrator:
             engine=self.engine,
             knowledge=self.knowledge,
             scenario_id=request.scenario_id,
+            memory=self.memory,
+            conversation_id=request.conversation_id,
         )
+        prior_memory = self.memory.get(request.conversation_id)
         run.transition(
             AgentState.RECEIVED,
             title="接收调度请求",
@@ -51,7 +64,9 @@ class DispatchOrchestrator:
 
         started = perf_counter()
         plan = self.provider.plan_context_tools(
-            request.message, tools.model_definitions()
+            request.message,
+            tools.model_definitions(),
+            has_memory=prior_memory is not None,
         )
         run.set_planner(strategy=plan.strategy, model=plan.model)
         run.transition(
@@ -79,6 +94,10 @@ class DispatchOrchestrator:
                 )
             elif call.name == "search_sop":
                 evidence.extend(result.value)
+            elif call.name == "recall_conversation_memory" and result.value is not None:
+                evidence.append(
+                    tools.memory_evidence(result.value, request.conversation_id)
+                )
         if snapshot is None:
             raise RuntimeError("Agent 工具计划缺少强制世界快照")
 
@@ -104,6 +123,23 @@ class DispatchOrchestrator:
                 status="BLOCKED",
             )
             agent_trace = run.build_trace()
+            self.memory.record(
+                conversation_id=request.conversation_id,
+                scenario_id=request.scenario_id,
+                message=request.message,
+                outcome="CLARIFICATION_REQUIRED",
+                trace=agent_trace,
+                clarification=resolved.clarification,
+            )
+            self.observability.record(
+                trace_id=trace_id,
+                conversation_id=request.conversation_id,
+                scenario_id=request.scenario_id,
+                trace=agent_trace,
+                model="deterministic-parameter-resolver",
+                fallback_used=False,
+                validation=None,
+            )
             message = "还不能形成可执行草案。" + " ".join(
                 resolved.clarification.questions
             )
@@ -142,6 +178,7 @@ class DispatchOrchestrator:
             requested_by=request.requested_by,
             resolved_task=resolved.task,
             resolved_resource_block=resolved.resource_block,
+            context_evidence=evidence,
         )
         if parsed.intent is None:
             raise ValueError("意图解析未生成结构化结果")
@@ -164,7 +201,17 @@ class DispatchOrchestrator:
         validation = tools.validation_value(validation_result)
 
         intent_type = parsed.intent.intent_type
-        if intent_type is IntentType.CREATE_TASK:
+        memory_reference = prior_memory is not None and any(
+            term in request.message
+            for term in ("刚才", "之前", "上次", "前面", "哪些实体", "哪些工具")
+        )
+        if memory_reference and intent_type in {
+            IntentType.QUERY_STATUS,
+            IntentType.EXPLAIN_DECISION,
+        }:
+            message = self.memory.summary(prior_memory)
+            actions = ["查看 Agent 执行轨迹", "查看依据与引用"]
+        elif intent_type is IntentType.CREATE_TASK:
             task = parsed.intent.task
             message = (
                 f"已形成紧急运输任务草案：{task.pickup_node_id} 到 "
@@ -214,6 +261,24 @@ class DispatchOrchestrator:
             ),
         )
         agent_trace = run.build_trace()
+        self.memory.record(
+            conversation_id=request.conversation_id,
+            scenario_id=request.scenario_id,
+            message=request.message,
+            outcome="READY",
+            trace=agent_trace,
+            intent=parsed.intent,
+            validation=validation,
+        )
+        self.observability.record(
+            trace_id=trace_id,
+            conversation_id=request.conversation_id,
+            scenario_id=request.scenario_id,
+            trace=agent_trace,
+            model=parsed.model,
+            fallback_used=parsed.fallback_used,
+            validation=validation,
+        )
 
         response = ChatResponse(
             traceId=trace_id,
@@ -248,5 +313,7 @@ class DispatchOrchestrator:
             engine=self.engine,
             knowledge=self.knowledge,
             scenario_id=scenario_id,
+            memory=self.memory,
+            conversation_id="catalog",
         ).catalog()
 
