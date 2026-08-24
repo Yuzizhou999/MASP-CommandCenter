@@ -54,6 +54,48 @@ def test_provider_falls_back_to_deterministic_intent(isolated_settings) -> None:
     assert result.intent.based_on_world_revision == 123
 
 
+def test_provider_prioritizes_authoritative_task_for_new_wording(
+    isolated_settings,
+) -> None:
+    resolved_task = {
+        "pickupNodeId": "jack:AP100",
+        "dropoffNodeId": "jack:AP200",
+        "requiredRobotGroup": "jack",
+        "payloadType": "shelf",
+    }
+
+    result = DeepSeekProvider(isolated_settings).parse_intent(
+        "请处理这项业务",
+        world_revision=8,
+        requested_by="tester",
+        resolved_task=resolved_task,
+    )
+
+    assert result.intent is not None and result.intent.task is not None
+    assert result.intent.intent_type is IntentType.CREATE_TASK
+    assert result.intent.task.pickup_node_id == "jack:AP100"
+    assert result.intent.task.dropoff_node_id == "jack:AP200"
+
+
+@pytest.mark.parametrize("message", ["新增一个运输任务", "帮我把货送过去", "安排搬运"])
+def test_provider_new_task_wording_requests_task_fields(
+    isolated_settings, message: str
+) -> None:
+    result = DeepSeekProvider(isolated_settings).parse_intent(
+        message,
+        world_revision=8,
+        requested_by="tester",
+    )
+
+    assert result.intent is None
+    assert result.clarification is not None
+    assert result.clarification.missing_fields == [
+        "pickupNodeId",
+        "dropoffNodeId",
+        "requiredRobotGroup",
+    ]
+
+
 def test_provider_rejects_model_generated_recovery_intent(
     isolated_settings, monkeypatch
 ) -> None:

@@ -11,8 +11,22 @@ from .contracts import ClarificationRequest, IntentType, utc_now
 from .engine_adapter import MaspAdapter
 
 
-TASK_TERMS = ("创建", "插单", "送到", "运到", "运输", "搬运", "紧急任务")
-BLOCK_TERMS = ("封闭", "封路", "检修", "禁行")
+TASK_TERMS = (
+    "创建",
+    "新增",
+    "插单",
+    "安排",
+    "送到",
+    "送去",
+    "送过去",
+    "运到",
+    "运输",
+    "转运",
+    "搬运",
+    "急货",
+    "紧急任务",
+)
+BLOCK_TERMS = ("封闭", "封路", "检修", "停用", "禁行")
 NEW_INTENT_TERMS = (
     "报告",
     "总结",

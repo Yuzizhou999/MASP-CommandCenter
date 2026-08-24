@@ -53,9 +53,9 @@ from .explanations import PlanExplanationService
 from .intent_store import IntentStore
 from .incidents import IncidentService, IncidentStore
 from .knowledge import KnowledgeBase
+from .llm_provider import create_llm_provider
 from .model_evaluation import ModelSafetyEvaluator
 from .orchestrator import DispatchOrchestrator
-from .provider import DeepSeekProvider
 from .settings import Settings
 from .scenario_drafts import ScenarioDraftConflict, ScenarioDraftStore
 
@@ -66,7 +66,7 @@ audit = AuditStore(settings.data_dir / "audit.jsonl")
 approvals = ApprovalStore(settings.data_dir / "approvals.json")
 intents = IntentStore(settings.data_dir / "committed-intents.json")
 knowledge = KnowledgeBase(settings.root / "knowledge")
-provider = DeepSeekProvider(settings)
+provider = create_llm_provider(settings)
 clarification_store = ClarificationStore(settings.data_dir / "clarifications.json")
 clarification_resolver = ClarificationResolver(clarification_store, engine)
 orchestrator = DispatchOrchestrator(

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import command_center.settings as settings_module
+import pytest
 from command_center.settings import Settings
 
 
@@ -43,3 +44,26 @@ def test_explicit_agent_checkpoint_overrides_bundled_model(
     settings = Settings.load()
 
     assert settings.agent_checkpoint == alternate.resolve()
+
+
+def test_settings_discovers_local_llm_model_card(tmp_path: Path, monkeypatch) -> None:
+    _prepare_root(tmp_path)
+    model_dir = tmp_path / "models" / "masp-intent-lora"
+    model_dir.mkdir()
+    card = model_dir / "model-card.json"
+    card.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(settings_module, "ROOT", tmp_path)
+    monkeypatch.delenv("LOCAL_LLM_MODEL_CARD", raising=False)
+
+    settings = Settings.load()
+
+    assert settings.local_llm_model_card == card.resolve()
+
+
+def test_settings_rejects_unknown_llm_provider(tmp_path: Path, monkeypatch) -> None:
+    _prepare_root(tmp_path)
+    monkeypatch.setattr(settings_module, "ROOT", tmp_path)
+    monkeypatch.setenv("LLM_PROVIDER", "unknown")
+
+    with pytest.raises(ValueError, match="LLM_PROVIDER"):
+        Settings.load()

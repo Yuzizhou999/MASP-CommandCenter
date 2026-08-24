@@ -78,6 +78,63 @@ class AgentToolPlan:
     model: str
 
 
+def intent_request_payload(
+    text: str,
+    *,
+    world_revision: int,
+    requested_by: str,
+    resolved_task: dict[str, Any] | None = None,
+    resolved_resource_block: dict[str, Any] | None = None,
+    context_evidence: list[EvidenceItem] | None = None,
+) -> dict[str, Any]:
+    return {
+        "request": text,
+        "worldRevision": world_revision,
+        "requestedBy": requested_by,
+        "authoritativeParameters": {
+            "task": resolved_task,
+            "resourceBlock": resolved_resource_block,
+        },
+        "retrievedContext": [
+            {
+                "source": row.source,
+                "title": row.title,
+                "detail": row.detail,
+            }
+            for row in (context_evidence or [])
+        ],
+        "schema": DispatchIntent.model_json_schema(by_alias=True),
+    }
+
+
+def intent_training_messages(
+    text: str,
+    *,
+    world_revision: int,
+    requested_by: str,
+    resolved_task: dict[str, Any] | None = None,
+    resolved_resource_block: dict[str, Any] | None = None,
+    context_evidence: list[EvidenceItem] | None = None,
+) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": json.dumps(
+                intent_request_payload(
+                    text,
+                    world_revision=world_revision,
+                    requested_by=requested_by,
+                    resolved_task=resolved_task,
+                    resolved_resource_block=resolved_resource_block,
+                    context_evidence=context_evidence,
+                ),
+                ensure_ascii=False,
+            ),
+        },
+    ]
+
+
 class DeepSeekProvider:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -373,39 +430,19 @@ class DeepSeekProvider:
             )
 
         try:
-            schema = DispatchIntent.model_json_schema(by_alias=True)
             response = self._post(
                 payload={
                     "model": self.settings.deepseek_model,
                     "temperature": 0,
                     "response_format": {"type": "json_object"},
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {
-                            "role": "user",
-                            "content": json.dumps(
-                                {
-                                    "request": text,
-                                    "worldRevision": world_revision,
-                                    "requestedBy": requested_by,
-                                    "authoritativeParameters": {
-                                        "task": resolved_task,
-                                        "resourceBlock": resolved_resource_block,
-                                    },
-                                    "retrievedContext": [
-                                        {
-                                            "source": row.source,
-                                            "title": row.title,
-                                            "detail": row.detail,
-                                        }
-                                        for row in (context_evidence or [])
-                                    ],
-                                    "schema": schema,
-                                },
-                                ensure_ascii=False,
-                            ),
-                        },
-                    ],
+                    "messages": intent_training_messages(
+                        text,
+                        world_revision=world_revision,
+                        requested_by=requested_by,
+                        resolved_task=resolved_task,
+                        resolved_resource_block=resolved_resource_block,
+                        context_evidence=context_evidence,
+                    ),
                 }
             )
             content = response.json()["choices"][0]["message"]["content"]
@@ -585,7 +622,22 @@ class DeepSeekProvider:
             )
         except ValueError:
             task_like = any(
-                term in text for term in ("创建", "插单", "送到", "运到", "紧急")
+                term in text
+                for term in (
+                    "创建",
+                    "新增",
+                    "插单",
+                    "安排",
+                    "送到",
+                    "送去",
+                    "送过去",
+                    "运到",
+                    "运输",
+                    "转运",
+                    "搬运",
+                    "急货",
+                    "紧急任务",
+                )
             )
             missing = (
                 ["pickupNodeId", "dropoffNodeId", "requiredRobotGroup"]
@@ -619,7 +671,9 @@ class DeepSeekProvider:
         resolved_resource_block: dict[str, Any] | None = None,
     ) -> DispatchIntent:
         normalized = text.strip()
-        if any(term in normalized for term in ("封闭", "封路", "检修", "禁行")):
+        if resolved_resource_block is not None or any(
+            term in normalized for term in ("封闭", "封路", "检修", "停用", "禁行")
+        ):
             if resolved_resource_block is None:
                 resources = (
                     ["zone:zone-jack-pp363-pp365"]
@@ -649,7 +703,24 @@ class DeepSeekProvider:
                 reason=normalized,
                 query=normalized,
             )
-        if any(term in normalized for term in ("创建", "插单", "送到", "运到", "紧急")):
+        if resolved_task is not None or any(
+            term in normalized
+            for term in (
+                "创建",
+                "新增",
+                "插单",
+                "安排",
+                "送到",
+                "送去",
+                "送过去",
+                "运到",
+                "运输",
+                "转运",
+                "搬运",
+                "急货",
+                "紧急任务",
+            )
+        ):
             if resolved_task is None:
                 group = (
                     "jack"

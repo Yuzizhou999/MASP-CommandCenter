@@ -125,6 +125,31 @@ def test_generic_resource_block_requires_target(isolated_settings) -> None:
     assert response.clarification.collected_parameters["durationMs"] == 180000
 
 
+@pytest.mark.parametrize(
+    ("message", "missing_fields"),
+    [
+        ("新增一个紧急运输任务", {"pickupNodeId", "dropoffNodeId", "requiredRobotGroup"}),
+        ("帮我把货送过去", {"pickupNodeId", "dropoffNodeId", "requiredRobotGroup"}),
+        ("临时停用一条通道", {"resourceIds"}),
+    ],
+)
+def test_expanded_dispatch_wording_enters_clarification(
+    isolated_settings, message: str, missing_fields: set[str]
+) -> None:
+    _, _, orchestrator = _orchestrator(isolated_settings)
+    response = orchestrator.chat(
+        ChatRequest(
+            message=message,
+            scenarioId="interactive-multi-fleet",
+            conversationId=f"wording-{len(message)}",
+        )
+    )
+
+    assert response.state == "CLARIFICATION_REQUIRED"
+    assert response.clarification is not None
+    assert set(response.clarification.missing_fields) == missing_fields
+
+
 def test_plan_explanation_cites_persisted_masp_evidence(isolated_settings) -> None:
     engine = MaspAdapter(isolated_settings)
     audit = AuditStore(isolated_settings.data_dir / "audit.jsonl")

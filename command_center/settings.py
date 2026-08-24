@@ -35,6 +35,13 @@ class Settings:
     deepseek_circuit_reset_seconds: float = 30
     deepseek_input_cost_per_million: float = 0.27
     deepseek_output_cost_per_million: float = 1.10
+    llm_provider: str = "deepseek"
+    local_llm_enabled: bool = False
+    local_llm_api_key: str = "local"
+    local_llm_base_url: str = "http://127.0.0.1:8000/v1"
+    local_llm_model: str = "masp-intent-lora"
+    local_llm_timeout_seconds: float = 30
+    local_llm_model_card: Path | None = None
     agent_model_id: str = "masp-ppo-priority"
     agent_model_version: str = "1.0.0"
     agent_checkpoint: Path | None = None
@@ -70,6 +77,20 @@ class Settings:
             bundled_checkpoint = ROOT / "models" / "ppo-priority-v1.pt"
             if bundled_checkpoint.is_file():
                 checkpoint = bundled_checkpoint.resolve()
+        model_card_value = os.getenv("LOCAL_LLM_MODEL_CARD", "").strip()
+        model_card = None
+        if model_card_value:
+            model_card = Path(model_card_value)
+            if not model_card.is_absolute():
+                model_card = ROOT / model_card
+            model_card = model_card.resolve()
+        else:
+            default_model_card = ROOT / "models" / "masp-intent-lora" / "model-card.json"
+            if default_model_card.is_file():
+                model_card = default_model_card.resolve()
+        llm_provider = os.getenv("LLM_PROVIDER", "deepseek").strip().lower()
+        if llm_provider not in {"deepseek", "local", "auto"}:
+            raise ValueError("LLM_PROVIDER 必须是 deepseek、local 或 auto")
         return cls(
             app_env=os.getenv("APP_ENV", "development").strip().lower(),
             host=os.getenv("APP_HOST", "127.0.0.1"),
@@ -104,6 +125,19 @@ class Settings:
             deepseek_output_cost_per_million=max(
                 0, float(os.getenv("DEEPSEEK_OUTPUT_COST_PER_MILLION", "1.10"))
             ),
+            llm_provider=llm_provider,
+            local_llm_enabled=_as_bool(os.getenv("LOCAL_LLM_ENABLED")),
+            local_llm_api_key=os.getenv("LOCAL_LLM_API_KEY", "local"),
+            local_llm_base_url=os.getenv(
+                "LOCAL_LLM_BASE_URL", "http://127.0.0.1:8000/v1"
+            ).rstrip("/"),
+            local_llm_model=os.getenv(
+                "LOCAL_LLM_MODEL", "masp-intent-lora"
+            ).strip(),
+            local_llm_timeout_seconds=max(
+                1, float(os.getenv("LOCAL_LLM_TIMEOUT_SECONDS", "30"))
+            ),
+            local_llm_model_card=model_card,
             agent_model_id=os.getenv(
                 "MASP_AGENT_MODEL_ID", "masp-ppo-priority"
             ).strip(),

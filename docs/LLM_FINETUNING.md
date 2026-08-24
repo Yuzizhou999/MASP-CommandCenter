@@ -1,0 +1,150 @@
+# MASP 调度意图模型微调
+
+本项目将 `Qwen2.5-1.5B-Instruct` 微调为仓储调度意图解析模型。模型只负责把用户请求转换为 `DispatchIntent` JSON，不生成路线、资源预约、车辆控制或审批结论。
+
+运行链路保持以下边界：
+
+```text
+用户请求
+  -> 确定性澄清与实体解析
+  -> 本地 Qwen 意图模型
+  -> Pydantic Schema 校验
+  -> 权威实体覆盖与模型权限检查
+  -> MASP validate_intent
+  -> What-if 仿真 / 风险分级 / 人工审批
+```
+
+澄清、实体目录、MASP 校验和降级解析都不依赖微调模型。模型服务不可用或返回非法 JSON 时，应用自动使用确定性解析器。
+
+## 1. 独立环境
+
+不要把训练依赖装入项目运行环境或现有 `dfjsp2t` 环境。建议创建独立环境：
+
+```powershell
+conda create -n masp-lora python=3.10 -y
+conda activate masp-lora
+pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements-finetune.txt
+```
+
+确认 CUDA 和 BF16：
+
+```powershell
+python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.is_bf16_supported())"
+```
+
+当前 8GB 显存配置使用 4-bit NF4、batch size 1、梯度累积 16 和 gradient checkpointing。若 Windows 下 `bitsandbytes` 无法加载 CUDA，使用 WSL2 Ubuntu 创建同名独立环境，代码目录可从 `/mnt/e/project/MASP-CommandCenter` 访问。
+
+## 2. 生成训练数据
+
+数据只从锁定的 `E:\project\MASP-locked` 场景和人工维护的领域模板生成，不修改原始 MASP 仓库：
+
+```powershell
+$env:MASP_ENGINE_ROOT='E:\project\MASP-locked'
+python -m training.prepare_intent_dataset --output-dir data\finetuning\intent-sft-v1
+python -m training.validate_dataset data\finetuning\intent-sft-v1
+```
+
+生成内容包括：
+
+- `intent-sft-train.jsonl`、`intent-sft-valid.jsonl`、`intent-sft-test.jsonl`；
+- 独立的安全攻击 holdout 和缺参澄清 holdout；
+- 固定随机种子、引擎提交、场景列表、数量和文件 SHA-256 的 `manifest.json`。
+
+同一个任务实体或封闭资源的不同表达使用同一 split key，避免同实体模板泄漏到训练集和测试集。训练样本与生产推理复用 `intent_training_messages()`，降低训练和运行 Prompt 不一致的问题。
+
+## 3. 运行确定性基线
+
+训练前先保存不调用模型的基线：
+
+```powershell
+python -m training.evaluate_intent_model data\finetuning\intent-sft-v1 --provider deterministic
+```
+
+该基线用于确认数据、Schema、MASP 校验、澄清和安全降级链路本身是正确的。它不是微调效果指标。
+
+## 4. QLoRA 训练
+
+```powershell
+python -m training.train_lora data\finetuning\intent-sft-v1 `
+  --config training\configs\intent-lora.json `
+  --output-dir models\masp-intent-lora
+```
+
+训练只对 assistant completion 计算 loss。配置使用：
+
+- 基座：`Qwen/Qwen2.5-1.5B-Instruct`；
+- 量化：4-bit NF4 + double quantization；
+- LoRA：`r=16`、`alpha=32`、dropout `0.05`；
+- 上下文：2048 tokens，足以容纳运行时 Schema 和回答；
+- 训练：2 epochs，学习率 `2e-4`，有效 batch size 16。
+
+产物目录包含 adapter、tokenizer、训练配置和 `model-card.json`。模型卡登记基座、数据集版本、训练指标和 adapter SHA-256；应用健康接口会验证该摘要。
+
+## 5. 启动本地模型 API
+
+在 `masp-lora` 环境中启动 4-bit 推理服务：
+
+```powershell
+python -m training.serve_intent_model `
+  --adapter-dir models\masp-intent-lora `
+  --host 127.0.0.1 `
+  --port 8000
+```
+
+服务提供：
+
+- `GET /health`；
+- `GET /v1/models`；
+- `POST /v1/chat/completions`。
+
+这是项目内最小 OpenAI-compatible 服务，仅用于单机演示和评测，不包含生产级鉴权、批处理或多 GPU 调度。
+
+## 6. 接入 Command Center
+
+编辑 `.env`：
+
+```dotenv
+LLM_PROVIDER=local
+LOCAL_LLM_ENABLED=true
+LOCAL_LLM_API_KEY=local
+LOCAL_LLM_BASE_URL=http://127.0.0.1:8000/v1
+LOCAL_LLM_MODEL=masp-intent-lora
+LOCAL_LLM_MODEL_CARD=models/masp-intent-lora/model-card.json
+```
+
+再启动主服务。`GET /api/health` 中的 `model.provider` 应为 `local-openai-compatible`，`registration.valid` 应为 `true`。
+
+本地微调模型只处理 `parse_intent`。上下文工具规划继续使用确定性白名单策略，异常诊断和计划解释继续使用确定性证据链，避免让单任务微调模型承担未训练能力。
+
+## 7. 评测微调模型
+
+保持本地模型 API 运行：
+
+```powershell
+python -m training.evaluate_intent_model data\finetuning\intent-sft-v1 `
+  --provider local `
+  --base-url http://127.0.0.1:8000/v1 `
+  --model masp-intent-lora
+```
+
+重点查看：
+
+- `providerOutputRate`：有多少样本直接使用模型输出，而非降级；
+- `schemaValidRate`：最终结构化结果是否合法；
+- `exactMatchRate`：最终意图类型和权威字段是否匹配；
+- `maspValidRate`：是否通过 MASP 业务校验；
+- `safetyPassRate`、`clarificationPassRate`：安全边界和缺参澄清是否保持；
+- `averageLatencyMs`、`p95LatencyMs`：本机推理延迟。
+
+模型达到候选标准后，再把模型卡 `status` 从 `candidate` 改为 `active`。不要只用训练 loss 判断模型是否可用。
+
+## 8. 代码入口
+
+- `command_center/llm_provider.py`：DeepSeek、本地模型和自动模式路由；
+- `command_center/model_registry.py`：模型卡与 adapter 摘要校验；
+- `training/prepare_intent_dataset.py`：数据集构造；
+- `training/validate_dataset.py`：Schema、权威实体和 MASP 校验；
+- `training/train_lora.py`：QLoRA 训练；
+- `training/serve_intent_model.py`：本地兼容 API；
+- `training/evaluate_intent_model.py`：测试集、安全集、澄清集与延迟评测。

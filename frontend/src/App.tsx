@@ -866,7 +866,7 @@ export default function App() {
             <div><span>待调度任务</span><strong className="mono">{formatCount(snapshot?.counts.tasks)}</strong><small>{scenarioMeta ? `${Math.round(scenarioMeta.endTimeMs / 60000)} 分钟仿真窗` : "-"}</small></div>
             <div><span>路网节点</span><strong className="mono">{formatCount(snapshot?.counts.nodes)}</strong><small>{formatCount(snapshot?.counts.edges)} 条有向边</small></div>
             <div><span>冲突资源对</span><strong className="mono">{formatCount(snapshot?.counts.conflictPairs)}</strong><small>确定性安全校验</small></div>
-            <div><span>模型状态</span><strong>{health?.model.configured ? "DeepSeek API" : "本地降级"}</strong><small>{health?.model.model}</small></div>
+            <div><span>模型状态</span><strong>{health?.model.configured ? (health.model.provider === "deepseek" ? "DeepSeek API" : "本地微调模型") : "本地降级"}</strong><small>{health?.model.model}</small></div>
           </section>
         )}
 

@@ -1,6 +1,6 @@
 # 保利智仓·灵枢
 
-面向多车型智能仓储的 AI 调度指挥中心。系统使用 DeepSeek 将自然语言请求转换为结构化调度意图，再由 MASP 数字孪生完成路径规划、资源预约、安全校验、What-if 仿真和指标计算。
+面向多车型智能仓储的 AI 调度指挥中心。系统使用 DeepSeek 或本地 Qwen 微调模型将自然语言请求转换为结构化调度意图，再由 MASP 数字孪生完成路径规划、资源预约、安全校验、What-if 仿真和指标计算。
 
 当前版本是仿真验证系统，只允许在 `simulation` 环境提交意图，不连接真实 WMS、RCS 或车辆控制器。
 
@@ -17,6 +17,7 @@
 - DeepSeek 重试与熔断、Token/成本统计和逐条轨迹评测；
 - 缺失站点、车型或资源时进入多轮澄清，不使用默认实体补齐；
 - DeepSeek API 调用，未配置密钥或 API 异常时自动使用确定性本地解析；
+- 基于 Qwen2.5-1.5B-Instruct 的 4-bit QLoRA 意图微调、版本登记、本地兼容 API 和离线评测；
 - 可从场景包自动生成或在画布手工配置路网、工位、车辆和任务流；
 - 多车型车辆轨迹、任务路径和资源封锁时窗回放；
 - 可配置车辆规模、任务负载、车型、策略和随机种子的确定性仿真；
@@ -50,7 +51,7 @@ E:\project\MASP-CommandCenter   灵枢应用、智能体、治理和前端
 |---|---|
 | 交互层 | React 19、TypeScript、Fluent UI、Vite |
 | 应用服务 | FastAPI、Pydantic v2、JSON API |
-| 智能体 | 有界状态机、DeepSeek Tool Calling、Pydantic 强类型工具、本地确定性降级 |
+| 智能体 | 有界状态机、DeepSeek Tool Calling、Qwen QLoRA 意图模型、Pydantic 强类型工具、本地确定性降级 |
 | 治理 | 风险分级、审批、世界版本、审计、仿真态提交 |
 | 数字孪生 | MASP 在线调度、路径规划、资源预约、事件回放 |
 | 数据与评测 | 混合知识检索、结构化记忆、Agent 观测、矩阵评测、安全门槛、脱敏质检 |
@@ -103,6 +104,12 @@ DEEPSEEK_TIMEOUT_SECONDS=30
 ```
 
 可以直接调用 DeepSeek 官方 API。密钥只由 FastAPI 后端读取，绝不进入浏览器资源。若未配置密钥、请求超时、返回非 JSON 或 Schema 校验失败，系统自动切换到本地解析器，并在界面和审计日志中明确标注降级状态。
+
+## 微调与使用本地意图模型
+
+项目提供从锁定 MASP 场景生成数据、QLoRA 训练、模型卡登记、OpenAI-compatible 本地服务和 holdout 评测的完整链路。默认基座为 `Qwen/Qwen2.5-1.5B-Instruct`，适配 8GB 显存单卡。
+
+本地模型只负责 `DispatchIntent` 解析；工具规划、路径、预约、校验、仿真、审批和车辆控制均不交给该模型。完整命令和验收指标见 [大模型微调指南](docs/LLM_FINETUNING.md)。
 
 ## 配置群车策略模型
 
@@ -208,6 +215,7 @@ Agent 会话记忆写入 `data/agent-memories.json`，不保存模型自由文�
 - [评测方法](docs/EVALUATION.md)
 - [安全与权益说明](docs/SECURITY_AND_RIGHTS.md)
 - [部署说明](docs/DEPLOYMENT.md)
+- [大模型微调指南](docs/LLM_FINETUNING.md)
 
 ## 当前安全边界
 
