@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import subprocess
 import sys
@@ -42,6 +43,7 @@ class MaspAdapter:
         self.root = settings.engine_root
         self._simulation_lock = Lock()
         self._modules: dict[str, Any] | None = None
+        self._dashboard_module: Any | None = None
         self.settings.runs_dir.mkdir(parents=True, exist_ok=True)
         self._assert_layout()
 
@@ -178,15 +180,37 @@ class MaspAdapter:
                 digest.update(chunk)
         return digest.hexdigest()
 
+    def _checkpoint_engine_commit(self, checkpoint: Path | None) -> str | None:
+        if checkpoint is None:
+            return None
+        registry_path = checkpoint.with_suffix(".json")
+        if not registry_path.is_file():
+            return None
+        try:
+            value = self._read_json(registry_path).get("engineCommit")
+        except (OSError, ValueError, json.JSONDecodeError):
+            return None
+        return str(value) if value else None
+
     def agent_model_status(self) -> AgentModelStatus:
         checkpoint = self.settings.agent_checkpoint
         checkpoint_present = bool(checkpoint and checkpoint.is_file())
+        checkpoint_engine = self._checkpoint_engine_commit(checkpoint)
+        checkpoint_compatible = (
+            checkpoint_engine is None
+            or checkpoint_engine == self.settings.engine_commit
+        )
         checkpoint_sha256 = (
             self._file_sha256(checkpoint)
             if checkpoint is not None and checkpoint_present
             else None
         )
-        if checkpoint_present:
+        if checkpoint_present and not checkpoint_compatible:
+            notice = (
+                f"模型权重登记于 MASP {checkpoint_engine[:8]}，与当前引擎不一致，"
+                "学习策略已停用并回退规则基线。"
+            )
+        elif checkpoint_present:
             notice = "已检测到模型权重，运行前将校验版本、观测和动作契约。"
         elif checkpoint is not None:
             notice = "配置的模型权重不存在，智能体请求将使用规则基线。"
@@ -196,7 +220,11 @@ class MaspAdapter:
             modelId=self.settings.agent_model_id,
             modelVersion=self.settings.agent_model_version,
             algorithm="Actor-Critic/PPO priority policy",
-            mode="LEARNED" if checkpoint_present else "BASELINE",
+            mode=(
+                "LEARNED"
+                if checkpoint_present and checkpoint_compatible
+                else "BASELINE"
+            ),
             configured=checkpoint is not None,
             checkpointPresent=checkpoint_present,
             checkpointName=checkpoint.name if checkpoint is not None else None,
@@ -226,6 +254,15 @@ class MaspAdapter:
             reasons.append("服务端未配置智能体模型权重。")
         elif not self.settings.agent_checkpoint.is_file():
             reasons.append("服务端配置的智能体模型权重不存在。")
+        elif (
+            checkpoint_engine := self._checkpoint_engine_commit(
+                self.settings.agent_checkpoint
+            )
+        ) and checkpoint_engine != self.settings.engine_commit:
+            reasons.append(
+                f"模型权重登记于 MASP {checkpoint_engine[:8]}，"
+                f"与当前引擎 {self.settings.engine_commit[:8]} 不兼容。"
+            )
         else:
             try:
                 root_text = str(self.root)
@@ -445,6 +482,34 @@ class MaspAdapter:
             "validate_task_stream_generation_document": validate_task_stream_generation_document,
         }
         return self._modules
+
+    def _dispatch_dashboard_module(self) -> Any:
+        if self._dashboard_module is not None:
+            return self._dashboard_module
+        module_path = self.root / "tools" / "build_dispatch_dashboard.py"
+        module_name = f"_masp_dispatch_dashboard_{hashlib.sha256(str(self.root).encode()).hexdigest()[:12]}"
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if spec is None or spec.loader is None:
+            raise EngineVersionError(f"无法加载 MASP 调度回放构建器：{module_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self._dashboard_module = module
+        return module
+
+    def _dispatch_replay_bundle(self, run_dir: Path) -> dict[str, Any]:
+        dashboard = self._dispatch_dashboard_module()
+        return dashboard.build_bundle(
+            run_dir,
+            self.root / "generated" / "xiate-unified-scene-model.json",
+            motion_map_path=(
+                self.root / "generated" / "xiate-unified-map-model.json"
+            ),
+            conflicts_path=(
+                self.root / "generated" / "xiate-conflict-resources.json"
+            ),
+            profiles_path=self.root / "config" / "robot-profiles.json",
+            scheduler_path=self.root / "config" / "scheduler.json",
+        )
 
     def workstation_catalog(self) -> list[dict[str, Any]]:
         """Return the version-locked MASP workstation catalog."""
@@ -739,6 +804,8 @@ class MaspAdapter:
                     "p1": row["p1"],
                     "p2": row["p2"],
                     "p3": row["p3"],
+                    "length": float(row.get("length", 0.0)),
+                    "motionDirection": int(row.get("motionDirection", 0)),
                     "shared": bool(row.get("sharedMatch")),
                 }
                 for row in scene.get("edges", [])
@@ -1604,6 +1671,7 @@ class MaspAdapter:
             "scenario": self._read_json(root / "planned-scenario.json"),
             "result": self._read_json(root / "result.json"),
             "planning": self._read_json(root / "planning-summary.json"),
+            "replay": self._dispatch_replay_bundle(root),
         }
         evidence_path = root / "agent-policy-evidence.json"
         if evidence_path.exists():

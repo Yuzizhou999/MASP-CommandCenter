@@ -97,6 +97,8 @@ export interface MapEdge {
   p1: [number, number];
   p2: [number, number];
   p3: [number, number];
+  length?: number;
+  motionDirection?: number;
   shared: boolean;
 }
 
@@ -245,6 +247,95 @@ export interface SimulationSummary {
   error?: string | null;
 }
 
+export interface ReplayMotion {
+  startRotationMs: number;
+  linearMs: number;
+  endRotationMs: number;
+  startHeadingRad: number;
+  travelStartHeadingRad: number;
+  travelEndHeadingRad: number;
+  endHeadingRad: number;
+}
+
+export interface ReplaySegment {
+  id: string;
+  kind: string;
+  startMs: number;
+  endMs: number;
+  startNodeId?: string | null;
+  endNodeId?: string | null;
+  edgeId?: string | null;
+  expectedLoadState?: string;
+  resourceIds?: string[];
+  commandPayload?: {
+    startHeadingRad?: number;
+    endHeadingRad?: number;
+    [key: string]: unknown;
+  };
+  motion?: ReplayMotion;
+}
+
+export interface ReplayPlan {
+  id: string;
+  vehicleId: string;
+  taskId?: string | null;
+  createdAtMs: number;
+  committedUntilMs: number;
+  segments: ReplaySegment[];
+}
+
+export interface ReplayVehicle {
+  vehicleId: string;
+  robotGroup: "fork" | "jack";
+  initialNodeId: string;
+  initialHeadingRad: number;
+  state: string;
+  loadState: string;
+  activeTaskId?: string | null;
+  availableAtMs?: number | null;
+}
+
+export interface ReplayTask {
+  taskId: string;
+  releaseTimeMs: number;
+  pickupNodeId: string;
+  dropoffNodeId: string;
+  requiredRobotGroup: "fork" | "jack";
+  state: string;
+  assignedVehicleId?: string | null;
+  assignedAtMs?: number | null;
+  pickedAtMs?: number | null;
+  completedAtMs?: number | null;
+  dueTimeMs?: number | null;
+  initialGlobalRouteMs?: number | null;
+}
+
+export interface DispatchReplay {
+  scenarioId: string;
+  seed?: number;
+  endTimeMs: number;
+  replayMode: "online" | "offline";
+  sweepModel: {
+    sampleSpacing: number;
+    footprintMargin: number;
+    baseGeometryOnly: boolean;
+  };
+  vehicleProfiles: Record<string, { length: number; width: number }>;
+  vehicles: ReplayVehicle[];
+  tasks: ReplayTask[];
+  plans: ReplayPlan[];
+  events: Array<{
+    id?: string;
+    type: string;
+    timeMs: number;
+    payload?: Record<string, unknown>;
+  }>;
+  metrics: Record<string, number | string | Record<string, number> | null>;
+  planning: Record<string, unknown>;
+  baselinePlanning: Record<string, unknown>;
+  manifest: Record<string, unknown>;
+}
+
 export interface RunDetail {
   summary: SimulationSummary;
   scenario: {
@@ -253,11 +344,14 @@ export interface RunDetail {
       vehicleId: string;
       robotGroup: "fork" | "jack";
       initialNodeId: string;
+      initialHeadingRad?: number;
     }>;
     plans: Array<{
       id: string;
       vehicleId: string;
       taskId: string;
+      createdAtMs?: number;
+      committedUntilMs?: number;
       segments: Array<{
         id: string;
         kind: string;
@@ -268,6 +362,7 @@ export interface RunDetail {
         edgeId?: string;
         expectedLoadState?: string;
         resourceIds?: string[];
+        commandPayload?: Record<string, unknown>;
       }>;
     }>;
   };
@@ -275,6 +370,7 @@ export interface RunDetail {
     eventLog: Array<Record<string, unknown>>;
   };
   planning: Record<string, unknown>;
+  replay: DispatchReplay;
   agentEvidence?: AgentPolicyArtifact;
 }
 

@@ -36,6 +36,7 @@ import { api } from "./api";
 import { ApprovalsPanel } from "./components/ApprovalsPanel";
 import { AgentPolicyPanel } from "./components/AgentPolicyPanel";
 import { AssistantPanel } from "./components/AssistantPanel";
+import { DispatchReplayPanel } from "./components/DispatchReplayPanel";
 import { IncidentWorkbench } from "./components/IncidentWorkbench";
 import { EvaluationCenter } from "./components/EvaluationCenter";
 import { PlanExplanationPanel } from "./components/PlanExplanationPanel";
@@ -103,6 +104,7 @@ export default function App() {
   const [playbackMs, setPlaybackMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(5);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
   const [report, setReport] = useState<ShiftReport | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -113,6 +115,7 @@ export default function App() {
     setSelectedRunId(runId);
     setPlaying(false);
     setPlaybackMs(0);
+    setSelectedVehicleIds([]);
     try {
       const detail = await api.runDetail(runId);
       setRunDetail(detail);
@@ -120,6 +123,14 @@ export default function App() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法加载仿真回放");
     }
+  }, []);
+
+  const toggleReplayVehicle = useCallback((vehicleId: string) => {
+    setSelectedVehicleIds((current) =>
+      current.includes(vehicleId)
+        ? current.filter((item) => item !== vehicleId)
+        : [...current, vehicleId],
+    );
   }, []);
 
   const loadInitial = useCallback(async () => {
@@ -754,13 +765,15 @@ export default function App() {
           <div className="status-banner warning-banner"><Alert20Regular />{health.engine.warning}</div>
         )}
 
-        <section className="metric-strip" aria-label="关键运营指标">
-          <div><span>车辆</span><strong className="mono">{formatCount(snapshot?.counts.vehicles)}</strong><small>fork {snapshot?.groups.fork || 0} / jack {snapshot?.groups.jack || 0}</small></div>
-          <div><span>待调度任务</span><strong className="mono">{formatCount(snapshot?.counts.tasks)}</strong><small>{scenarioMeta ? `${Math.round(scenarioMeta.endTimeMs / 60000)} 分钟仿真窗` : "-"}</small></div>
-          <div><span>路网节点</span><strong className="mono">{formatCount(snapshot?.counts.nodes)}</strong><small>{formatCount(snapshot?.counts.edges)} 条有向边</small></div>
-          <div><span>冲突资源对</span><strong className="mono">{formatCount(snapshot?.counts.conflictPairs)}</strong><small>确定性安全校验</small></div>
-          <div><span>模型状态</span><strong>{health?.model.configured ? "DeepSeek API" : "本地降级"}</strong><small>{health?.model.model}</small></div>
-        </section>
+        {view === "command" && (
+          <section className="metric-strip" aria-label="关键运营指标">
+            <div><span>车辆</span><strong className="mono">{formatCount(snapshot?.counts.vehicles)}</strong><small>fork {snapshot?.groups.fork || 0} / jack {snapshot?.groups.jack || 0}</small></div>
+            <div><span>待调度任务</span><strong className="mono">{formatCount(snapshot?.counts.tasks)}</strong><small>{scenarioMeta ? `${Math.round(scenarioMeta.endTimeMs / 60000)} 分钟仿真窗` : "-"}</small></div>
+            <div><span>路网节点</span><strong className="mono">{formatCount(snapshot?.counts.nodes)}</strong><small>{formatCount(snapshot?.counts.edges)} 条有向边</small></div>
+            <div><span>冲突资源对</span><strong className="mono">{formatCount(snapshot?.counts.conflictPairs)}</strong><small>确定性安全校验</small></div>
+            <div><span>模型状态</span><strong>{health?.model.configured ? "DeepSeek API" : "本地降级"}</strong><small>{health?.model.model}</small></div>
+          </section>
+        )}
 
         {snapshot && map && view === "command" && (
           <div className="command-grid">
@@ -775,6 +788,8 @@ export default function App() {
               onTogglePlaying={() => setPlaying((value) => !value)}
               onPlaybackChange={(value) => { setPlaybackMs(value); setPlaying(false); }}
               onSpeedChange={setSpeed}
+              selectedVehicleIds={selectedVehicleIds}
+              onToggleVehicle={toggleReplayVehicle}
             />
             <AssistantPanel
               response={chatResponse}
@@ -785,6 +800,12 @@ export default function App() {
               onSimulate={handleSimulate}
               onCreateApproval={handleCreateApproval}
               onCommit={handleCommit}
+            />
+            <DispatchReplayPanel
+              run={runDetail}
+              playbackMs={playbackMs}
+              selectedVehicleIds={selectedVehicleIds}
+              onToggleVehicle={toggleReplayVehicle}
             />
           </div>
         )}
@@ -816,6 +837,14 @@ export default function App() {
               onTogglePlaying={() => setPlaying((value) => !value)}
               onPlaybackChange={(value) => { setPlaybackMs(value); setPlaying(false); }}
               onSpeedChange={setSpeed}
+              selectedVehicleIds={selectedVehicleIds}
+              onToggleVehicle={toggleReplayVehicle}
+            />
+            <DispatchReplayPanel
+              run={runDetail}
+              playbackMs={playbackMs}
+              selectedVehicleIds={selectedVehicleIds}
+              onToggleVehicle={toggleReplayVehicle}
             />
             <SimulationTable
               runs={runs}
@@ -865,6 +894,8 @@ export default function App() {
               onTogglePlaying={() => undefined}
               onPlaybackChange={setPlaybackMs}
               onSpeedChange={setSpeed}
+              selectedVehicleIds={selectedVehicleIds}
+              onToggleVehicle={toggleReplayVehicle}
             />
           </div>
         )}

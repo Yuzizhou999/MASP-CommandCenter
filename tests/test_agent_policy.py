@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 from pydantic import ValidationError
@@ -65,6 +66,30 @@ def test_missing_checkpoint_runs_auditable_rule_baseline(isolated_settings) -> N
 
     detail = engine.get_run_detail(summary.run_id)
     assert detail["agentEvidence"]["runId"] == summary.run_id
+
+
+def test_checkpoint_registered_for_another_engine_is_disabled(isolated_settings) -> None:
+    checkpoint = isolated_settings.root / "models" / "policy.pt"
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_bytes(b"registered checkpoint")
+    checkpoint.with_suffix(".json").write_text(
+        json.dumps({"engineCommit": "a" * 40}),
+        encoding="utf-8",
+    )
+    engine = MaspAdapter(
+        replace(isolated_settings, agent_checkpoint=checkpoint)
+    )
+
+    status = engine.agent_model_status()
+    prepared = engine._prepare_agent_policy(
+        AgentPolicyOptions(allowDeviation=True), seed=0
+    )
+
+    assert status.checkpoint_present is True
+    assert status.mode == "BASELINE"
+    assert "与当前引擎不一致" in status.notice
+    assert prepared["deviationEnabled"] is False
+    assert any("不兼容" in reason for reason in prepared["fallbackReasons"])
 
 
 def test_agent_runtime_controls_are_forwarded_to_masp(
