@@ -352,6 +352,11 @@ def chat(request: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
+@app.get("/api/v1/agent/tools")
+def agent_tools() -> list[dict[str, Any]]:
+    return orchestrator.tool_catalog()
+
+
 @app.post("/api/v1/intents/validate")
 def validate_intent(
     intent: DispatchIntent,

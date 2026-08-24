@@ -7,6 +7,8 @@
 ## 核心能力
 
 - 自然语言紧急插单、通道封锁、状态查询和报告生成；
+- 有界 Agent 状态机、DeepSeek 兼容 Tool Calling 和逐步执行轨迹；
+- 服务端工具白名单，模型只能选择只读上下文工具，安全校验不可跳过；
 - 缺失站点、车型或资源时进入多轮澄清，不使用默认实体补齐；
 - DeepSeek API 调用，未配置密钥或 API 异常时自动使用确定性本地解析；
 - 可从场景包自动生成或在画布手工配置路网、工位、车辆和任务流；
@@ -42,7 +44,7 @@ E:\project\MASP-CommandCenter   灵枢应用、智能体、治理和前端
 |---|---|
 | 交互层 | React 19、TypeScript、Fluent UI、Vite |
 | 应用服务 | FastAPI、Pydantic v2、JSON API |
-| 智能体 | DeepSeek `deepseek-chat`、结构化 JSON、本地确定性降级 |
+| 智能体 | 有界状态机、DeepSeek Tool Calling、Pydantic 强类型工具、本地确定性降级 |
 | 治理 | 风险分级、审批、世界版本、审计、仿真态提交 |
 | 数字孪生 | MASP 在线调度、路径规划、资源预约、事件回放 |
 | 数据与评测 | 可重复矩阵评测、统计汇总、安全门槛、脱敏质检 |
@@ -143,6 +145,7 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 | `GET` | `/api/v1/map` | MASP 统一路网 |
 | `GET` | `/api/v1/agent-policy` | 群车策略模型登记与权重状态 |
 | `POST` | `/api/v1/agent/chat` | 自然语言到结构化意图 |
+| `GET` | `/api/v1/agent/tools` | 查看 Agent 工具目录、权限和输入 Schema |
 | `POST` | `/api/v1/intents/validate` | 确定性校验和风险分级 |
 | `POST` | `/api/v1/simulations` | 运行数字孪生 |
 | `POST` | `/api/v1/simulations/compare` | 比较 2-4 个方案 |

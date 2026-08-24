@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from time import perf_counter
+
+from .agent_runtime import AgentState, BoundedAgentRun
+from .agent_tools import DispatchAgentTools
 from .audit import AuditStore
 from .clarifications import ClarificationResolver, ClarificationStore
 from .contracts import (
     ChatRequest,
     ChatResponse,
-    EvidenceItem,
     IntentType,
     new_id,
 )
@@ -34,24 +37,73 @@ class DispatchOrchestrator:
 
     def chat(self, request: ChatRequest) -> ChatResponse:
         trace_id = new_id("trace")
-        snapshot = self.engine.world_snapshot(request.scenario_id)
+        run = BoundedAgentRun()
+        tools = DispatchAgentTools(
+            engine=self.engine,
+            knowledge=self.knowledge,
+            scenario_id=request.scenario_id,
+        )
+        run.transition(
+            AgentState.RECEIVED,
+            title="接收调度请求",
+            detail=f"已绑定会话 {request.conversation_id} 和场景 {request.scenario_id}",
+        )
+
+        started = perf_counter()
+        plan = self.provider.plan_context_tools(
+            request.message, tools.model_definitions()
+        )
+        run.set_planner(strategy=plan.strategy, model=plan.model)
+        run.transition(
+            AgentState.PLANNING,
+            title="制定上下文工具计划",
+            detail=(
+                f"{plan.strategy} 选择 {len(plan.calls)} 个只读工具，"
+                "写操作未开放给模型"
+            ),
+            duration_ms=(perf_counter() - started) * 1000,
+        )
+        run.transition(
+            AgentState.CONTEXT_GATHERING,
+            title="收集权威上下文",
+            detail="按允许列表执行工具并记录调用结果",
+        )
+        snapshot = None
+        evidence = []
+        for call in plan.calls:
+            result = run.execute_tool(tools, call.name, call.arguments)
+            if call.name == "get_world_snapshot":
+                snapshot = result.value
+                evidence.append(
+                    tools.world_evidence(result.value, request.scenario_id)
+                )
+            elif call.name == "search_sop":
+                evidence.extend(result.value)
+        if snapshot is None:
+            raise RuntimeError("Agent 工具计划缺少强制世界快照")
+
+        started = perf_counter()
         resolved = self.clarifications.resolve(
             request.message, request.conversation_id
         )
-        evidence = [
-            EvidenceItem(
-                source=f"MASP:{request.scenario_id}",
-                title="当前世界快照",
-                detail=(
-                    f"revision {snapshot['worldRevision']}，"
-                    f"{snapshot['counts']['vehicles']} 辆车，"
-                    f"{snapshot['counts']['tasks']} 个任务，"
-                    f"{snapshot['counts']['conflictPairs']} 对冲突资源。"
-                ),
-            )
-        ]
-        evidence.extend(self.knowledge.search(request.message, limit=2))
+        run.transition(
+            AgentState.PARAMETER_RESOLUTION,
+            title="解析并绑定业务实体",
+            detail=(
+                "请求参数完整，可以形成结构化意图"
+                if resolved.clarification is None
+                else "缺少必要参数，暂停执行并请求用户补充"
+            ),
+            duration_ms=(perf_counter() - started) * 1000,
+        )
         if resolved.clarification is not None:
+            run.transition(
+                AgentState.CLARIFICATION_REQUIRED,
+                title="等待补充信息",
+                detail="；".join(resolved.clarification.questions),
+                status="BLOCKED",
+            )
+            agent_trace = run.build_trace()
             message = "还不能形成可执行草案。" + " ".join(
                 resolved.clarification.questions
             )
@@ -65,6 +117,7 @@ class DispatchOrchestrator:
                 model="deterministic-parameter-resolver",
                 fallbackUsed=False,
                 suggestedActions=resolved.clarification.questions,
+                agentTrace=agent_trace,
             )
             self.audit.append(
                 trace_id=trace_id,
@@ -77,9 +130,12 @@ class DispatchOrchestrator:
                     "clarification": resolved.clarification.model_dump(
                         by_alias=True, mode="json"
                     ),
+                    "agentTrace": agent_trace.model_dump(by_alias=True, mode="json"),
                 },
             )
             return response
+
+        started = perf_counter()
         parsed = self.provider.parse_intent(
             resolved.message,
             world_revision=int(snapshot["worldRevision"]),
@@ -89,7 +145,23 @@ class DispatchOrchestrator:
         )
         if parsed.intent is None:
             raise ValueError("意图解析未生成结构化结果")
-        validation = self.engine.validate_intent(parsed.intent, request.scenario_id)
+        run.transition(
+            AgentState.INTENT_DRAFTING,
+            title="生成结构化调度意图",
+            detail=f"形成 {parsed.intent.intent_type.value} 草案，模型 {parsed.model}",
+            duration_ms=(perf_counter() - started) * 1000,
+        )
+        run.transition(
+            AgentState.SAFETY_VALIDATION,
+            title="进入确定性安全校验",
+            detail="意图必须经过 MASP 规则和风险边界，模型不能跳过此步骤",
+        )
+        validation_result = run.execute_tool(
+            tools,
+            "validate_dispatch_intent",
+            {"intent": parsed.intent.model_dump(by_alias=True, mode="json")},
+        )
+        validation = tools.validation_value(validation_result)
 
         intent_type = parsed.intent.intent_type
         if intent_type is IntentType.CREATE_TASK:
@@ -132,6 +204,17 @@ class DispatchOrchestrator:
             message = f"意图未通过确定性校验：{errors}"
             actions = ["修改意图"]
 
+        run.transition(
+            AgentState.COMPLETED,
+            title="完成 Agent 决策",
+            detail=(
+                "已生成可继续仿真的安全草案"
+                if validation.valid
+                else "草案已被确定性安全边界拦截"
+            ),
+        )
+        agent_trace = run.build_trace()
+
         response = ChatResponse(
             traceId=trace_id,
             conversationId=request.conversation_id,
@@ -142,6 +225,7 @@ class DispatchOrchestrator:
             model=parsed.model,
             fallbackUsed=parsed.fallback_used,
             suggestedActions=actions,
+            agentTrace=agent_trace,
         )
         self.audit.append(
             trace_id=trace_id,
@@ -154,7 +238,15 @@ class DispatchOrchestrator:
                 "validation": validation.model_dump(by_alias=True, mode="json"),
                 "model": parsed.model,
                 "fallbackUsed": parsed.fallback_used,
+                "agentTrace": agent_trace.model_dump(by_alias=True, mode="json"),
             },
         )
         return response
+
+    def tool_catalog(self, scenario_id: str = "interactive-multi-fleet") -> list[dict]:
+        return DispatchAgentTools(
+            engine=self.engine,
+            knowledge=self.knowledge,
+            scenario_id=scenario_id,
+        ).catalog()
 

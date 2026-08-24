@@ -60,6 +60,19 @@ class ParseResult:
     clarification: ClarificationRequest | None = None
 
 
+@dataclass(frozen=True)
+class PlannedToolCall:
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class AgentToolPlan:
+    calls: tuple[PlannedToolCall, ...]
+    strategy: str
+    model: str
+
+
 class DeepSeekProvider:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -76,6 +89,101 @@ class DeepSeekProvider:
             "mode": "api" if self.configured else "deterministic-fallback",
             "baseUrl": self.settings.deepseek_base_url,
         }
+
+    def plan_context_tools(
+        self,
+        text: str,
+        tool_definitions: list[dict[str, Any]],
+    ) -> AgentToolPlan:
+        """Let the model choose read-only context tools, with a deterministic fallback."""
+        fallback = AgentToolPlan(
+            calls=(
+                PlannedToolCall(name="get_world_snapshot", arguments={}),
+                PlannedToolCall(
+                    name="search_sop", arguments={"query": text, "limit": 2}
+                ),
+            ),
+            strategy="DETERMINISTIC_POLICY",
+            model="deterministic-tool-policy",
+        )
+        if not self.configured:
+            return fallback
+
+        allowed_names = {
+            str(item.get("function", {}).get("name"))
+            for item in tool_definitions
+            if item.get("type") == "function"
+        }
+        try:
+            response = httpx.post(
+                f"{self.settings.deepseek_base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.settings.deepseek_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.settings.deepseek_model,
+                    "temperature": 0,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "你是仓储调度 Agent 的只读上下文规划器。"
+                                "必须调用 get_world_snapshot；当请求涉及调度规则、"
+                                "安全、检修、异常或操作流程时调用 search_sop。"
+                                "只能使用提供的工具，不得请求写操作或车辆控制。"
+                            ),
+                        },
+                        {"role": "user", "content": text},
+                    ],
+                    "tools": tool_definitions,
+                    "tool_choice": "auto",
+                },
+                timeout=self.settings.deepseek_timeout_seconds,
+            )
+            response.raise_for_status()
+            message = response.json()["choices"][0]["message"]
+            raw_calls = message.get("tool_calls") or []
+            calls: list[PlannedToolCall] = []
+            seen: set[tuple[str, str]] = set()
+            for raw_call in raw_calls[:4]:
+                function = raw_call.get("function") or {}
+                name = str(function.get("name") or "")
+                if name not in allowed_names:
+                    continue
+                raw_arguments = function.get("arguments") or "{}"
+                arguments = (
+                    raw_arguments
+                    if isinstance(raw_arguments, dict)
+                    else json.loads(raw_arguments)
+                )
+                if not isinstance(arguments, dict):
+                    continue
+                if name == "get_world_snapshot":
+                    arguments = {}
+                elif name == "search_sop":
+                    query = arguments.get("query")
+                    if not isinstance(query, str) or not query.strip():
+                        continue
+                    arguments = {
+                        "query": query[:1000],
+                        "limit": max(1, min(int(arguments.get("limit", 2)), 5)),
+                    }
+                signature = (name, json.dumps(arguments, sort_keys=True, ensure_ascii=False))
+                if signature not in seen:
+                    calls.append(PlannedToolCall(name=name, arguments=arguments))
+                    seen.add(signature)
+            if not calls:
+                return fallback
+            if not any(call.name == "get_world_snapshot" for call in calls):
+                calls.insert(0, PlannedToolCall(name="get_world_snapshot", arguments={}))
+            return AgentToolPlan(
+                calls=tuple(calls),
+                strategy="MODEL_TOOL_CALLING",
+                model=self.settings.deepseek_model,
+            )
+        except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return fallback
 
     def parse_intent(
         self,

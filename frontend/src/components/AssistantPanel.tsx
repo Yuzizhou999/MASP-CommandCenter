@@ -135,6 +135,44 @@ export function AssistantPanel({
               </div>
             )}
 
+            {response.agentTrace && (
+              <Accordion collapsible className="agent-trace-accordion">
+                <AccordionItem value="agent-trace">
+                  <AccordionHeader icon={<Bot24Regular />}>
+                    Agent 执行轨迹 · {response.agentTrace.steps.length} 步
+                  </AccordionHeader>
+                  <AccordionPanel>
+                    <div className="agent-trace-summary">
+                      <Badge
+                        appearance="outline"
+                        color={response.agentTrace.strategy === "MODEL_TOOL_CALLING" ? "informative" : "warning"}
+                      >
+                        {response.agentTrace.strategy === "MODEL_TOOL_CALLING" ? "模型工具规划" : "确定性工具策略"}
+                      </Badge>
+                      <span className="mono">{response.agentTrace.plannerModel}</span>
+                      <span>{response.agentTrace.durationMs.toFixed(1)} ms</span>
+                    </div>
+                    <ol className="agent-trace-list">
+                      {response.agentTrace.steps.map((step) => (
+                        <li key={step.stepId} className={`agent-trace-step agent-trace-${step.status.toLowerCase()}`}>
+                          <span className="agent-step-index mono">{step.sequence}</span>
+                          <div>
+                            <div className="agent-step-heading">
+                              <strong>{step.title}</strong>
+                              {step.toolName && <code>{step.toolName}</code>}
+                              {step.readOnly && <span>只读</span>}
+                            </div>
+                            <p>{step.detail}</p>
+                            <small className="mono">{step.state} · {step.durationMs.toFixed(1)} ms</small>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </AccordionPanel>
+                </AccordionItem>
+              </Accordion>
+            )}
+
             {response.evidence.length > 0 && (
               <Accordion collapsible className="evidence-accordion">
                 <AccordionItem value="evidence">

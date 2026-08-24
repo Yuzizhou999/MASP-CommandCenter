@@ -91,9 +91,7 @@ export function DispatchReplayPanel({
   const ratio = baselineMs > 0 ? actualMs / baselineMs : null;
   const deltaMs = actualMs - baselineMs;
   const visibleEvents = replay.events.filter((event) => event.timeMs <= playbackMs).slice(-18).reverse();
-  const planning = replay.planning;
-  const latency = (planning.planningLatencyMs || {}) as Record<string, number>;
-  const policy = String(planning.policy || replay.manifest.policy || run.summary.policy || "unknown");
+  const policy = String(replay.planning.policy || replay.manifest.policy || run.summary.policy || "unknown");
   const completed = taskRows.filter((row) => row.status === "已完成").length;
   const moving = vehicleRows.filter((row) => row.status === "行驶中").length;
   const waiting = vehicleRows.filter((row) => row.status === "等待").length;
@@ -118,18 +116,6 @@ export function DispatchReplayPanel({
           <div><strong>{deltaMs < 0 ? "-" : "+"}{formatDuration(Math.abs(deltaMs))}</strong><span>相对基线增量</span><small>{comparable.length} 个可比较任务</small></div>
         </div>
       </section>
-
-      <details className="replay-section planning-section">
-        <summary className="replay-section-heading"><h2>规划与 RL 性能</h2><span>{policy === "rl" ? "RL 优先级" : `策略 ${policy}`}</span></summary>
-        <div className="replay-stat-grid planning-stat-grid">
-          <div><strong>{Number(latency.p95 || 0).toFixed(1)} ms</strong><span>规划周期 P95</span></div>
-          <div><strong>{Number(latency.max || 0).toFixed(1)} ms</strong><span>最慢规划周期</span></div>
-          <div><strong>{Number(planning.planningTimeoutCount || 0)}</strong><span>规划超时周期</span></div>
-          <div><strong>{Number(planning.routeCombinationsTried || 0)}</strong><span>路线组合尝试</span></div>
-          <div><strong>{Number(planning.scheduleAttempts || 0)}</strong><span>SIPP 调度尝试</span></div>
-          <div><strong>{policy === "rl" ? `${Number(planning.rlInferenceCount || 0)} 次` : "未启用"}</strong><span>RL 优先级参与</span></div>
-        </div>
-      </details>
 
       <div className="replay-list-grid">
         <section className="replay-section replay-list-section">

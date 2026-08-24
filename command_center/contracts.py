@@ -402,6 +402,40 @@ class ClarificationRequest(BaseModel):
     )
 
 
+class AgentTraceStep(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    step_id: str = Field(default_factory=lambda: new_id("agent-step"), alias="stepId")
+    sequence: int = Field(ge=1)
+    state: Literal[
+        "RECEIVED",
+        "PLANNING",
+        "CONTEXT_GATHERING",
+        "PARAMETER_RESOLUTION",
+        "INTENT_DRAFTING",
+        "SAFETY_VALIDATION",
+        "CLARIFICATION_REQUIRED",
+        "COMPLETED",
+    ]
+    status: Literal["COMPLETED", "BLOCKED", "FAILED"] = "COMPLETED"
+    title: str
+    detail: str
+    tool_name: str | None = Field(default=None, alias="toolName")
+    read_only: bool | None = Field(default=None, alias="readOnly")
+    duration_ms: float = Field(default=0, ge=0, alias="durationMs")
+
+
+class AgentExecutionTrace(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    strategy: Literal["MODEL_TOOL_CALLING", "DETERMINISTIC_POLICY"]
+    planner_model: str = Field(alias="plannerModel")
+    status: Literal["COMPLETED", "CLARIFICATION_REQUIRED", "FAILED"]
+    max_steps: int = Field(ge=1, alias="maxSteps")
+    duration_ms: float = Field(ge=0, alias="durationMs")
+    steps: list[AgentTraceStep] = Field(default_factory=list)
+
+
 class ChatResponse(BaseModel):
     trace_id: str = Field(default_factory=lambda: new_id("trace"), alias="traceId")
     conversation_id: str = Field(alias="conversationId")
@@ -414,6 +448,7 @@ class ChatResponse(BaseModel):
     model: str
     fallback_used: bool = Field(alias="fallbackUsed")
     suggested_actions: list[str] = Field(default_factory=list, alias="suggestedActions")
+    agent_trace: AgentExecutionTrace | None = Field(default=None, alias="agentTrace")
 
 
 class PlanExplanationRequest(BaseModel):

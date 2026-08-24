@@ -155,6 +155,35 @@ export interface Evidence {
   detail: string;
 }
 
+export interface AgentTraceStep {
+  stepId: string;
+  sequence: number;
+  state:
+    | "RECEIVED"
+    | "PLANNING"
+    | "CONTEXT_GATHERING"
+    | "PARAMETER_RESOLUTION"
+    | "INTENT_DRAFTING"
+    | "SAFETY_VALIDATION"
+    | "CLARIFICATION_REQUIRED"
+    | "COMPLETED";
+  status: "COMPLETED" | "BLOCKED" | "FAILED";
+  title: string;
+  detail: string;
+  toolName?: string | null;
+  readOnly?: boolean | null;
+  durationMs: number;
+}
+
+export interface AgentExecutionTrace {
+  strategy: "MODEL_TOOL_CALLING" | "DETERMINISTIC_POLICY";
+  plannerModel: string;
+  status: "COMPLETED" | "CLARIFICATION_REQUIRED" | "FAILED";
+  maxSteps: number;
+  durationMs: number;
+  steps: AgentTraceStep[];
+}
+
 export interface ChatResponse {
   traceId: string;
   conversationId: string;
@@ -172,6 +201,7 @@ export interface ChatResponse {
   model: string;
   fallbackUsed: boolean;
   suggestedActions: string[];
+  agentTrace?: AgentExecutionTrace | null;
 }
 
 export interface AgentPolicyOptions {
