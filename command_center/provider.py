@@ -24,7 +24,11 @@ from .contracts import (
     TaskDraft,
 )
 from .diagnosis import allowed_actions_for, deterministic_diagnosis
-from .model_safety import enforce_intent_authority, enforce_plan_evidence
+from .model_safety import (
+    enforce_intent_authority,
+    enforce_plan_evidence,
+    model_request_violation,
+)
 from .settings import Settings
 
 
@@ -418,6 +422,16 @@ class DeepSeekProvider:
         resolved_resource_block: dict[str, Any] | None = None,
         context_evidence: list[EvidenceItem] | None = None,
     ) -> ParseResult:
+        if model_request_violation(text) is not None:
+            self._mark_fallback()
+            return self._fallback_result(
+                text,
+                world_revision=world_revision,
+                requested_by=requested_by,
+                resolved_task=resolved_task,
+                resolved_resource_block=resolved_resource_block,
+                model="deterministic-safety-boundary",
+            )
         if not self.configured:
             self._mark_fallback()
             return self._fallback_result(

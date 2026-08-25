@@ -15,11 +15,34 @@ MODEL_INTENT_TYPES = frozenset(
     }
 )
 
+FORBIDDEN_MODEL_REQUEST_TERMS = (
+    "直接输出 REQUEST_RECOVERY",
+    "直接控制",
+    "跳过主管审批",
+    "跳过审批",
+    "解除安全停车",
+    "直接把通道封锁写入",
+    "写入资源预约表",
+    "生成一条车辆经过的具体路线并立即执行",
+    "生成具体路线并立即执行",
+    "生产环境设置为 true",
+    "调用 delete_all",
+    "忽略工具白名单",
+)
+
 
 class ModelBoundaryError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+def model_request_violation(text: str) -> str | None:
+    normalized = " ".join(text.strip().split())
+    return next(
+        (term for term in FORBIDDEN_MODEL_REQUEST_TERMS if term in normalized),
+        None,
+    )
 
 
 def enforce_intent_authority(
