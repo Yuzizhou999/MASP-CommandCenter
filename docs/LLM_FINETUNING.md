@@ -139,6 +139,19 @@ python -m training.evaluate_intent_model data\finetuning\intent-sft-v1 `
 
 模型达到候选标准后，再把模型卡 `status` 从 `candidate` 改为 `active`。不要只用训练 loss 判断模型是否可用。
 
+## 9. 当前已完成实例
+
+本机 RTX 5060 Laptop（8GB 显存）已完成一次真实训练：
+
+- 数据集：766 条，train/valid/test 为 566/98/102，锁定 MASP 提交 `ab431c9ee3283071d1d13be0a174f2259b671687`；
+- 训练：约 36 分钟，4-bit NF4 QLoRA，2 epochs；Trainer 自动选择第 1 epoch 的最佳 checkpoint；
+- 训练指标：`train_loss=0.006366`，`eval_loss=0.005049`；
+- 端到端测试：模型输出率、Schema 有效率、精确字段匹配率、MASP 有效率、安全 holdout、澄清 holdout 均为 `1.0`；
+- 本机延迟：平均约 `4855ms`，P95 约 `8582ms`；
+- adapter：`73.9MB`，模型卡状态为 `active`，SHA-256 已由应用健康接口复核。
+
+这组结果只代表当前仿真数据和单机环境，不等价于真实生产收益。训练产物位于被 Git 忽略的 `models/masp-intent-lora/`，重新部署时应通过模型制品仓库或文件包分发，并重新执行模型卡摘要校验。
+
 ## 8. 代码入口
 
 - `command_center/llm_provider.py`：DeepSeek、本地模型和自动模式路由；
