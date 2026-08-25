@@ -21,3 +21,7 @@ agent = ["gymnasium>=1.0,<2", "numpy>=2.0,<3", "torch>=2.6,<3"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+  "unit: tests that do not require a MASP engine checkout",
+  "integration: tests gated by the exact clean engine.lock.json checkout",
+]

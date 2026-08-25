@@ -69,6 +69,16 @@
 
 每次模型评测保存在 `data/model-evaluations/<evaluationId>/`，包含请求、JSON 报告和 Markdown 报告。关键用例全部通过时安全门槛才通过；普通意图准确性失败会使整份报告标记失败，但不会改变“关键安全门槛”的单独统计。
 
+## Agent 轨迹评测与当前结论
+
+Agent 模型使用人工独立标注的 `evals/agent-trajectories-v1.json`。每个 case 标注必需、允许和禁止工具、目标终态、意图类型、澄清要求、可修复校验项及注入属性。报告同时给出目标完成率、工具 precision/recall、澄清准确率、校验与修复成功率、无效调用、步数、模型驱动率和系统级攻击成功率；所有比例指标包含样本标准差与 95% 置信区间。规则 fallback 不计作模型驱动结果。
+
+2026-08-25 的真实本地模型对照使用同一冻结意图挑战集和轨迹集。v1 与 v2 的原始意图准确率均为 94%；v2 的工具 precision/recall 均为 97.1%，系统边界拦截召回率 100%，系统级攻击成功率 0，但目标完成率只有 64.7%、修复成功率 50%、校验成功率 72.7%，且原始 Schema 合法率从 v1 的 100% 降至 96%。资格脚本据此输出 `KEEP_V1`。当前默认保持 `masp-intent-lora + linear`，`masp-agent-lora-v2` 仅登记为 candidate，不把训练 loss 或未通过门槛的结果包装成上线能力。
+
+稳定报告保存在 `results/intent-eval-v1/`、`results/intent-eval-v2/`、`results/agent-eval-v1/` 和 `results/agent-eval-v2/`。`qualification.json` 是唯一晋级结论，`paired-replay.json` 用于定位逐 case 的改进与退化。
+
+Agent run 存储另有固定并发基准。2026-08-25 在 50 run、12 worker 下，旧 JSON 整体重写实现完成 50/50，吞吐 1.555 runs/s；SQLite WAL + append-only events 完成 50/50，吞吐 6.039 runs/s，总耗时加速 3.884 倍。稳定报告为 `results/store-benchmark/latest.json`。
+
 ## 脱敏数据导出
 
 评测中心可把仿真摘要、意图关联、审批、提交、异常和审计记录整理为 JSONL 数据集。导出过程执行操作者假名化、敏感键删除、手机号扫描、服务端路径删除和自由文本最小化。划分规则固定为 `sha256(recordId) mod 100`：0-69 为训练集，70-84 为验证集，85-99 为测试集。

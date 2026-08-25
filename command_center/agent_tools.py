@@ -14,6 +14,7 @@ from .contracts import (
 )
 from .engine_adapter import MaspAdapter
 from .knowledge import KnowledgeBase
+from .model_safety import screen_retrieved_evidence
 
 
 class CurrentWorldSnapshotInput(BaseModel):
@@ -41,6 +42,7 @@ class ValidateDispatchIntentInput(BaseModel):
 class AgentToolResult:
     value: Any
     summary: str
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -157,13 +159,32 @@ class DispatchAgentTools:
             )
         if name == "search_sop":
             assert isinstance(parsed, SearchSopInput)
-            evidence = self.knowledge.search(parsed.query, limit=parsed.limit)
+            screening = screen_retrieved_evidence(
+                self.knowledge.search(parsed.query, limit=parsed.limit)
+            )
+            evidence = screening.accepted
             return AgentToolResult(
                 value=evidence,
                 summary=(
                     f"命中 {len(evidence)} 条 SOP："
                     + ("、".join(row.title for row in evidence) if evidence else "无匹配")
+                    + (
+                        f"；隔离 {len(screening.quarantined)} 条可疑检索内容"
+                        if screening.quarantined
+                        else ""
+                    )
                 ),
+                metadata={
+                    "quarantined": [
+                        {
+                            "source": row.source,
+                            "title": row.title,
+                            "chunkId": row.chunk_id,
+                            "violation": violation,
+                        }
+                        for row, violation in screening.quarantined
+                    ]
+                },
             )
         if name == "recall_conversation_memory":
             assert self.memory is not None and self.conversation_id is not None

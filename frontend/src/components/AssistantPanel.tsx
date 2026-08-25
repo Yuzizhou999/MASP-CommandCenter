@@ -368,12 +368,18 @@ export function AssistantPanel({
                     <div className="agent-trace-summary">
                       <Badge
                         appearance="outline"
-                        color={response.agentTrace.strategy === "MODEL_TOOL_CALLING" ? "informative" : "warning"}
+                        color={response.agentTrace.strategy === "ACTION_PROTOCOL_LOOP" ? "success" : response.agentTrace.strategy === "MODEL_TOOL_CALLING" ? "informative" : "warning"}
                       >
-                        {response.agentTrace.strategy === "MODEL_TOOL_CALLING" ? "模型工具规划" : "确定性工具策略"}
+                        {response.agentTrace.strategy === "ACTION_PROTOCOL_LOOP" ? "单动作闭环" : response.agentTrace.strategy === "MODEL_TOOL_CALLING" ? "模型工具规划" : "确定性工具策略"}
                       </Badge>
                       <span className="mono">{response.agentTrace.plannerModel}</span>
                       <span>{response.agentTrace.durationMs.toFixed(1)} ms</span>
+                      {typeof response.agentTrace.usage.decisions === "number" && <span>决策 {response.agentTrace.usage.decisions}</span>}
+                      {typeof response.agentTrace.usage.toolCalls === "number" && <span>工具 {response.agentTrace.usage.toolCalls}</span>}
+                      {typeof response.agentTrace.usage.totalTokens === "number" && <span className="mono">Token {response.agentTrace.usage.totalTokens.toLocaleString("zh-CN")}</span>}
+                      {typeof response.agentTrace.usage.estimatedCostUsd === "number" && response.agentTrace.usage.estimatedCostUsd > 0 && <span className="mono">${response.agentTrace.usage.estimatedCostUsd.toFixed(4)}</span>}
+                      {typeof response.agentTrace.usage.repairAttempts === "number" && response.agentTrace.usage.repairAttempts > 0 && <span>修复 {response.agentTrace.usage.repairAttempts}</span>}
+                      {response.agentTrace.terminalReason && <code>{response.agentTrace.terminalReason}</code>}
                     </div>
                     <ol className="agent-trace-list">
                       {response.agentTrace.steps.map((step) => (
@@ -383,10 +389,11 @@ export function AssistantPanel({
                             <div className="agent-step-heading">
                               <strong>{step.title}</strong>
                               {step.toolName && <code>{step.toolName}</code>}
+                              {step.action && <code>{step.action}</code>}
                               {step.readOnly && <span>只读</span>}
                             </div>
                             <p>{step.detail}</p>
-                            <small className="mono">{step.state} · {step.durationMs.toFixed(1)} ms</small>
+                            <small className="mono">{step.state}{step.observationCode ? ` · ${step.observationCode}` : ""} · {step.durationMs.toFixed(1)} ms</small>
                           </div>
                         </li>
                       ))}

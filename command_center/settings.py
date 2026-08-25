@@ -47,6 +47,14 @@ class Settings:
     agent_checkpoint: Path | None = None
     agent_device: str = "cpu"
     agent_torch_threads: int = 1
+    agent_runtime_mode: str = "linear"
+    agent_max_decisions: int = 8
+    agent_max_tool_calls: int = 6
+    agent_max_repair_attempts: int = 2
+    agent_max_total_tokens: int = 8192
+    agent_max_estimated_cost_usd: float = 0.25
+    agent_max_latency_ms: int = 30000
+    agent_max_steps: int = 48
     root: Path = ROOT
 
     @property
@@ -91,6 +99,9 @@ class Settings:
         llm_provider = os.getenv("LLM_PROVIDER", "deepseek").strip().lower()
         if llm_provider not in {"deepseek", "local", "auto"}:
             raise ValueError("LLM_PROVIDER 必须是 deepseek、local 或 auto")
+        runtime_mode = os.getenv("AGENT_RUNTIME_MODE", "linear").strip().lower()
+        if runtime_mode not in {"linear", "loop"}:
+            raise ValueError("AGENT_RUNTIME_MODE 必须是 linear 或 loop")
         return cls(
             app_env=os.getenv("APP_ENV", "development").strip().lower(),
             host=os.getenv("APP_HOST", "127.0.0.1"),
@@ -148,5 +159,27 @@ class Settings:
             agent_device=os.getenv("MASP_AGENT_DEVICE", "cpu").strip().lower(),
             agent_torch_threads=max(
                 1, min(16, int(os.getenv("MASP_AGENT_TORCH_THREADS", "1")))
+            ),
+            agent_runtime_mode=runtime_mode,
+            agent_max_decisions=max(
+                1, min(32, int(os.getenv("AGENT_MAX_DECISIONS", "8")))
+            ),
+            agent_max_tool_calls=max(
+                1, min(24, int(os.getenv("AGENT_MAX_TOOL_CALLS", "6")))
+            ),
+            agent_max_repair_attempts=max(
+                0, min(5, int(os.getenv("AGENT_MAX_REPAIR_ATTEMPTS", "2")))
+            ),
+            agent_max_total_tokens=max(
+                128, int(os.getenv("AGENT_MAX_TOTAL_TOKENS", "8192"))
+            ),
+            agent_max_estimated_cost_usd=max(
+                0, float(os.getenv("AGENT_MAX_ESTIMATED_COST_USD", "0.25"))
+            ),
+            agent_max_latency_ms=max(
+                100, int(os.getenv("AGENT_MAX_LATENCY_MS", "30000"))
+            ),
+            agent_max_steps=max(
+                8, min(256, int(os.getenv("AGENT_MAX_STEPS", "48")))
             ),
         )

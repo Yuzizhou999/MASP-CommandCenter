@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import sqlite3
+from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Condition, RLock
@@ -76,7 +79,12 @@ class AgentRunManager:
         workflow: DispatchWorkflowService | None = None,
         max_workers: int = 4,
     ) -> None:
-        self.path = path
+        self.legacy_path = path if path.suffix.lower() == ".json" else None
+        self.path = (
+            path.with_suffix(".sqlite3")
+            if path.suffix.lower() == ".json"
+            else path
+        )
         self.orchestrator = orchestrator
         self.provider = provider
         self.workflow = workflow
@@ -88,8 +96,7 @@ class AgentRunManager:
         self._recovery_started = False
         self._stopping = False
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.path.exists():
-            self._write({"schemaVersion": 1, "runs": {}})
+        self._initialize_store()
 
     def start(self) -> int:
         with self._lock:
@@ -123,11 +130,19 @@ class AgentRunManager:
     ) -> AgentRunRecord:
         normalized_key = idempotency_key.strip()[:200] if idempotency_key else None
         with self._lock:
-            data = self._read()
-            if normalized_key:
-                for existing in data["runs"].values():
-                    if existing.get("idempotencyKey") != normalized_key:
-                        continue
+            with self._connect() as connection:
+                existing = None
+                if normalized_key:
+                    found = connection.execute(
+                        "SELECT document FROM agent_runs WHERE idempotency_key = ?",
+                        (normalized_key,),
+                    ).fetchone()
+                    if found is not None:
+                        existing = json.loads(found["document"])
+                        existing["events"] = self._events_for(
+                            connection, str(existing["runId"])
+                        )
+                if existing is not None:
                     submitted = request.model_dump(by_alias=True, mode="json")
                     if existing.get("request") != submitted:
                         raise ValueError("同一 Idempotency-Key 不能用于不同的 Agent 请求")
@@ -158,26 +173,37 @@ class AgentRunManager:
                 "completedAt": None,
             }
             self._append_event(row, "run_queued", {"status": "QUEUED"})
-            data["runs"][run_id] = row
-            self._write(data)
+            with self._connect() as connection:
+                self._insert_row(connection, row)
+                connection.commit()
             record = AgentRunRecord.model_validate(row)
         self._submit(run_id)
         return record
 
     def get(self, run_id: str) -> AgentRunRecord:
-        with self._lock:
-            row = self._read()["runs"].get(run_id)
-            if row is None:
-                raise KeyError(f"未知 Agent run：{run_id}")
-            return AgentRunRecord.model_validate(row)
+        with self._connect() as connection:
+            row = self._row_for(connection, run_id)
+        if row is None:
+            raise KeyError(f"未知 Agent run：{run_id}")
+        return AgentRunRecord.model_validate(row)
 
     def events_after(self, run_id: str, event_id: int) -> list[dict[str, Any]]:
-        record = self.get(run_id)
-        return [
-            event.model_dump(by_alias=True, mode="json")
-            for event in record.events
-            if event.event_id > event_id
-        ]
+        with self._connect() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM agent_runs WHERE run_id = ?", (run_id,)
+            ).fetchone()
+            if exists is None:
+                raise KeyError(f"未知 Agent run：{run_id}")
+            rows = connection.execute(
+                """
+                SELECT event_id, event_type, payload, created_at
+                FROM agent_run_events
+                WHERE run_id = ? AND event_id > ?
+                ORDER BY event_id
+                """,
+                (run_id, event_id),
+            ).fetchall()
+        return [self._event_document(row) for row in rows]
 
     def resume(
         self, run_id: str, decision: AgentRunResumeRequest
@@ -230,7 +256,7 @@ class AgentRunManager:
                         "主管拒绝了高风险 Agent 草案",
                     )
 
-        record = self._update(run_id, update)
+        record = self._update(run_id, update, include_events=True)
         with self._lock:
             condition = self._conditions.get(run_id)
         if condition is not None:
@@ -247,7 +273,7 @@ class AgentRunManager:
             row["cancelRequested"] = True
             self._set_terminal(row, "CANCELLED", "用户取消了 Agent run")
 
-        record = self._update(run_id, update)
+        record = self._update(run_id, update, include_events=True)
         with self._lock:
             condition = self._conditions.get(run_id)
         if condition is not None:
@@ -261,32 +287,34 @@ class AgentRunManager:
                 return 0
             self._recovery_started = True
             data = self._read()
-            run_ids: list[str] = []
-            changed = False
-            now = _utc_now()
-            for run_id, row in data["runs"].items():
-                status = row.get("status")
-                if status not in {"QUEUED", "RUNNING", "WAITING_APPROVAL"}:
-                    continue
-                deadline = datetime.fromisoformat(row["deadlineAt"])
-                if status != "WAITING_APPROVAL" and now >= deadline:
-                    self._set_terminal(row, "TIMED_OUT", "Agent run 在服务恢复前已超时")
-                    changed = True
-                    continue
-                if status in {"QUEUED", "RUNNING"}:
+        run_ids: list[str] = []
+        now = _utc_now()
+        for run_id, snapshot in data["runs"].items():
+            status = snapshot.get("status")
+            if status not in {"QUEUED", "RUNNING", "WAITING_APPROVAL"}:
+                continue
+            deadline = datetime.fromisoformat(snapshot["deadlineAt"])
+            if status != "WAITING_APPROVAL" and now >= deadline:
+                self._update(
+                    run_id,
+                    lambda row: self._set_terminal(
+                        row, "TIMED_OUT", "Agent run 在服务恢复前已超时"
+                    ),
+                )
+                continue
+            if status in {"QUEUED", "RUNNING"}:
+                def mark_recovered(row: dict[str, Any]) -> None:
                     row["status"] = "QUEUED"
                     row["recovered"] = True
                     row["traceSteps"] = []
-                    row["updatedAt"] = _iso()
                     self._append_event(
                         row,
                         "run_recovered",
                         {"reason": "service_restart"},
                     )
-                    run_ids.append(run_id)
-                    changed = True
-            if changed:
-                self._write(data)
+
+                self._update(run_id, mark_recovered)
+                run_ids.append(run_id)
         for run_id in run_ids:
             self._submit(run_id)
         return len(run_ids)
@@ -324,6 +352,7 @@ class AgentRunManager:
                 scenarioId=record.request.scenario_id,
                 requestedBy=record.request.requested_by,
                 conversationId=record.request.conversation_id,
+                agentMode=record.request.agent_mode,
             )
             goal_execution = (
                 record.request.execution_mode == "GOAL_EXECUTION"
@@ -866,23 +895,59 @@ class AgentRunManager:
     ) -> AgentRunEvaluation:
         trace = response.agent_trace
         steps = trace.steps if trace else []
-        sequences = [step.sequence for step in steps]
+        tool_indices = [
+            index for index, step in enumerate(steps) if step.tool_name is not None
+        ]
+        observed_after_tool = all(
+            any(
+                later.state in {"OBSERVING", "PARAMETER_RESOLUTION", "SAFETY_VALIDATION"}
+                for later in steps[index + 1 :]
+            )
+            for index in tool_indices
+            if steps[index].tool_name != "validate_dispatch_intent"
+        )
+        budget_usage = trace.usage if trace else {}
+        budget_limits = trace.budgets if trace else {}
         checks = {
-            "boundedSteps": bool(trace and len(steps) <= trace.max_steps),
-            "sequentialTrace": sequences == list(range(1, len(steps) + 1)),
-            "readOnlyTools": all(
-                step.read_only is not False for step in steps if step.tool_name
+            "worldSnapshotGrounded": bool(
+                response.state == "CLARIFICATION_REQUIRED"
+                or any(step.tool_name == "get_world_snapshot" for step in steps)
             ),
-            "deterministicBoundary": bool(
+            "toolResultsObserved": observed_after_tool,
+            "noRejectedModelActions": not any(
+                step.status == "REJECTED" for step in steps
+            ),
+            "deterministicVerifierReached": bool(
                 response.state == "CLARIFICATION_REQUIRED"
                 or any(step.state == "SAFETY_VALIDATION" for step in steps)
             ),
-            "terminalState": bool(
+            "terminalOutcomeConsistent": bool(
                 trace
-                and trace.status in {"COMPLETED", "CLARIFICATION_REQUIRED"}
+                and (
+                    (response.state == "READY" and trace.status == "COMPLETED")
+                    or response.state == trace.status
+                )
             ),
-            "withinTimeout": bool(
+            "validationOrClarificationSucceeded": bool(
+                response.state == "CLARIFICATION_REQUIRED"
+                or (response.validation is not None and response.validation.valid)
+            ),
+            "withinRequestTimeout": bool(
                 trace and trace.duration_ms <= timeout_seconds * 1000
+            ),
+            "withinConfiguredBudgets": bool(
+                trace
+                and all(
+                    float(budget_usage.get(usage_key, 0)) <= float(limit)
+                    for usage_key, limit_key in (
+                        ("decisions", "maxDecisions"),
+                        ("toolCalls", "maxToolCalls"),
+                        ("repairAttempts", "maxRepairAttempts"),
+                        ("totalTokens", "maxTotalTokens"),
+                        ("estimatedCostUsd", "maxEstimatedCostUsd"),
+                    )
+                    for limit in [budget_limits.get(limit_key, float("inf"))]
+                )
             ),
         }
         if workflow_phase is not None:
@@ -946,15 +1011,37 @@ class AgentRunManager:
         self,
         run_id: str,
         callback: Callable[[dict[str, Any]], None],
+        *,
+        include_events: bool = False,
     ) -> AgentRunRecord:
-        with self._lock:
-            data = self._read()
-            row = data["runs"].get(run_id)
-            if row is None:
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            found = connection.execute(
+                "SELECT document FROM agent_runs WHERE run_id = ?", (run_id,)
+            ).fetchone()
+            if found is None:
                 raise KeyError(f"未知 Agent run：{run_id}")
+            row = json.loads(found["document"])
+            previous_event_id = int(
+                connection.execute(
+                    """
+                    SELECT COALESCE(MAX(event_id), 0)
+                    FROM agent_run_events WHERE run_id = ?
+                    """,
+                    (run_id,),
+                ).fetchone()[0]
+            )
+            row["events"] = []
+            row["_lastEventId"] = previous_event_id
             callback(row)
             row["updatedAt"] = _iso()
-            self._write(data)
+            row.pop("_lastEventId", None)
+            self._update_row(connection, row, previous_event_id)
+            connection.commit()
+            if include_events:
+                complete = self._row_for(connection, run_id)
+                assert complete is not None
+                return AgentRunRecord.model_validate(complete)
             return AgentRunRecord.model_validate(row)
 
     @staticmethod
@@ -962,9 +1049,10 @@ class AgentRunManager:
         row: dict[str, Any], event_type: str, payload: dict[str, Any]
     ) -> None:
         events = row.setdefault("events", [])
+        previous_event_id = int(row.get("_lastEventId", 0))
         events.append(
             {
-                "eventId": len(events) + 1,
+                "eventId": previous_event_id + len(events) + 1,
                 "eventType": event_type,
                 "payload": payload,
                 "createdAt": _iso(),
@@ -972,17 +1060,191 @@ class AgentRunManager:
         )
 
     def _read(self) -> dict[str, Any]:
-        if not self.path.exists():
-            return {"schemaVersion": 1, "runs": {}}
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT run_id FROM agent_runs ORDER BY created_at"
+            ).fetchall()
+            return {
+                "schemaVersion": 2,
+                "runs": {
+                    str(row["run_id"]): self._row_for(
+                        connection, str(row["run_id"])
+                    )
+                    for row in rows
+                },
+            }
 
     def _write(self, payload: dict[str, Any]) -> None:
-        temporary = self.path.with_suffix(f"{self.path.suffix}.tmp")
-        temporary.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        """Compatibility bulk import used by migration and legacy tests only."""
+
+        with self._lock:
+            with self._connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                connection.execute("DELETE FROM agent_run_events")
+                connection.execute("DELETE FROM agent_runs")
+                for row in payload.get("runs", {}).values():
+                    self._insert_row(connection, dict(row))
+                connection.commit()
+
+    def _initialize_store(self) -> None:
+        legacy_payload: dict[str, Any] | None = None
+        if self.legacy_path is not None and self.legacy_path.is_file():
+            try:
+                parsed = json.loads(self.legacy_path.read_text(encoding="utf-8"))
+                if isinstance(parsed, dict):
+                    legacy_payload = parsed
+            except (OSError, json.JSONDecodeError):
+                legacy_payload = None
+        with self._connect() as connection:
+            connection.executescript(
+                """
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = NORMAL;
+                CREATE TABLE IF NOT EXISTS agent_runs (
+                    run_id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    idempotency_key TEXT UNIQUE,
+                    document TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_agent_runs_status
+                    ON agent_runs(status);
+                CREATE TABLE IF NOT EXISTS agent_run_events (
+                    run_id TEXT NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    event_type TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (run_id, event_id),
+                    FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
+                );
+                """
+            )
+            count = int(
+                connection.execute("SELECT COUNT(*) FROM agent_runs").fetchone()[0]
+            )
+        if count == 0 and legacy_payload and legacy_payload.get("runs"):
+            self._write(legacy_payload)
+
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(self.path, timeout=30)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA busy_timeout = 30000")
+        try:
+            yield connection
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _event_document(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "eventId": int(row["event_id"]),
+            "eventType": str(row["event_type"]),
+            "payload": json.loads(row["payload"]),
+            "createdAt": str(row["created_at"]),
+        }
+
+    def _events_for(
+        self, connection: sqlite3.Connection, run_id: str
+    ) -> list[dict[str, Any]]:
+        rows = connection.execute(
+            """
+            SELECT event_id, event_type, payload, created_at
+            FROM agent_run_events WHERE run_id = ? ORDER BY event_id
+            """,
+            (run_id,),
+        ).fetchall()
+        return [self._event_document(row) for row in rows]
+
+    def _row_for(
+        self, connection: sqlite3.Connection, run_id: str
+    ) -> dict[str, Any] | None:
+        found = connection.execute(
+            "SELECT document FROM agent_runs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        if found is None:
+            return None
+        row = json.loads(found["document"])
+        row["events"] = self._events_for(connection, run_id)
+        return row
+
+    @staticmethod
+    def _document_without_events(row: dict[str, Any]) -> str:
+        document = {key: value for key, value in row.items() if key != "events"}
+        return json.dumps(document, ensure_ascii=False, separators=(",", ":"))
+
+    def _insert_row(
+        self, connection: sqlite3.Connection, row: dict[str, Any]
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO agent_runs(
+                run_id, status, idempotency_key, document, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                row["runId"],
+                row["status"],
+                row.get("idempotencyKey"),
+                self._document_without_events(row),
+                row["createdAt"],
+                row["updatedAt"],
+            ),
         )
-        temporary.replace(self.path)
+        for event in row.get("events", []):
+            self._insert_event(connection, str(row["runId"]), event)
+
+    def _update_row(
+        self,
+        connection: sqlite3.Connection,
+        row: dict[str, Any],
+        previous_event_id: int,
+    ) -> None:
+        connection.execute(
+            """
+            UPDATE agent_runs
+            SET status = ?, idempotency_key = ?, document = ?, updated_at = ?
+            WHERE run_id = ?
+            """,
+            (
+                row["status"],
+                row.get("idempotencyKey"),
+                self._document_without_events(row),
+                row["updatedAt"],
+                row["runId"],
+            ),
+        )
+        for event in row.get("events", []):
+            if int(event["eventId"]) > previous_event_id:
+                self._insert_event(connection, str(row["runId"]), event)
+
+    @staticmethod
+    def _insert_event(
+        connection: sqlite3.Connection,
+        run_id: str,
+        event: dict[str, Any],
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO agent_run_events(
+                run_id, event_id, event_type, payload, created_at
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                int(event["eventId"]),
+                str(event["eventType"]),
+                json.dumps(
+                    event.get("payload") or {},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                str(event["createdAt"]),
+            ),
+        )
 
     def _new_executor(self) -> ThreadPoolExecutor:
         return ThreadPoolExecutor(

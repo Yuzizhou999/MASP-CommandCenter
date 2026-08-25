@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from command_center.contracts import DispatchIntent, EvidenceItem, IntentType
+from command_center.agent_protocol import AgentAction, AgentActionType
 from command_center.engine_adapter import MaspAdapter
 from command_center.model_safety import enforce_intent_authority
 from command_center.provider import intent_training_messages
@@ -110,12 +111,14 @@ def validate_example(
 ) -> dict[str, Any]:
     messages = example.get("messages")
     metadata = example.get("metadata")
-    if not isinstance(messages, list) or len(messages) != 3:
-        raise ValueError("训练样本必须包含 system、user、assistant 三条消息")
-    if [row.get("role") for row in messages] != ["system", "user", "assistant"]:
-        raise ValueError("训练样本消息角色顺序无效")
     if not isinstance(metadata, dict):
         raise ValueError("训练样本缺少 metadata")
+    if metadata.get("datasetType") == "agent-trajectory":
+        return validate_agent_trajectory(example)
+    if not isinstance(messages, list) or len(messages) != 3:
+        raise ValueError("意图训练样本必须包含 system、user、assistant 三条消息")
+    if [row.get("role") for row in messages] != ["system", "user", "assistant"]:
+        raise ValueError("意图训练样本消息角色顺序无效")
 
     request_payload = json.loads(messages[1]["content"])
     assistant_payload = json.loads(messages[2]["content"])
@@ -147,6 +150,61 @@ def validate_example(
     return {
         "intentType": intent.intent_type.value,
         "valid": validation.valid if validation is not None else True,
+    }
+
+
+def validate_agent_trajectory(example: dict[str, Any]) -> dict[str, Any]:
+    messages = example.get("messages")
+    metadata = example.get("metadata")
+    if not isinstance(messages, list) or len(messages) < 3:
+        raise ValueError("Agent 轨迹至少需要 system、user、assistant 三条消息")
+    roles = [row.get("role") for row in messages]
+    if roles[0] != "system" or roles[1] != "user" or roles[-1] != "assistant":
+        raise ValueError("Agent 轨迹必须以 system/user 开始并以 assistant 结束")
+    if any(
+        roles[index] == roles[index - 1]
+        for index in range(2, len(roles))
+    ):
+        raise ValueError("Agent 轨迹中的 user/assistant 必须交替出现")
+
+    actions: list[AgentAction] = []
+    for row in messages:
+        if row.get("role") != "assistant":
+            continue
+        content = row.get("content")
+        if not isinstance(content, str):
+            raise ValueError("assistant 动作必须是 JSON 字符串")
+        actions.append(AgentAction.from_content(content))
+    if not actions:
+        raise ValueError("Agent 轨迹没有 assistant 动作")
+
+    supervised = (metadata or {}).get("superviseAssistantIndices")
+    if supervised is None:
+        supervised = list(range(len(actions)))
+    if (
+        not isinstance(supervised, list)
+        or not supervised
+        or any(not isinstance(index, int) for index in supervised)
+        or any(index < 0 or index >= len(actions) for index in supervised)
+        or len(supervised) != len(set(supervised))
+    ):
+        raise ValueError("superviseAssistantIndices 必须引用有效且不重复的动作")
+
+    terminal = actions[-1].action
+    expected_terminal = str((metadata or {}).get("expectedTerminalState") or "")
+    terminal_map = {
+        AgentActionType.PROPOSE_INTENT: "READY",
+        AgentActionType.REQUEST_CLARIFICATION: "CLARIFICATION_REQUIRED",
+    }
+    if terminal not in terminal_map:
+        raise ValueError("Agent 轨迹最后动作必须是提出意图或请求澄清")
+    if expected_terminal and terminal_map[terminal] != expected_terminal:
+        raise ValueError("轨迹最后动作与 expectedTerminalState 不一致")
+    return {
+        "valid": True,
+        "actionCount": len(actions),
+        "supervisedActionCount": len(supervised),
+        "terminalAction": terminal.value,
     }
 
 

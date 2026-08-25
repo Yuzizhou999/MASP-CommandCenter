@@ -32,6 +32,8 @@ def _write_model_card(root: Path, adapter_bytes: bytes = b"adapter") -> Path:
                 "adapterFile": adapter.name,
                 "adapterSha256": hashlib.sha256(adapter_bytes).hexdigest(),
                 "status": "candidate",
+                "runScope": "full",
+                "sampleLimits": {"train": None, "valid": None, "maxSteps": -1},
                 "createdAt": "2026-08-24T00:00:00+00:00",
                 "metrics": {"eval_loss": 0.5},
             },
@@ -80,9 +82,12 @@ def test_local_provider_reports_registration_and_keeps_tools_deterministic(
     plan = provider.plan_context_tools("封闭通道前需要检查什么？", [], has_memory=True)
 
     assert status["provider"] == "local-openai-compatible"
-    assert status["capability"] == "dispatch-intent-parsing"
+    assert status["capability"] == "dispatch-intent-and-agent-actions"
+    assert status["agentCapability"] == "single-action-protocol"
     assert status["registration"]["valid"] is True
     assert status["registration"]["adapterSha256Matches"] is True
+    assert status["registration"]["runScope"] == "full"
+    assert status["registration"]["sampleLimits"]["maxSteps"] == -1
     assert plan.strategy == "DETERMINISTIC_POLICY"
     assert [row.name for row in plan.calls] == [
         "get_world_snapshot",

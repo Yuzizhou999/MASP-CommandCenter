@@ -864,10 +864,31 @@ class MaspAdapter:
                     if task.task_id in existing_ids:
                         raise ValueError(f"任务ID {task.task_id} 已存在")
                 except (ValueError, KeyError) as error:
+                    message = str(error)
+                    lowered = message.lower()
+                    if "已存在" in message or "duplicate" in lowered:
+                        issue_code = "intent.task.id.duplicate"
+                    elif any(
+                        term in lowered
+                        for term in ("priority", "priorityclass", "优先级")
+                    ):
+                        issue_code = "intent.task.priority.invalid"
+                    elif any(
+                        term in lowered
+                        for term in ("duetime", "releasetime", "time window", "时间窗")
+                    ):
+                        issue_code = "intent.task.time_window.invalid"
+                    elif any(
+                        term in lowered
+                        for term in ("node", "pickup", "dropoff", "站点", "节点")
+                    ):
+                        issue_code = "intent.task.node.alias"
+                    else:
+                        issue_code = "intent.task.field.invalid"
                     issues.append(
                         ValidationIssue(
-                            code="intent.task.invalid",
-                            message=str(error),
+                            code=issue_code,
+                            message=message,
                             severity="error",
                         )
                     )

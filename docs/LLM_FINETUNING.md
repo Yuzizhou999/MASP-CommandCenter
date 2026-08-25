@@ -1,20 +1,22 @@
-# MASP 调度意图模型微调
+# MASP 调度 Agent 模型微调
 
-本项目将 `Qwen2.5-1.5B-Instruct` 微调为仓储调度意图解析模型。模型只负责把用户请求转换为 `DispatchIntent` JSON，不生成路线、资源预约、车辆控制或审批结论。
+项目保留两套可对照能力：冻结的 v1 adapter 把用户请求转换为 `DispatchIntent` JSON；v2 候选 adapter 学习有界 Agent 的单动作协议，在每轮从 `CALL_TOOL`、`REQUEST_CLARIFICATION`、`PROPOSE_INTENT` 中选择一个动作。两者都不生成路线、资源预约、车辆控制或审批结论。
 
 运行链路保持以下边界：
 
 ```text
 用户请求
-  -> 确定性澄清与实体解析
-  -> 本地 Qwen 意图模型
-  -> Pydantic Schema 校验
-  -> 权威实体覆盖与模型权限检查
-  -> MASP validate_intent
+  -> 确定性澄清与权威实体绑定
+  -> 本地 Qwen / DeepSeek / deterministic driver
+  -> CALL_TOOL -> observation -> 下一轮决策
+  -> PROPOSE_INTENT -> Pydantic 与权威边界
+  -> MASP validate_intent -> 可修复 issue 最多回送两次
   -> What-if 仿真 / 风险分级 / 人工审批
 ```
 
-澄清、实体目录、MASP 校验和降级解析都不依赖微调模型。模型服务不可用或返回非法 JSON 时，应用自动使用确定性解析器。
+硬缺参澄清、实体目录、工具白名单、检索注入隔离、MASP 校验、预算和审批都不依赖微调模型。非法工具或非法 JSON 会成为 rejection observation；本地服务不可用时应用使用确定性 driver。
+
+`models/masp-intent-lora` 是冻结 v1 基线，不能被 v2 训练覆盖。v2 只有同时通过原意图挑战集无退化门槛和新增轨迹门槛后才能晋级。
 
 ## 1. 独立环境
 
@@ -81,6 +83,23 @@ python -m training.train_lora data\finetuning\intent-sft-v1 `
 
 产物目录包含 adapter、tokenizer、训练配置和 `model-card.json`。模型卡登记基座、数据集版本、训练指标和 adapter SHA-256；应用健康接口会验证该摘要。
 
+### 多轮 Agent v2
+
+v2 数据不是由 1.5B 自滚动生成，而是由冻结的确定性策略、v1 保持样本、人工设计的工具拒绝/修复/澄清/注入轨迹，以及可选的人工审核 teacher 轨迹组成。独立 gold 不进入训练集。
+
+```powershell
+$env:MASP_ENGINE_ROOT='E:\project\MASP-locked'
+python -m training.prepare_agent_dataset `
+  --source-dir data\finetuning\intent-sft-v1 `
+  --output-dir data\finetuning\agent-sft-v2
+python -m training.validate_dataset data\finetuning\agent-sft-v2
+python -m training.train_lora data\finetuning\agent-sft-v2 `
+  --config training\configs\agent-lora-v2.json `
+  --output-dir models\masp-agent-lora-v2
+```
+
+训练器会监督多轮会话中选定的 assistant turn；故意构造的非法动作可通过 `superviseAssistantIndices` 排除。`manifest.json` 固定数据摘要、MASP commit、生成策略和 gold 隔离声明。
+
 ## 5. 启动本地模型 API
 
 在 `masp-lora` 环境中启动 4-bit 推理服务：
@@ -111,11 +130,20 @@ LOCAL_LLM_API_KEY=local
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8000/v1
 LOCAL_LLM_MODEL=masp-intent-lora
 LOCAL_LLM_MODEL_CARD=models/masp-intent-lora/model-card.json
+AGENT_RUNTIME_MODE=linear
 ```
 
 再启动主服务。`GET /api/health` 中的 `model.provider` 应为 `local-openai-compatible`，`registration.valid` 应为 `true`。
 
-本地微调模型只处理 `parse_intent`。上下文工具规划继续使用确定性白名单策略，异常诊断和计划解释继续使用确定性证据链，避免让单任务微调模型承担未训练能力。
+v1 模型使用 `AGENT_RUNTIME_MODE=linear`，只处理 `parse_intent`。通过晋级门槛的 v2 使用以下组合：
+
+```dotenv
+LOCAL_LLM_MODEL=masp-agent-lora-v2
+LOCAL_LLM_MODEL_CARD=models/masp-agent-lora-v2/model-card.json
+AGENT_RUNTIME_MODE=loop
+```
+
+两种模式共用同一工具白名单、权威边界、verifier、预算、审计和目标执行路径。不要把 v1 adapter 配成默认 loop driver；它在 loop 中的兼容包装仅用于过渡诊断，不是部署模式。
 
 ## 7. 评测微调模型
 
@@ -138,6 +166,27 @@ python -m training.evaluate_intent_model data\finetuning\intent-sft-v1 `
 - `averageLatencyMs`、`p95LatencyMs`：本机推理延迟。
 
 模型达到候选标准后，再把模型卡 `status` 从 `candidate` 改为 `active`。不要只用训练 loss 判断模型是否可用。
+
+### 冻结轨迹评测与晋级
+
+轨迹 gold 独立标注了必需/允许/禁止工具、终态、是否应澄清、意图类型、可修复 verifier issue 和直接/间接注入。评测器会在指定 case 的第一次 MASP 校验中注入 gold issue，确保 `repairSuccessRate` 测到真实回路，而不是空指标。
+
+```powershell
+python -m training.evaluate_agent_trajectories `
+  --mode linear_v1 --local-base-url http://127.0.0.1:8000/v1 `
+  --output-dir results\agent-eval-v1
+
+python -m training.evaluate_agent_trajectories `
+  --mode loop_local --local-base-url http://127.0.0.1:8001/v1 `
+  --output-dir results\agent-eval-v2
+
+python -m training.compare_agent_replays `
+  results\agent-eval-v1\agent-trajectory-eval-latest.json `
+  results\agent-eval-v2\agent-trajectory-eval-latest.json `
+  --output results\agent-eval-v2\paired-replay.json
+```
+
+最后运行 `training.qualify_agent_candidate`，同时输入 v1/v2 的 `intent-challenge-v1` 报告和轨迹报告。脚本只输出两种结论：`PROMOTE` 或 `KEEP_V1`。门槛包括 v1 各率指标退化不超过 1 个百分点、目标完成、工具 precision/recall、无效调用、修复成功、澄清，以及系统级注入攻击成功率必须为 0。
 
 ## 8. 独立挑战集与基座对照
 
@@ -208,3 +257,7 @@ QLoRA 通过模型和系统两组资格门；基座模型只通过系统组。QL
 - `training/serve_intent_model.py`：本地兼容 API；
 - `training/evaluate_intent_model.py`：测试集、安全集、澄清集与延迟评测。
 - `training/evaluate_intent_challenge.py`：基座与 QLoRA 的独立挑战集评测。
+- `training/prepare_agent_dataset.py`：多轮单动作轨迹数据构造；
+- `training/evaluate_agent_trajectories.py`：轨迹、修复和注入评测；
+- `training/compare_agent_replays.py`：同 case paired replay diff；
+- `training/qualify_agent_candidate.py`：v1 无退化与 v2 新增量的双层晋级门。

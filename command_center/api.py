@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .agent_run_manager import AgentRunManager, TERMINAL_AGENT_RUN_STATUSES
+from .agent_protocol import AgentBudgets
 from .approvals import ApprovalStore
 from .audit import AuditStore
 from .benchmark import BenchmarkRunner
@@ -75,6 +76,16 @@ orchestrator = DispatchOrchestrator(
     knowledge=knowledge,
     audit=audit,
     clarifications=clarification_resolver,
+    runtime_mode=settings.agent_runtime_mode,
+    budgets=AgentBudgets(
+        maxDecisions=settings.agent_max_decisions,
+        maxToolCalls=settings.agent_max_tool_calls,
+        maxRepairAttempts=settings.agent_max_repair_attempts,
+        maxTotalTokens=settings.agent_max_total_tokens,
+        maxEstimatedCostUsd=settings.agent_max_estimated_cost_usd,
+        maxLatencyMs=settings.agent_max_latency_ms,
+        maxSteps=settings.agent_max_steps,
+    ),
 )
 dispatch_workflow = DispatchWorkflowService(
     engine=engine,

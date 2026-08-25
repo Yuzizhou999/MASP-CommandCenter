@@ -3,15 +3,21 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+from .agent_protocol import AgentObservation
 from .contracts import DiagnosisReport, IncidentRecord, PlanExplanationReport
 from .diagnosis import deterministic_diagnosis
 from .model_registry import model_registration
-from .provider import AgentToolPlan, DeepSeekProvider, PlannedToolCall
+from .provider import (
+    AgentDecisionResult,
+    AgentToolPlan,
+    DeepSeekProvider,
+    PlannedToolCall,
+)
 from .settings import Settings
 
 
 class OpenAICompatibleLocalProvider(DeepSeekProvider):
-    """Use a domain-tuned local API for intent parsing only."""
+    """Use a domain-tuned local API for intent parsing or Agent actions."""
 
     def __init__(self, settings: Settings) -> None:
         adapted = replace(
@@ -48,6 +54,24 @@ class OpenAICompatibleLocalProvider(DeepSeekProvider):
             model="deterministic-tool-policy",
         )
 
+    def decide_agent_action(
+        self,
+        text: str,
+        tool_definitions: list[dict[str, Any]],
+        *,
+        observations: list[AgentObservation],
+        authoritative_parameters: dict[str, Any],
+        action_history: list[dict[str, Any]] | None = None,
+    ) -> AgentDecisionResult:
+        return self._decide_agent_action(
+            text,
+            tool_definitions,
+            observations=observations,
+            authoritative_parameters=authoritative_parameters,
+            action_history=action_history,
+            native_tools=False,
+        )
+
     def diagnose_incident(self, incident: IncidentRecord) -> DiagnosisReport:
         self._mark_fallback()
         return deterministic_diagnosis(
@@ -68,7 +92,8 @@ class OpenAICompatibleLocalProvider(DeepSeekProvider):
             {
                 "provider": "local-openai-compatible",
                 "mode": "local-api" if self.configured else "deterministic-fallback",
-                "capability": "dispatch-intent-parsing",
+                "capability": "dispatch-intent-and-agent-actions",
+                "agentCapability": "single-action-protocol",
                 "registration": model_registration(
                     self.runtime_settings.local_llm_model_card
                 ),

@@ -385,6 +385,9 @@ class ChatRequest(BaseModel):
     conversation_id: str = Field(
         default_factory=lambda: new_id("conversation"), alias="conversationId"
     )
+    agent_mode: Literal["linear", "loop"] | None = Field(
+        default=None, alias="agentMode"
+    )
 
 
 class AgentRunCreateRequest(ChatRequest):
@@ -432,18 +435,28 @@ class AgentTraceStep(BaseModel):
     state: Literal[
         "RECEIVED",
         "PLANNING",
+        "DECIDING",
+        "OBSERVING",
         "CONTEXT_GATHERING",
         "PARAMETER_RESOLUTION",
         "INTENT_DRAFTING",
+        "REPAIRING",
         "SAFETY_VALIDATION",
         "CLARIFICATION_REQUIRED",
+        "BLOCKED",
+        "BUDGET_EXCEEDED",
         "COMPLETED",
     ]
-    status: Literal["COMPLETED", "BLOCKED", "FAILED"] = "COMPLETED"
+    status: Literal["COMPLETED", "BLOCKED", "FAILED", "REJECTED"] = "COMPLETED"
     title: str
     detail: str
     tool_name: str | None = Field(default=None, alias="toolName")
     read_only: bool | None = Field(default=None, alias="readOnly")
+    action: str | None = None
+    observation_code: str | None = Field(default=None, alias="observationCode")
+    attempt: int | None = Field(default=None, ge=1)
+    prompt_tokens: int = Field(default=0, ge=0, alias="promptTokens")
+    completion_tokens: int = Field(default=0, ge=0, alias="completionTokens")
     duration_ms: float = Field(default=0, ge=0, alias="durationMs")
 
 
@@ -546,11 +559,24 @@ class AgentRunRecord(BaseModel):
 class AgentExecutionTrace(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    strategy: Literal["MODEL_TOOL_CALLING", "DETERMINISTIC_POLICY"]
+    strategy: Literal[
+        "MODEL_TOOL_CALLING",
+        "DETERMINISTIC_POLICY",
+        "ACTION_PROTOCOL_LOOP",
+    ]
     planner_model: str = Field(alias="plannerModel")
-    status: Literal["COMPLETED", "CLARIFICATION_REQUIRED", "FAILED"]
+    status: Literal[
+        "COMPLETED",
+        "CLARIFICATION_REQUIRED",
+        "BLOCKED",
+        "BUDGET_EXCEEDED",
+        "FAILED",
+    ]
     max_steps: int = Field(ge=1, alias="maxSteps")
     duration_ms: float = Field(ge=0, alias="durationMs")
+    budgets: dict[str, int | float] = Field(default_factory=dict)
+    usage: dict[str, int | float] = Field(default_factory=dict)
+    terminal_reason: str | None = Field(default=None, alias="terminalReason")
     steps: list[AgentTraceStep] = Field(default_factory=list)
 
 
@@ -580,7 +606,12 @@ class AgentConversationMemory(BaseModel):
 class ChatResponse(BaseModel):
     trace_id: str = Field(default_factory=lambda: new_id("trace"), alias="traceId")
     conversation_id: str = Field(alias="conversationId")
-    state: Literal["READY", "CLARIFICATION_REQUIRED"] = "READY"
+    state: Literal[
+        "READY",
+        "CLARIFICATION_REQUIRED",
+        "BLOCKED",
+        "BUDGET_EXCEEDED",
+    ] = "READY"
     message: str
     intent: DispatchIntent | None = None
     validation: IntentValidation | None = None

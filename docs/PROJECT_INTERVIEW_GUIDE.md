@@ -13,7 +13,7 @@
 
 可以这样介绍：
 
-> 我做的是一个面向多车型智能仓储的调度 Agent。用户可以用自然语言提出紧急插单、通道封闭、状态查询或异常解释请求。系统先由 DeepSeek 做上下文工具规划和结构化意图理解，再由服务端确定性解析器补齐或确认站点、车型和资源，最后交给 MASP 数字孪生完成路径规划、资源预约和冲突检测。大模型没有权限生成路径、写资源预约或控制车辆，所有可执行意图都必须经过 Pydantic Schema、MASP 规则和风险校验。对于高风险操作，系统先运行仿真，再生成 `PROCEED/BLOCK` 建议，只有人工审批通过后才允许提交到仿真环境。为了支持真实的 Agent 运行，我还实现了异步可恢复 run、SSE 轨迹、幂等、取消、超时、服务重启恢复和审批检查点。
+> 我做的是一个面向多车型智能仓储的调度 Agent。我实现了冻结的 linear v1 和有界 observe-decide-act loop 两种运行时：loop 中 DeepSeek 或本地 Qwen 每轮只选择一个只读工具、请求澄清或提出结构化意图，工具结果和 verifier issues 会进入下一轮决策。服务端负责实体绑定、工具白名单、预算、注入隔离和 MASP 校验，大模型没有权限生成路径、写资源预约或控制车辆。可修复校验问题最多回送两次，权限、审批和过期状态直接阻断。正式评测后 v2 未通过晋级门槛，所以当前默认仍是 linear v1，loop v2 作为候选保留；这也是项目不会为了展示 Agent 概念牺牲默认稳定性的证据。
 
 更短的版本：
 
@@ -75,14 +75,19 @@ React / TypeScript 前端
 FastAPI API 层
         |
         v
-AgentRunManager                     持久化：data/agent-runs.json
+AgentRunManager                     持久化：SQLite WAL + append-only events
   |  异步执行、SSE、幂等、取消、超时、恢复
   v
 DispatchOrchestrator
   |
-  +--> DeepSeekProvider
-  |      |-- 只读上下文工具规划
-  |      |-- JSON 结构化意图解析
+  +--> AgentLoopExecutor / AgentProtocol
+  |      |-- CALL_TOOL -> observation -> DECIDING 回边
+  |      |-- REQUEST_CLARIFICATION（服务端生成问题）
+  |      |-- PROPOSE_INTENT -> verifier -> 有界修复
+  |
+  +--> DeepSeek / local Qwen / deterministic driver
+  |      |-- 统一单动作协议
+  |      |-- linear v1 兼容模式
   |      |-- 故障解释 / 计划解释
   |      `-- 重试、熔断、Token 和成本统计、确定性降级
   |
@@ -105,8 +110,10 @@ DispatchWorkflowService
 | 模块 | 主要职责 |
 |---|---|
 | `command_center/api.py` | FastAPI 路由、请求模型转换、异常到 HTTP 状态码的映射 |
-| `command_center/provider.py` | DeepSeek 兼容接口、Prompt、JSON 解析、重试熔断、Fallback、Token 统计 |
-| `command_center/orchestrator.py` | 编排一次同步 Agent 对话，驱动工具、澄清、意图解析和安全校验 |
+| `command_center/provider.py` | DeepSeek/本地 driver、单动作归一化、重试熔断、Fallback、Token 和成本统计 |
+| `command_center/agent_protocol.py` | 单动作 Schema、observation、预算和 verifier issue 分类 |
+| `command_center/agent_loop.py` | observe-decide-act 回路、工具拒绝观察、修复和安全终局 |
+| `command_center/orchestrator.py` | `linear` 与 `loop` 双模式入口及共享安全服务 |
 | `command_center/agent_tools.py` | 请求绑定的工具白名单、输入 Schema 和工具执行器 |
 | `command_center/agent_runtime.py` | 有界状态机和逐步执行轨迹 |
 | `command_center/agent_run_manager.py` | 异步 Agent run、持久化、SSE 事件、审批等待和重启恢复 |
@@ -140,7 +147,7 @@ DispatchWorkflowService
 1. 校验并规范化请求；
 2. 根据 `idempotencyKey` 检查是否已有相同请求；
 3. 生成 `agent-run-*` ID；
-4. 将状态写入 `data/agent-runs.json`；
+4. 将 run 行和 append-only 事件写入 `data/agent-runs.sqlite3`；
 5. 提交到后台线程池；
 6. 前端通过查询接口或 SSE 观察状态。
 
@@ -151,16 +158,22 @@ DispatchWorkflowService
 
 ### 第 2 步：建立有界 Agent 状态机
 
-`BoundedAgentRun` 的状态顺序是固定的：
+可选的 `loop` 模式有真实回边；当前默认配置仍使用已通过基线门槛的 `linear` v1：
 
 ```text
 RECEIVED
-  -> PLANNING
-  -> CONTEXT_GATHERING
   -> PARAMETER_RESOLUTION
-  -> INTENT_DRAFTING
-  -> SAFETY_VALIDATION
-  -> COMPLETED
+  -> PLANNING -> DECIDING
+       | CALL_TOOL -> CONTEXT_GATHERING -> OBSERVING --+
+       |                                                |
+       +----------------------<-------------------------+
+       | PROPOSE_INTENT -> INTENT_DRAFTING -> SAFETY_VALIDATION
+       |                                      | fixable
+       |                                      v
+       +------------------------------ REPAIRING
+                                              | valid
+                                              v
+                                         COMPLETED
 ```
 
 如果字段不足，流程会从 `PARAMETER_RESOLUTION` 转到 `CLARIFICATION_REQUIRED`，不会猜一个默认站点或车型。
@@ -175,11 +188,11 @@ RECEIVED
 - 耗时；
 - 成功或失败状态。
 
-`max_steps=16` 是硬上限。这样做的原因是防止模型反复调用工具、形成无限循环或持续消耗预算。
+运行时分别强制决策、工具、修复、Token、估算成本、延迟和 trace step 预算。任一预算耗尽都进入结构化 `BUDGET_EXCEEDED`，不会抛出未解释的 500。`linear` 模式保留原单向链，专门用于和 loop 做同口径评测。
 
-### 第 3 步：模型规划只读上下文工具
+### 第 3 步：模型逐轮决定一个动作
 
-`DeepSeekProvider.plan_context_tools()` 会把可选工具定义传给 DeepSeek。模型只能从服务端提供的工具中选择，当前可被模型选择的工具是：
+`decide_agent_action()` 每轮只接受一个动作。模型调用工具后，服务端执行并把结构化 observation 放回下一轮；非法工具、非法参数、多动作和非法 JSON 都作为 rejection observation 返回，不会静默丢弃。当前可被模型选择的工具是：
 
 - `get_world_snapshot`：读取服务端绑定场景的权威世界快照；
 - `search_sop`：检索仓储调度、安全和异常处置 SOP；
@@ -187,17 +200,17 @@ RECEIVED
 
 `validate_dispatch_intent` 虽然也是 Agent 工具，但 `modelSelectable=false`。它只能由编排器在固定阶段调用，不能由模型决定是否跳过。
 
-工具计划还有几层确定性保护：
+循环还有几层确定性保护：
 
-1. 最多只读取前 4 个模型工具调用；
-2. 过滤不在 allow-list 的工具；
-3. 强制加入 `get_world_snapshot`；
-4. 有会话记忆时强制加入记忆读取；
-5. 对 SOP 查询的 `query` 和 `limit` 做服务端范围限制；
-6. 相同工具和参数去重；
-7. 模型没有写操作工具定义。
+1. 单轮多动作直接拒绝；
+2. 工具名、参数和场景绑定都由服务端复核；
+3. 提出意图前必须读到权威 `get_world_snapshot`；
+4. SOP 正文标为不可信数据，标题和正文先过注入 scanner；
+5. 可疑 chunk 隔离并进入 trace，不能进入模型上下文；
+6. 模型没有写操作工具定义；
+7. 最终必须经过不可由模型选择或跳过的 verifier。
 
-如果 DeepSeek 不可用，系统直接使用确定性工具计划：世界快照、可选会话记忆、SOP 检索。
+如果 DeepSeek 或本地服务不可用，同一个循环由确定性 driver 驱动，并明确记录 `fallbackUsed`。评测额外要求候选的 `modelDrivenRate=100%`，防止 fallback 托高模型成绩。
 
 ### 第 4 步：确定性参数解析和多轮澄清
 
@@ -509,7 +522,7 @@ MASP 已经具备确定性的路径、资源和冲突计算。正确的架构是
 
 ### 7.2 持久化内容
 
-`data/agent-runs.json` 保存：
+`data/agent-runs.sqlite3` 保存 run 当前文档和 append-only 事件表，并启用 WAL：
 
 - 原始请求；
 - 当前状态；
@@ -567,8 +580,9 @@ commitment.commitId
 1. API 未配置：直接使用确定性策略；
 2. 网络错误、超时或可重试状态：有限重试；
 3. 连续失败：熔断；
-4. JSON 缺字段或 Schema 不通过：fallback；
-5. 前端显示 fallback 状态，审计记录保留原因。
+4. `linear` 模式的意图 JSON 缺字段或 Schema 不通过：fallback；
+5. `loop` 模式的非法单动作：作为 rejection observation 返回下一轮，不用 fallback 掩盖模型错误；
+6. 重复非法动作最终由决策或 step 预算终止，前端和审计保留原因。
 
 ### 8.2 参数不完整
 
@@ -707,13 +721,13 @@ $env:MASP_TEST_ENGINE_ROOT='E:\project\MASP-locked'
 
 建议回答：
 
-> 它不是一次请求一次回复，而是一个有明确状态、工具、边界和终态的执行系统。Agent 会按固定状态机读取权威上下文、解析参数、形成结构化意图、调用确定性安全校验，并在目标执行模式下继续编排仿真、推进门槛、审批和提交。每一步都有事件、耗时和结果，也支持取消、超时、重启恢复和幂等。
+> 它不是一次请求一次回复，也不是先规划完再顺序执行的流水线。loop 模式下模型每轮只能做一个动作，看到工具结果或 verifier issue 后再决定下一步；非法调用会成为 observation，fixable issue 可以有界修复。终局仍由确定性 verifier 决定，运行还有独立的决策、工具、修复、Token、成本、延迟和步数预算。linear v1 被保留为对照，而不是删掉历史基线。
 
 ### Q2：大模型在这里究竟做了什么？
 
 建议回答：
 
-> 大模型主要做三件事：选择只读上下文工具、把自然语言组织成结构化调度意图、基于真实证据生成诊断或计划解释。它不做路径规划、资源预约、冲突判断和设备控制，这些由 MASP 和服务端确定性规则完成。
+> 大模型主要做策略选择和语义组织：决定是否继续读取只读上下文、是否需要澄清、何时提出结构化意图，以及基于真实证据生成解释。澄清问题文本、权威实体、路径规划、资源预约、冲突判断、verifier 和设备控制都不交给模型。
 
 ### Q3：为什么不用 LLM 直接生成路线？
 
@@ -731,7 +745,7 @@ $env:MASP_TEST_ENGINE_ROOT='E:\project\MASP-locked'
 
 建议回答：
 
-> 我没有把安全寄托在 Prompt 上。模型只看到服务端提供的只读工具定义，工具执行器会重新校验输入和场景绑定。写操作工具没有暴露给模型，意图还要经过 Schema、实体权威性复核、MASP 安全校验和审批。即使用户在文本中要求“忽略规则并直接封路”，也无法获得写操作权限。
+> 我没有把安全寄托在 Prompt 或 1.5B 的拒答能力上。直接注入在模型调用前扫描；检索标题和正文按不可信数据分隔，命中注入模式的 chunk 会隔离并留 trace。之后还有只读工具白名单、Schema、权威实体覆盖、MASP verifier 和审批。评测口径是系统级攻击是否产生可提交/可执行越权动作，冻结攻击集上要求成功率为 0。
 
 ### Q6：为什么要把 `validate_dispatch_intent` 设置为不可由模型选择？
 
@@ -761,7 +775,7 @@ $env:MASP_TEST_ENGINE_ROOT='E:\project\MASP-locked'
 
 建议回答：
 
-> 理解阶段是 `RECEIVED -> PLANNING -> CONTEXT_GATHERING -> PARAMETER_RESOLUTION -> INTENT_DRAFTING -> SAFETY_VALIDATION -> COMPLETED`。如果参数不足会转到 `CLARIFICATION_REQUIRED`。目标工作流在理解完成后增加 `SIMULATING -> WAITING_APPROVAL/COMMITTING -> COMPLETED/BLOCKED`。Agent trace 和 workflow step 是分开的：前者记录理解过程，后者记录仿真与提交过程。
+> loop 理解阶段是 `RECEIVED -> PARAMETER_RESOLUTION -> PLANNING -> DECIDING`。`CALL_TOOL` 进入 `CONTEXT_GATHERING -> OBSERVING -> DECIDING` 回边；`PROPOSE_INTENT` 进入 `INTENT_DRAFTING -> SAFETY_VALIDATION`，fixable issue 走 `REPAIRING -> DECIDING`，其余进入 `BLOCKED`。参数不足是 `CLARIFICATION_REQUIRED`，预算耗尽是 `BUDGET_EXCEEDED`。目标工作流再增加 `SIMULATING -> WAITING_APPROVAL/COMMITTING -> COMPLETED/BLOCKED`。
 
 ### Q11：为什么需要 `GOAL_EXECUTION`，原来的 chat 不够吗？
 
@@ -821,7 +835,7 @@ $env:MASP_TEST_ENGINE_ROOT='E:\project\MASP-locked'
 
 建议回答：
 
-> 超时限制外部调用和调度流程的资源占用，最大步数防止工具循环。两者都是运行治理的一部分。审批等待单独暂停 deadline，避免把人工等待误判成 Agent 失控。
+> 只有一个最大步数不够，因为模型可能用很少 trace step 消耗大量 token 或成本。这里分别限制决策次数、工具调用、修复次数、Token、估算美元成本、延迟和 trace step；超限统一进入可解释的预算终局。审批等待单独暂停 deadline，避免把人工等待误判成 Agent 失控。
 
 ### Q21：项目里的 PPO 模型和 DeepSeek 有什么关系？
 
@@ -833,13 +847,13 @@ $env:MASP_TEST_ENGINE_ROOT='E:\project\MASP-locked'
 
 建议回答：
 
-> 当前是仿真验证版本，持久化主要使用本地 JSON/JSONL，生产环境需要数据库和分布式任务队列；还需要企业身份认证、RBAC、CSRF 防护、速率限制、密钥托管、日志脱敏、传输加密和依赖安全扫描。模型输出安全边界已经有服务端实现，但生产接入仍要补齐基础设施和合规流程。
+> 当前仍是单机仿真验证版本。Agent run 已从整份 JSON 重写迁移到 SQLite WAL 和 append-only event；50 并发、12 worker 的本机对照中，JSON 基线为 1.555 runs/s，SQLite WAL 为 6.039 runs/s，总耗时加速 3.884 倍。但生产仍需要 PostgreSQL、分布式任务队列和跨实例租约。企业身份认证、RBAC、CSRF、速率限制、密钥托管、日志脱敏、传输加密和依赖扫描也还没有完成。
 
 ### Q23：如果让你继续优化，你会先做什么？
 
 建议回答：
 
-> 我会先把 Agent run 和审批存储迁移到支持事务和并发控制的数据库，再增加模型评测集和线上观测，重点监控字段完全匹配率、非法工具调用率、fallback 率、审批等待时长、仿真阻断率和 P95 延迟。之后再考虑更复杂的多 Agent 协作，而不是先扩大模型权限。
+> 下一步不是先做多 Agent，而是把 SQLite 迁移到 PostgreSQL 和队列 worker，增加真实运维查询与更大规模注入集，并监控目标完成率、工具 precision/recall、无效调用、修复成功、过度澄清、model-driven rate、成本和 P95 延迟。模型或 prompt 更新必须先做轨迹 replay diff，再过 v1 无退化与系统安全双门槛。
 
 ## 13. 面试时容易说错的地方
 

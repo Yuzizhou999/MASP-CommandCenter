@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Iterable
 
-from .contracts import DiagnosisReport, DispatchIntent, IntentType, PlanExplanationFinding
+from .contracts import (
+    DiagnosisReport,
+    DispatchIntent,
+    EvidenceItem,
+    IntentType,
+    PlanExplanationFinding,
+)
 
 
 MODEL_INTENT_TYPES = frozenset(
@@ -91,6 +98,56 @@ FORBIDDEN_MODEL_REQUEST_PATTERNS = (
 )
 
 
+RETRIEVAL_INJECTION_PATTERNS = (
+    (
+        "retrieval.delimiter-breakout",
+        re.compile(r"<\s*/?\s*UNTRUSTED_RETRIEVAL\b", re.I),
+    ),
+    (
+        "retrieval.ignore-instructions",
+        re.compile(
+            r"ignore\s+(?:all\s+)?(?:(?:previous|prior)\s+)?"
+            r"(?:(?:system|developer)\s+)?instructions|"
+            r"(?:忽略|覆盖|替代).{0,12}(?:之前|以上|系统|开发者).{0,8}(?:指令|提示词|规则)",
+            re.I,
+        ),
+    ),
+    (
+        "retrieval.authority-rewrite",
+        re.compile(
+            r"(?:将|把|修改).{0,24}"
+            r"(?:requiredRobotGroup|environment|resourceBlock|resourceIds|requestedBy)"
+            r".{0,16}(?:改为|设为|替换|覆盖)",
+            re.I,
+        ),
+    ),
+    (
+        "retrieval.boundary-bypass",
+        re.compile(r"(?:跳过|绕过|禁用|关闭).{0,16}(?:审批|校验|安全边界|白名单)"),
+    ),
+    (
+        "retrieval.hidden-tool",
+        re.compile(
+            r"(?:调用|使用|执行).{0,16}"
+            r"(?:delete_all|commit_intent|write_reservation|production_control)",
+            re.I,
+        ),
+    ),
+    (
+        "retrieval.role-override",
+        re.compile(r"(?:你现在是|system\s*message|developer\s*message).{0,30}(?:助手|模型|agent|智能体)", re.I),
+    ),
+)
+
+_PROHIBITIVE_PREFIX = re.compile(r"(?:不得|禁止|严禁|不可|不能|切勿|不要)\s*$")
+
+
+@dataclass(frozen=True)
+class RetrievalScreening:
+    accepted: list[EvidenceItem]
+    quarantined: list[tuple[EvidenceItem, str]]
+
+
 class ModelBoundaryError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
@@ -113,6 +170,45 @@ def model_request_violation(text: str) -> str | None:
         ),
         None,
     )
+
+
+def retrieval_content_violation(text: str) -> str | None:
+    """Detect instruction-shaped content without treating safety prose as an attack."""
+
+    normalized = " ".join(text.strip().split())
+    for code, pattern in RETRIEVAL_INJECTION_PATTERNS:
+        for match in pattern.finditer(normalized):
+            prefix = normalized[max(0, match.start() - 8) : match.start()]
+            if _PROHIBITIVE_PREFIX.search(prefix):
+                continue
+            return code
+    return None
+
+
+def screen_retrieved_evidence(evidence: Iterable[EvidenceItem]) -> RetrievalScreening:
+    accepted: list[EvidenceItem] = []
+    quarantined: list[tuple[EvidenceItem, str]] = []
+    for row in evidence:
+        violation = retrieval_content_violation(f"{row.title}\n{row.detail}")
+        if violation is None:
+            accepted.append(row)
+        else:
+            quarantined.append((row, violation))
+    return RetrievalScreening(accepted=accepted, quarantined=quarantined)
+
+
+def untrusted_retrieval_record(row: EvidenceItem) -> dict[str, str | float | None]:
+    return {
+        "source": row.source,
+        "title": row.title,
+        "detail": (
+            "<UNTRUSTED_RETRIEVAL>\n"
+            f"{row.detail}\n"
+            "</UNTRUSTED_RETRIEVAL>"
+        ),
+        "chunkId": row.chunk_id,
+        "score": row.score,
+    }
 
 
 def enforce_intent_authority(

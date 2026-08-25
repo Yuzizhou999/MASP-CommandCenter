@@ -56,8 +56,25 @@ class KnowledgeBase:
 
     method = "hybrid-bm25-char-vector-v1"
 
-    def __init__(self, root: Path) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        sparse_weight: float = 0.45,
+        vector_weight: float = 0.10,
+        title_weight: float = 0.45,
+        score_threshold: float = 0.04,
+    ) -> None:
+        weights = (sparse_weight, vector_weight, title_weight)
+        if any(value < 0 for value in weights) or not math.isclose(
+            sum(weights), 1.0, abs_tol=1e-9
+        ):
+            raise ValueError("检索权重必须非负且总和为 1")
         self.root = root
+        self.sparse_weight = sparse_weight
+        self.vector_weight = vector_weight
+        self.title_weight = title_weight
+        self.score_threshold = score_threshold
         self.chunks = self._load()
         self._tokens = [Counter(self._terms(self._document(chunk))) for chunk in self.chunks]
         self._lengths = [sum(row.values()) for row in self._tokens]
@@ -193,9 +210,12 @@ class KnowledgeBase:
                 len(title_terms), 1
             )
             score = min(
-                1.0, 0.68 * sparse + 0.24 * vector + 0.08 * title_overlap
+                1.0,
+                self.sparse_weight * sparse
+                + self.vector_weight * vector
+                + self.title_weight * title_overlap,
             )
-            if score >= 0.04:
+            if score >= self.score_threshold:
                 ranked.append((score, sparse, vector, chunk))
         ranked.sort(
             key=lambda item: (-item[0], -item[1], -item[2], item[3].source)

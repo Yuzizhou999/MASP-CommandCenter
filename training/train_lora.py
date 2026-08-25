@@ -75,6 +75,64 @@ class TokenizedJsonlDataset:
         return self.rows[index]
 
 
+def tokenize_conversation(
+    tokenizer: Any,
+    messages: list[dict[str, str]],
+    *,
+    max_length: int,
+    supervise_assistant_indices: list[int] | None = None,
+) -> dict[str, Any]:
+    """Tokenize a transcript while supervising selected assistant turns."""
+
+    full_ids = list(
+        tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=False,
+        )
+    )
+    labels = [-100] * len(full_ids)
+    assistant_ordinal = 0
+    selected = (
+        set(supervise_assistant_indices)
+        if supervise_assistant_indices is not None
+        else None
+    )
+    for message_index, message in enumerate(messages):
+        if message.get("role") != "assistant":
+            continue
+        should_supervise = selected is None or assistant_ordinal in selected
+        if should_supervise:
+            prompt_ids = list(
+                tokenizer.apply_chat_template(
+                    messages[:message_index],
+                    tokenize=True,
+                    add_generation_prompt=True,
+                )
+            )
+            through_ids = list(
+                tokenizer.apply_chat_template(
+                    messages[: message_index + 1],
+                    tokenize=True,
+                    add_generation_prompt=False,
+                )
+            )
+            start = min(len(prompt_ids), len(full_ids))
+            end = min(len(through_ids), len(full_ids))
+            labels[start:end] = full_ids[start:end]
+        assistant_ordinal += 1
+
+    input_ids = full_ids[:max_length]
+    labels = labels[:max_length]
+    if all(value == -100 for value in labels):
+        raise ValueError("样本截断后没有保留受监督的 assistant token，请增大 maxLength")
+    return {
+        "input_ids": input_ids,
+        "attention_mask": [1] * len(input_ids),
+        "labels": labels,
+    }
+
+
 def _arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="使用 QLoRA 微调 MASP 意图模型")
     parser.add_argument("dataset_dir", type=Path)
@@ -87,6 +145,9 @@ def _arguments() -> argparse.Namespace:
         "--output-dir", type=Path, default=Path("models/masp-intent-lora")
     )
     parser.add_argument("--resume-from-checkpoint", type=str, default=None)
+    parser.add_argument("--max-train-samples", type=int, default=None)
+    parser.add_argument("--max-valid-samples", type=int, default=None)
+    parser.add_argument("--max-steps", type=int, default=-1)
     return parser.parse_args()
 
 
@@ -156,35 +217,13 @@ def main() -> None:
     max_length = int(config["maxLength"])
 
     def tokenize(row: dict[str, Any]) -> dict[str, Any]:
-        messages = row["messages"]
-        prompt = tokenizer.apply_chat_template(
-            messages[:-1], tokenize=False, add_generation_prompt=True
-        )
-        full = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=False
-        )
-        prompt_ids = tokenizer(
-            prompt,
-            add_special_tokens=False,
-            truncation=True,
+        metadata = row.get("metadata") or {}
+        return tokenize_conversation(
+            tokenizer,
+            row["messages"],
             max_length=max_length,
-        )["input_ids"]
-        encoded = tokenizer(
-            full,
-            add_special_tokens=False,
-            truncation=True,
-            max_length=max_length,
+            supervise_assistant_indices=metadata.get("superviseAssistantIndices"),
         )
-        labels = list(encoded["input_ids"])
-        prompt_length = min(len(prompt_ids), len(labels))
-        labels[:prompt_length] = [-100] * prompt_length
-        if all(value == -100 for value in labels):
-            raise ValueError("样本截断后没有保留 assistant token，请增大 maxLength")
-        return {
-            "input_ids": encoded["input_ids"],
-            "attention_mask": encoded["attention_mask"],
-            "labels": labels,
-        }
 
     train_rows = [
         json.loads(line)
@@ -196,6 +235,10 @@ def main() -> None:
         for line in valid_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+    if args.max_train_samples is not None:
+        train_rows = train_rows[: max(1, args.max_train_samples)]
+    if args.max_valid_samples is not None:
+        valid_rows = valid_rows[: max(1, args.max_valid_samples)]
     tokenized_train = TokenizedJsonlDataset([tokenize(row) for row in train_rows])
     tokenized_valid = TokenizedJsonlDataset([tokenize(row) for row in valid_rows])
     output_dir = args.output_dir.resolve()
@@ -222,6 +265,7 @@ def main() -> None:
         seed=int(config["seed"]),
         data_seed=int(config["seed"]),
         remove_unused_columns=False,
+        max_steps=args.max_steps,
     )
     trainer = deps["Trainer"](
         model=model,
@@ -243,16 +287,27 @@ def main() -> None:
         for key, value in {**train_result.metrics, **evaluation}.items()
         if isinstance(value, (int, float))
     }
+    metrics["gpuMaxMemoryAllocatedMb"] = round(
+        float(torch.cuda.max_memory_allocated()) / (1024 * 1024), 3
+    )
     model_card = {
         "schemaVersion": 1,
-        "modelId": "masp-intent-lora",
-        "version": "0.1.0",
+        "modelId": config.get("modelId", "masp-intent-lora"),
+        "version": config.get("version", "0.1.0"),
         "baseModel": config["baseModel"],
-        "trainingMethod": "QLoRA-SFT-completion-only",
+        "trainingMethod": config.get(
+            "trainingMethod", "QLoRA-SFT-multi-turn-assistant-actions"
+        ),
         "datasetVersion": manifest["datasetId"],
         "adapterFile": adapter_file.name,
         "adapterSha256": _sha256(adapter_file),
         "status": "candidate",
+        "runScope": "sanity" if args.max_steps > 0 else "full",
+        "sampleLimits": {
+            "train": args.max_train_samples,
+            "valid": args.max_valid_samples,
+            "maxSteps": args.max_steps,
+        },
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "metrics": metrics,
     }

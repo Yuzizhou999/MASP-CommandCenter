@@ -164,26 +164,39 @@ export interface AgentTraceStep {
   state:
     | "RECEIVED"
     | "PLANNING"
+    | "DECIDING"
+    | "OBSERVING"
     | "CONTEXT_GATHERING"
     | "PARAMETER_RESOLUTION"
     | "INTENT_DRAFTING"
+    | "REPAIRING"
     | "SAFETY_VALIDATION"
     | "CLARIFICATION_REQUIRED"
+    | "BLOCKED"
+    | "BUDGET_EXCEEDED"
     | "COMPLETED";
-  status: "COMPLETED" | "BLOCKED" | "FAILED";
+  status: "COMPLETED" | "BLOCKED" | "FAILED" | "REJECTED";
   title: string;
   detail: string;
   toolName?: string | null;
   readOnly?: boolean | null;
+  action?: string | null;
+  observationCode?: string | null;
+  attempt?: number | null;
+  promptTokens: number;
+  completionTokens: number;
   durationMs: number;
 }
 
 export interface AgentExecutionTrace {
-  strategy: "MODEL_TOOL_CALLING" | "DETERMINISTIC_POLICY";
+  strategy: "MODEL_TOOL_CALLING" | "DETERMINISTIC_POLICY" | "ACTION_PROTOCOL_LOOP";
   plannerModel: string;
-  status: "COMPLETED" | "CLARIFICATION_REQUIRED" | "FAILED";
+  status: "COMPLETED" | "CLARIFICATION_REQUIRED" | "BLOCKED" | "BUDGET_EXCEEDED" | "FAILED";
   maxSteps: number;
   durationMs: number;
+  budgets: Record<string, number>;
+  usage: Record<string, number>;
+  terminalReason?: string | null;
   steps: AgentTraceStep[];
 }
 
@@ -192,8 +205,8 @@ export interface AgentMetricEvent {
   conversationId: string;
   scenarioId: string;
   createdAt: string;
-  status: "COMPLETED" | "CLARIFICATION_REQUIRED" | "FAILED";
-  strategy: "MODEL_TOOL_CALLING" | "DETERMINISTIC_POLICY";
+  status: "COMPLETED" | "CLARIFICATION_REQUIRED" | "BLOCKED" | "BUDGET_EXCEEDED" | "FAILED";
+  strategy: "MODEL_TOOL_CALLING" | "DETERMINISTIC_POLICY" | "ACTION_PROTOCOL_LOOP";
   plannerModel: string;
   intentModel: string;
   fallbackUsed: boolean;
@@ -223,7 +236,7 @@ export interface AgentMetricsSummary {
 export interface ChatResponse {
   traceId: string;
   conversationId: string;
-  state: "READY" | "CLARIFICATION_REQUIRED";
+  state: "READY" | "CLARIFICATION_REQUIRED" | "BLOCKED" | "BUDGET_EXCEEDED";
   message: string;
   intent?: DispatchIntent | null;
   validation?: Validation | null;

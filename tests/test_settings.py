@@ -67,3 +67,15 @@ def test_settings_rejects_unknown_llm_provider(tmp_path: Path, monkeypatch) -> N
 
     with pytest.raises(ValueError, match="LLM_PROVIDER"):
         Settings.load()
+
+
+def test_settings_default_to_frozen_linear_runtime(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _prepare_root(tmp_path)
+    monkeypatch.setattr(settings_module, "ROOT", tmp_path)
+    monkeypatch.delenv("AGENT_RUNTIME_MODE", raising=False)
+
+    settings = Settings.load()
+
+    assert settings.agent_runtime_mode == "linear"

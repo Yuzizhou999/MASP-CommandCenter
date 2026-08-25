@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from time import monotonic, sleep
 
 from command_center.agent_run_manager import AgentRunManager
@@ -56,6 +57,45 @@ def _wait_for(manager: AgentRunManager, run_id: str, statuses: set[str]):
             return record
         sleep(0.02)
     raise AssertionError(f"Agent run did not reach {statuses}: {manager.get(run_id).status}")
+
+
+def test_sqlite_store_completes_50_concurrent_runs(isolated_settings) -> None:
+    manager = _manager(isolated_settings)
+
+    def create(index: int):
+        return manager.create(
+            AgentRunCreateRequest(
+                message="当前车辆和任务状态怎么样？",
+                scenarioId="interactive-multi-fleet",
+                conversationId=f"sqlite-concurrent-{index}",
+                timeoutSeconds=30,
+            ),
+            idempotency_key=f"sqlite-concurrent-{index}",
+        )
+
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        created = list(executor.map(create, range(50)))
+    deadline = monotonic() + 30
+    pending = {row.run_id for row in created}
+    while pending and monotonic() < deadline:
+        pending = {
+            run_id
+            for run_id in pending
+            if manager.get(run_id).status not in {"COMPLETED", "FAILED"}
+        }
+        if pending:
+            sleep(0.02)
+
+    assert not pending
+    records = [manager.get(row.run_id) for row in created]
+    assert len({row.run_id for row in records}) == 50
+    assert all(row.status == "COMPLETED" for row in records)
+    assert all(
+        [event.event_id for event in row.events]
+        == list(range(1, len(row.events) + 1))
+        for row in records
+    )
+    manager.shutdown()
 
 
 def test_async_agent_run_is_idempotent_persistent_and_evaluated(

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-25T12:26:16.179958+00:00",
+  "baselineRef": "96406f7",
+  "configuration": {
+    "runs": 50,
+    "workers": 12
+  },
+  "baseline": {
+    "label": "json-baseline",
+    "runCount": 50,
+    "completed": 50,
+    "failed": 0,
+    "timedOut": 0,
+    "totalMs": 32156.322,
+    "throughputRunsPerSecond": 1.555,
+    "meanCompletionMs": 17043.782,
+    "p95CompletionMs": 29924.927,
+    "storageBytes": 2091505
+  },
+  "candidate": {
+    "label": "sqlite-wal",
+    "runCount": 50,
+    "completed": 50,
+    "failed": 0,
+    "timedOut": 0,
+    "totalMs": 8279.472,
+    "throughputRunsPerSecond": 6.039,
+    "meanCompletionMs": 5022.699,
+    "p95CompletionMs": 7895.59,
+    "storageBytes": 1519616
+  },
+  "speedup": 3.884
+}

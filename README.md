@@ -1,5 +1,7 @@
 # 保利智仓·灵枢
 
+[![CI](https://github.com/Yuzizhou999/MASP-CommandCenter/actions/workflows/ci.yml/badge.svg)](https://github.com/Yuzizhou999/MASP-CommandCenter/actions/workflows/ci.yml)
+
 面向多车型智能仓储的 AI 调度指挥中心。系统使用 DeepSeek 或本地 Qwen 微调模型将自然语言请求转换为结构化调度意图，再由 MASP 数字孪生完成路径规划、资源预约、安全校验、What-if 仿真和指标计算。
 
 当前版本是仿真验证系统，只允许在 `simulation` 环境提交意图，不连接真实 WMS、RCS 或车辆控制器。
@@ -7,8 +9,11 @@
 ## 核心能力
 
 - 自然语言紧急插单、通道封锁、状态查询和报告生成；
-- 有界 Agent 状态机、DeepSeek 兼容 Tool Calling 和逐步执行轨迹；
+- `linear` v1 与有界 observe-decide-act `loop` 双运行模式，工具结果会进入下一轮模型决策；
+- DeepSeek 原生 Tool Calling、本地 Qwen 单动作 JSON 协议和确定性 fallback 共用同一执行引擎；
+- MASP verifier 可修复问题最多回送模型两次，越权、审批、过期版本和未知问题直接阻断；
 - 服务端工具白名单，模型只能选择只读上下文工具，安全校验不可跳过；
+- 检索内容使用不可信边界、注入扫描和隔离记录，最终仍由权威实体覆盖与 MASP 校验兜底；
 - BM25 与字符特征向量混合检索，证据包含稳定 chunk ID、相关度和检索方法；
 - 结构化会话记忆，只保存已确认实体、最近意图、风险和工具轨迹；
 - Agent 完成率、工具规划率、降级率、P95 延迟和工具分布观测；
@@ -17,7 +22,7 @@
 - DeepSeek 重试与熔断、Token/成本统计和逐条轨迹评测；
 - 缺失站点、车型或资源时进入多轮澄清，不使用默认实体补齐；
 - DeepSeek API 调用，未配置密钥或 API 异常时自动使用确定性本地解析；
-- 基于 Qwen2.5-1.5B-Instruct 的 4-bit QLoRA 意图微调、版本登记、本地兼容 API 和离线评测；
+- 基于 Qwen2.5-1.5B-Instruct 的 4-bit 多轮 QLoRA、版本登记、本地兼容 API、轨迹回放和离线晋级评测；
 - 可从场景包自动生成或在画布手工配置路网、工位、车辆和任务流；
 - 多车型车辆轨迹、任务路径和资源封锁时窗回放；
 - 可配置车辆规模、任务负载、车型、策略和随机种子的确定性仿真；
@@ -51,11 +56,11 @@ E:\project\MASP-CommandCenter   灵枢应用、智能体、治理和前端
 |---|---|
 | 交互层 | React 19、TypeScript、Fluent UI、Vite |
 | 应用服务 | FastAPI、Pydantic v2、JSON API |
-| 智能体 | 有界状态机、DeepSeek Tool Calling、Qwen QLoRA 意图模型、Pydantic 强类型工具、本地确定性降级 |
+| 智能体 | observe-decide-act 回路、单动作协议、DeepSeek Tool Calling、Qwen QLoRA、Pydantic 强类型工具、确定性 verifier |
 | 治理 | 风险分级、审批、世界版本、审计、仿真态提交 |
 | 数字孪生 | MASP 在线调度、路径规划、资源预约、事件回放 |
 | 数据与评测 | 混合知识检索、结构化记忆、Agent 观测、矩阵评测、安全门槛、脱敏质检 |
-| 存储 | JSON/JSONL 本地存储，运行结果按 run 和 benchmark 独立落盘 |
+| 存储 | SQLite WAL Agent run 与 append-only event、JSONL 审计，仿真结果按 run 和 benchmark 独立落盘 |
 
 大模型只负责理解和解释。路径、资源预约、冲突判断、方案指标全部来自 MASP 确定性引擎。故障诊断中的每条根因与建议必须引用真实 `EV-*` 证据，虚构证据、车辆、任务或越权动作会使整份 AI 报告降级为规则诊断。
 
@@ -109,7 +114,20 @@ DEEPSEEK_TIMEOUT_SECONDS=30
 
 项目提供从锁定 MASP 场景生成数据、QLoRA 训练、模型卡登记、OpenAI-compatible 本地服务和 holdout 评测的完整链路。默认基座为 `Qwen/Qwen2.5-1.5B-Instruct`，适配 8GB 显存单卡。
 
-本地模型只负责 `DispatchIntent` 解析；工具规划、路径、预约、校验、仿真、审批和车辆控制均不交给该模型。完整命令和验收指标见 [大模型微调指南](docs/LLM_FINETUNING.md)。
+冻结的 v1 adapter 只负责 `DispatchIntent` 解析，当前仍是默认的 `linear` 模型。v2 候选 adapter 学习 `CALL_TOOL`、`REQUEST_CLARIFICATION`、`PROPOSE_INTENT` 单动作协议；它已完成正式训练和真实评测，但没有通过晋级门槛，因此只作为候选工件保留。路径、预约、校验、仿真、审批和车辆控制始终不交给模型。完整命令和晋级指标见 [大模型微调指南](docs/LLM_FINETUNING.md)。
+
+运行模式与预算可通过 `.env` 配置：
+
+```dotenv
+AGENT_RUNTIME_MODE=linear
+AGENT_MAX_DECISIONS=8
+AGENT_MAX_TOOL_CALLS=6
+AGENT_MAX_REPAIR_ATTEMPTS=2
+AGENT_MAX_TOTAL_TOKENS=8192
+AGENT_MAX_ESTIMATED_COST_USD=0.25
+AGENT_MAX_LATENCY_MS=30000
+AGENT_MAX_STEPS=48
+```
 
 ## 配置群车策略模型
 
@@ -207,7 +225,7 @@ checkpoint 必须带有 MASP 定义的版本、观测、动作、奖励和优先
 
 Agent 会话记忆写入 `data/agent-memories.json`，不保存模型自由文本；匿名化运行指标追加到 `data/agent-metrics.jsonl`，不包含用户提示词和模型回复。
 
-可恢复 Agent 运行写入 `data/agent-runs.json`。运行请求、步骤、审批决定、终态结果和轨迹评测用于进程重启恢复与 SSE 重连；该文件属于本地运行数据，不进入 Git。
+可恢复 Agent 运行写入 `data/agent-runs.sqlite3`。每个 run 独立事务更新，事件进入 append-only 表并启用 WAL；首次启动会自动导入旧 `agent-runs.json`。该数据库属于本地运行数据，不进入 Git。
 
 ## 文档
 

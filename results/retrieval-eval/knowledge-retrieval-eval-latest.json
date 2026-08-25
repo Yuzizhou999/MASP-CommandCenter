@@ -1,0 +1,1262 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "knowledge-retrieval-v1",
+  "goldSource": "manual-independent-annotation",
+  "generatedAt": "2026-08-25T12:30:34.185263+00:00",
+  "caseCount": 24,
+  "baseline": {
+    "weights": {
+      "sparse": 0.68,
+      "vector": 0.24,
+      "title": 0.08,
+      "threshold": 0.04
+    },
+    "recallAt1": 0.75,
+    "recallAt3": 0.979167,
+    "mrr": 0.888889,
+    "cases": [
+      {
+        "caseId": "KB-FAULT-01",
+        "query": "坏车以后怎么安全处理",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-02",
+        "query": "车辆故障时先停车还是先重派任务",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-03",
+        "query": "装着货的叉车出故障怎么处置",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-04",
+        "query": "故障车辆隔离后受影响任务怎么办",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.3333333333333333
+      },
+      {
+        "caseId": "KB-FAULT-05",
+        "query": "车辆异常需要确认哪些事实",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-06",
+        "query": "AI 能不能直接控制故障车倒退",
+        "expectedSources": [
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 0.5,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-TRAFFIC-01",
+        "query": "共享窄路检修怎么封闭",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-02",
+        "query": "通道拥堵时需要检查哪些资源预约",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/task-dispatch.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-03",
+        "query": "工位停用后任务如何处理",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/task-dispatch.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-04",
+        "query": "等待环死锁恢复需要什么步骤",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-05",
+        "query": "封路前为什么必须跑数字孪生",
+        "expectedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 0.5,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-06",
+        "query": "卡住的车辆能否受控倒退",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-01",
+        "query": "紧急插单要提供哪些参数",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/task-dispatch.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-02",
+        "query": "叉车任务取货点和放货点怎么填写",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-03",
+        "query": "新增搬运任务要指定车型吗",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/task-dispatch.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-04",
+        "query": "计划提交前要做哪些校验",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-05",
+        "query": "急单如何绑定世界版本",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "security/ai-boundary.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-06",
+        "query": "任务参数不足时能不能让模型猜",
+        "expectedSources": [
+          "security/ai-boundary.md",
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.5,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-01",
+        "query": "大模型禁止执行哪些仓储动作",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-02",
+        "query": "模型工具白名单和审批规则",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-03",
+        "query": "为什么 AI 不能直接写资源预约",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-AI-04",
+        "query": "模型输出需要哪些确定性数据依据",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-05",
+        "query": "生产环境控制权能交给大模型吗",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-AI-06",
+        "query": "跳过主管审批直接执行是否允许",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.5
+      }
+    ]
+  },
+  "configured": {
+    "weights": {
+      "sparse": 0.45,
+      "vector": 0.1,
+      "title": 0.45,
+      "threshold": 0.04
+    },
+    "recallAt1": 0.791667,
+    "recallAt3": 0.979167,
+    "mrr": 0.916667,
+    "cases": [
+      {
+        "caseId": "KB-FAULT-01",
+        "query": "坏车以后怎么安全处理",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-02",
+        "query": "车辆故障时先停车还是先重派任务",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-03",
+        "query": "装着货的叉车出故障怎么处置",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-04",
+        "query": "故障车辆隔离后受影响任务怎么办",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-FAULT-05",
+        "query": "车辆异常需要确认哪些事实",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-06",
+        "query": "AI 能不能直接控制故障车倒退",
+        "expectedSources": [
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 0.5,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-TRAFFIC-01",
+        "query": "共享窄路检修怎么封闭",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-02",
+        "query": "通道拥堵时需要检查哪些资源预约",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/task-dispatch.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-03",
+        "query": "工位停用后任务如何处理",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/task-dispatch.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-04",
+        "query": "等待环死锁恢复需要什么步骤",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-05",
+        "query": "封路前为什么必须跑数字孪生",
+        "expectedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 0.5,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-06",
+        "query": "卡住的车辆能否受控倒退",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-01",
+        "query": "紧急插单要提供哪些参数",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/task-dispatch.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-02",
+        "query": "叉车任务取货点和放货点怎么填写",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-03",
+        "query": "新增搬运任务要指定车型吗",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/task-dispatch.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-04",
+        "query": "计划提交前要做哪些校验",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-05",
+        "query": "急单如何绑定世界版本",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-06",
+        "query": "任务参数不足时能不能让模型猜",
+        "expectedSources": [
+          "security/ai-boundary.md",
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 0.5,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-01",
+        "query": "大模型禁止执行哪些仓储动作",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-02",
+        "query": "模型工具白名单和审批规则",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-03",
+        "query": "为什么 AI 不能直接写资源预约",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-AI-04",
+        "query": "模型输出需要哪些确定性数据依据",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-05",
+        "query": "生产环境控制权能交给大模型吗",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-AI-06",
+        "query": "跳过主管审批直接执行是否允许",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      }
+    ]
+  },
+  "recommended": {
+    "weights": {
+      "sparse": 0.45,
+      "vector": 0.1,
+      "title": 0.45,
+      "threshold": 0.04
+    },
+    "recallAt1": 0.791667,
+    "recallAt3": 0.979167,
+    "mrr": 0.916667,
+    "cases": [
+      {
+        "caseId": "KB-FAULT-01",
+        "query": "坏车以后怎么安全处理",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-02",
+        "query": "车辆故障时先停车还是先重派任务",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-03",
+        "query": "装着货的叉车出故障怎么处置",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-04",
+        "query": "故障车辆隔离后受影响任务怎么办",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-FAULT-05",
+        "query": "车辆异常需要确认哪些事实",
+        "expectedSources": [
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/vehicle-fault.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-FAULT-06",
+        "query": "AI 能不能直接控制故障车倒退",
+        "expectedSources": [
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 0.5,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-TRAFFIC-01",
+        "query": "共享窄路检修怎么封闭",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-02",
+        "query": "通道拥堵时需要检查哪些资源预约",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/task-dispatch.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-03",
+        "query": "工位停用后任务如何处理",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/task-dispatch.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-04",
+        "query": "等待环死锁恢复需要什么步骤",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-05",
+        "query": "封路前为什么必须跑数字孪生",
+        "expectedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 0.5,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TRAFFIC-06",
+        "query": "卡住的车辆能否受控倒退",
+        "expectedSources": [
+          "sop/traffic-and-deadlock.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-01",
+        "query": "紧急插单要提供哪些参数",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/task-dispatch.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-02",
+        "query": "叉车任务取货点和放货点怎么填写",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/traffic-and-deadlock.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-03",
+        "query": "新增搬运任务要指定车型吗",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "sop/task-dispatch.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-04",
+        "query": "计划提交前要做哪些校验",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-05",
+        "query": "急单如何绑定世界版本",
+        "expectedSources": [
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-TASK-06",
+        "query": "任务参数不足时能不能让模型猜",
+        "expectedSources": [
+          "security/ai-boundary.md",
+          "sop/task-dispatch.md"
+        ],
+        "retrievedSources": [
+          "sop/task-dispatch.md",
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md"
+        ],
+        "recallAt1": 0.5,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-01",
+        "query": "大模型禁止执行哪些仓储动作",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-02",
+        "query": "模型工具白名单和审批规则",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-03",
+        "query": "为什么 AI 不能直接写资源预约",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-AI-04",
+        "query": "模型输出需要哪些确定性数据依据",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      },
+      {
+        "caseId": "KB-AI-05",
+        "query": "生产环境控制权能交给大模型吗",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "sop/traffic-and-deadlock.md",
+          "security/ai-boundary.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 0.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 0.5
+      },
+      {
+        "caseId": "KB-AI-06",
+        "query": "跳过主管审批直接执行是否允许",
+        "expectedSources": [
+          "security/ai-boundary.md"
+        ],
+        "retrievedSources": [
+          "security/ai-boundary.md",
+          "sop/vehicle-fault.md",
+          "sop/traffic-and-deadlock.md"
+        ],
+        "recallAt1": 1.0,
+        "recallAt3": 1.0,
+        "reciprocalRank": 1.0
+      }
+    ]
+  },
+  "qualification": {
+    "checks": {
+      "recallAt1": {
+        "minimum": 0.79,
+        "actual": 0.791667,
+        "passed": true
+      },
+      "recallAt3": {
+        "minimum": 0.97,
+        "actual": 0.979167,
+        "passed": true
+      },
+      "mrr": {
+        "minimum": 0.91,
+        "actual": 0.916667,
+        "passed": true
+      }
+    },
+    "passed": true
+  },
+  "gridSize": 88,
+  "ranking": [
+    {
+      "weights": {
+        "sparse": 0.45,
+        "vector": 0.1,
+        "title": 0.45,
+        "threshold": 0.04
+      },
+      "recallAt1": 0.791667,
+      "recallAt3": 0.979167,
+      "mrr": 0.916667
+    },
+    {
+      "weights": {
+        "sparse": 0.45,
+        "vector": 0.18,
+        "title": 0.37,
+        "threshold": 0.04
+      },
+      "recallAt1": 0.791667,
+      "recallAt3": 0.979167,
+      "mrr": 0.916667
+    },
+    {
+      "weights": {
+        "sparse": 0.45,
+        "vector": 0.1,
+        "title": 0.45,
+        "threshold": 0.06
+      },
+      "recallAt1": 0.791667,
+      "recallAt3": 0.979167,
+      "mrr": 0.916667
+    },
+    {
+      "weights": {
+        "sparse": 0.45,
+        "vector": 0.18,
+        "title": 0.37,
+        "threshold": 0.06
+      },
+      "recallAt1": 0.791667,
+      "recallAt3": 0.979167,
+      "mrr": 0.916667
+    },
+    {
+      "weights": {
+        "sparse": 0.45,
+        "vector": 0.1,
+        "title": 0.45,
+        "threshold": 0.02
+      },
+      "recallAt1": 0.791667,
+      "recallAt3": 0.979167,
+      "mrr": 0.916667
+    },
+    {
+      "weights": {
+        "sparse": 0.45,
+        "vector": 0.18,
+        "title": 0.37,
+        "threshold": 0.02
+      },
+      "recallAt1": 0.791667,
+      "recallAt3": 0.979167,
+      "mrr": 0.916667
+    },
+    {
+      "weights": {
+        "sparse": 0.45,
+        "vector": 0.1,
+        "title": 0.45,
+        "threshold": 0.08
+      },
+      "recallAt1": 0.791667,
+      "recallAt3": 0.979167,
+      "mrr": 0.916667
+    },
+    {
+      "weights": {
+        "sparse": 0.45,
+        "vector": 0.18,
+        "title": 0.37,
+        "threshold": 0.08
+      },
+      "recallAt1": 0.791667,
+      "recallAt3": 0.979167,
+      "mrr": 0.916667
+    },
+    {
+      "weights": {
+        "sparse": 0.55,
+        "vector": 0.1,
+        "title": 0.35,
+        "threshold": 0.04
+      },
+      "recallAt1": 0.75,
+      "recallAt3": 0.979167,
+      "mrr": 0.895833
+    },
+    {
+      "weights": {
+        "sparse": 0.45,
+        "vector": 0.24,
+        "title": 0.31,
+        "threshold": 0.04
+      },
+      "recallAt1": 0.75,
+      "recallAt3": 0.979167,
+      "mrr": 0.895833
+    }
+  ]
+}

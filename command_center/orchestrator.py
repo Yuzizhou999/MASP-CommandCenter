@@ -5,6 +5,8 @@ from typing import Callable
 
 from .agent_memory import AgentMemoryStore
 from .agent_observability import AgentObservabilityStore
+from .agent_loop import AgentLoopExecutor
+from .agent_protocol import AgentBudgets
 from .agent_runtime import AgentState, BoundedAgentRun
 from .agent_tools import DispatchAgentTools
 from .audit import AuditStore
@@ -20,6 +22,7 @@ from .contracts import (
 )
 from .engine_adapter import MaspAdapter
 from .knowledge import KnowledgeBase
+from .model_safety import model_request_violation
 from .provider import DeepSeekProvider
 
 
@@ -34,6 +37,8 @@ class DispatchOrchestrator:
         clarifications: ClarificationResolver | None = None,
         memory: AgentMemoryStore | None = None,
         observability: AgentObservabilityStore | None = None,
+        runtime_mode: str = "linear",
+        budgets: AgentBudgets | None = None,
     ) -> None:
         self.engine = engine
         self.provider = provider
@@ -48,8 +53,116 @@ class DispatchOrchestrator:
         self.clarifications = clarifications or ClarificationResolver(
             ClarificationStore(engine.settings.data_dir / "clarifications.json"), engine
         )
+        if runtime_mode not in {"linear", "loop"}:
+            raise ValueError("Agent runtime_mode 必须是 linear 或 loop")
+        self.runtime_mode = runtime_mode
+        self.budgets = budgets or AgentBudgets()
+        self.loop = AgentLoopExecutor(
+            engine=engine,
+            provider=provider,
+            knowledge=knowledge,
+            audit=audit,
+            clarifications=self.clarifications,
+            memory=self.memory,
+            observability=self.observability,
+            budgets=self.budgets,
+        )
 
     def chat(
+        self,
+        request: ChatRequest,
+        *,
+        on_step: Callable[[AgentTraceStep], None] | None = None,
+        approval_gate: Callable[[DispatchIntent, IntentValidation], None] | None = None,
+    ) -> ChatResponse:
+        mode = request.agent_mode or self.runtime_mode
+        if model_request_violation(request.message) is not None:
+            return self._blocked_request_response(request, mode=mode, on_step=on_step)
+        if mode == "loop":
+            return self.loop.chat(
+                request,
+                on_step=on_step,
+                approval_gate=approval_gate,
+            )
+        return self._chat_linear(
+            request,
+            on_step=on_step,
+            approval_gate=approval_gate,
+        )
+
+    def _blocked_request_response(
+        self,
+        request: ChatRequest,
+        *,
+        mode: str,
+        on_step: Callable[[AgentTraceStep], None] | None,
+    ) -> ChatResponse:
+        trace_id = new_id("trace")
+        run = BoundedAgentRun(
+            max_steps=self.budgets.max_steps if mode == "loop" else 16,
+            reserve_terminal_step=True,
+            on_step=on_step,
+        )
+        run.set_planner(
+            strategy="ACTION_PROTOCOL_LOOP" if mode == "loop" else "DETERMINISTIC_POLICY",
+            model="deterministic-safety-boundary",
+        )
+        run.transition(
+            AgentState.RECEIVED,
+            title="接收调度请求",
+            detail=f"已绑定会话 {request.conversation_id} 和场景 {request.scenario_id}",
+        )
+        run.transition(
+            AgentState.BLOCKED,
+            title="确定性安全边界阻断请求",
+            detail="请求试图绕过审批、仿真或 simulation 环境边界",
+            status="BLOCKED",
+            observation_code="policy.user_request_blocked",
+        )
+        run.set_budget_summary(
+            budgets=(
+                self.budgets.model_dump(by_alias=True, mode="json")
+                if mode == "loop"
+                else {}
+            ),
+            usage={},
+            terminal_reason="policy.user_request_blocked",
+        )
+        trace = run.build_trace()
+        self.observability.record(
+            trace_id=trace_id,
+            conversation_id=request.conversation_id,
+            scenario_id=request.scenario_id,
+            trace=trace,
+            model="deterministic-safety-boundary",
+            fallback_used=False,
+            validation=None,
+        )
+        response = ChatResponse(
+            traceId=trace_id,
+            conversationId=request.conversation_id,
+            state="BLOCKED",
+            message="请求被确定性安全边界阻断，不能绕过仿真、审批或环境限制。",
+            model="deterministic-safety-boundary",
+            fallbackUsed=False,
+            suggestedActions=["查看安全边界", "修改请求"],
+            agentTrace=trace,
+        )
+        self.audit.append(
+            trace_id=trace_id,
+            event_type="AGENT_REQUEST_BLOCKED",
+            actor=request.requested_by,
+            payload={
+                "request": request.message,
+                "scenarioId": request.scenario_id,
+                "mode": mode,
+                "reason": "policy.user_request_blocked",
+                "agentTrace": trace.model_dump(by_alias=True, mode="json"),
+            },
+        )
+        return response
+
+    def _chat_linear(
         self,
         request: ChatRequest,
         *,
@@ -104,6 +217,13 @@ class DispatchOrchestrator:
                 )
             elif call.name == "search_sop":
                 evidence.extend(result.value)
+                for item in (result.metadata or {}).get("quarantined") or []:
+                    run.record(
+                        title="隔离可疑检索内容",
+                        detail=f"{item['source']}：{item['violation']}",
+                        status="BLOCKED",
+                        observation_code=str(item["violation"]),
+                    )
             elif call.name == "recall_conversation_memory" and result.value is not None:
                 evidence.append(
                     tools.memory_evidence(result.value, request.conversation_id)
