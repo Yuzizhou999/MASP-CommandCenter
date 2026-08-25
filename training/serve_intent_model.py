@@ -54,22 +54,57 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--adapter-dir", type=Path, default=Path("models/masp-intent-lora")
     )
+    parser.add_argument(
+        "--base-model",
+        default=None,
+        help="不加载 adapter，直接提供指定 Hugging Face 基座模型",
+    )
+    parser.add_argument("--model-id", default=None)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--max-new-tokens", type=int, default=384)
     return parser.parse_args()
 
 
-def create_app(adapter_dir: Path, *, max_new_tokens: int = 384):
-    deps = _dependencies()
-    torch = deps["torch"]
+def resolve_model_spec(
+    adapter_dir: Path, *, base_model: str | None = None, model_id: str | None = None
+) -> dict[str, Any]:
+    if base_model:
+        return {
+            "adapterDir": None,
+            "tokenizerSource": base_model,
+            "baseModel": base_model,
+            "modelId": model_id or base_model,
+            "mode": "base-model",
+            "created": int(time()),
+        }
     adapter_dir = adapter_dir.resolve()
     card_path = adapter_dir / "model-card.json"
     if not card_path.is_file():
         raise FileNotFoundError(f"未找到模型卡：{card_path}")
     card = json.loads(card_path.read_text(encoding="utf-8"))
-    model_id = str(card["modelId"])
-    base_model = str(card["baseModel"])
+    return {
+        "adapterDir": adapter_dir,
+        "tokenizerSource": adapter_dir,
+        "baseModel": str(card["baseModel"]),
+        "modelId": model_id or str(card["modelId"]),
+        "mode": "lora-adapter",
+        "created": int(card_path.stat().st_mtime),
+    }
+
+
+def create_app(
+    adapter_dir: Path,
+    *,
+    base_model: str | None = None,
+    model_id: str | None = None,
+    max_new_tokens: int = 384,
+):
+    deps = _dependencies()
+    torch = deps["torch"]
+    spec = resolve_model_spec(
+        adapter_dir, base_model=base_model, model_id=model_id
+    )
     state: dict[str, Any] = {}
     generation_lock = Lock()
 
@@ -81,7 +116,7 @@ def create_app(adapter_dir: Path, *, max_new_tokens: int = 384):
             torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
         )
         tokenizer = deps["AutoTokenizer"].from_pretrained(
-            adapter_dir, trust_remote_code=False
+            spec["tokenizerSource"], trust_remote_code=False
         )
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -92,13 +127,17 @@ def create_app(adapter_dir: Path, *, max_new_tokens: int = 384):
             bnb_4bit_compute_dtype=compute_dtype,
         )
         base = deps["AutoModelForCausalLM"].from_pretrained(
-            base_model,
+            spec["baseModel"],
             torch_dtype=compute_dtype,
             quantization_config=quantization,
             device_map="auto",
             trust_remote_code=False,
         )
-        model = deps["PeftModel"].from_pretrained(base, adapter_dir)
+        model = (
+            deps["PeftModel"].from_pretrained(base, spec["adapterDir"])
+            if spec["adapterDir"] is not None
+            else base
+        )
         model.eval()
         state.update({"tokenizer": tokenizer, "model": model})
         yield
@@ -112,8 +151,9 @@ def create_app(adapter_dir: Path, *, max_new_tokens: int = 384):
     def health() -> dict[str, Any]:
         return {
             "status": "ok" if state else "loading",
-            "model": model_id,
-            "baseModel": base_model,
+            "model": spec["modelId"],
+            "baseModel": spec["baseModel"],
+            "mode": spec["mode"],
         }
 
     @app.get("/v1/models")
@@ -122,9 +162,9 @@ def create_app(adapter_dir: Path, *, max_new_tokens: int = 384):
             "object": "list",
             "data": [
                 {
-                    "id": model_id,
+                    "id": spec["modelId"],
                     "object": "model",
-                    "created": int(card_path.stat().st_mtime),
+                    "created": spec["created"],
                     "owned_by": "masp-command-center",
                 }
             ],
@@ -132,7 +172,7 @@ def create_app(adapter_dir: Path, *, max_new_tokens: int = 384):
 
     @app.post("/v1/chat/completions")
     def chat_completions(request: ChatCompletionRequest) -> dict[str, Any]:
-        if request.model not in {model_id, "masp-intent-lora"}:
+        if request.model != spec["modelId"]:
             raise HTTPException(status_code=404, detail="model not found")
         if not state:
             raise HTTPException(status_code=503, detail="model is loading")
@@ -167,7 +207,7 @@ def create_app(adapter_dir: Path, *, max_new_tokens: int = 384):
             "id": f"chatcmpl-{uuid4().hex[:16]}",
             "object": "chat.completion",
             "created": int(time()),
-            "model": model_id,
+            "model": spec["modelId"],
             "choices": [
                 {
                     "index": 0,
@@ -188,7 +228,12 @@ def create_app(adapter_dir: Path, *, max_new_tokens: int = 384):
 def main() -> None:
     args = _arguments()
     deps = _dependencies()
-    app = create_app(args.adapter_dir, max_new_tokens=args.max_new_tokens)
+    app = create_app(
+        args.adapter_dir,
+        base_model=args.base_model,
+        model_id=args.model_id,
+        max_new_tokens=args.max_new_tokens,
+    )
     deps["uvicorn"].run(app, host=args.host, port=args.port, log_level="info")
 
 

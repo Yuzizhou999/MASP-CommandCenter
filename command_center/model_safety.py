@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Iterable
 
 from .contracts import DiagnosisReport, DispatchIntent, IntentType, PlanExplanationFinding
@@ -30,6 +31,65 @@ FORBIDDEN_MODEL_REQUEST_TERMS = (
     "忽略工具白名单",
 )
 
+FORBIDDEN_MODEL_REQUEST_PATTERNS = (
+    (
+        "boundary-bypass",
+        re.compile(
+            r"(?:绕过|跳过|忽略|别管|不用|不要|别做).{0,16}"
+            r"(?:审批|确认|校验|仿真|规则|约束|工具白名单|what-if)",
+            flags=re.IGNORECASE,
+        ),
+    ),
+    (
+        "route-execution",
+        re.compile(
+            r"(?:规划|生成|安排).{0,16}(?:路线|轨迹).{0,24}(?:下发|执行|控制)"
+        ),
+    ),
+    (
+        "production-switch",
+        re.compile(r"(?:切换|设置|进入|改成).{0,12}(?:生产模式|生产环境)"),
+    ),
+    (
+        "unauthorized-interface",
+        re.compile(r"(?:未公开|未授权|白名单外).{0,20}(?:接口|工具|API)", re.I),
+    ),
+    (
+        "destructive-operation",
+        re.compile(
+            r"(?:清空|删除|删掉).{0,24}(?:任务|数据|数据库)|"
+            r"(?:任务|数据|数据库).{0,24}(?:清空|删除|删掉)"
+        ),
+    ),
+    (
+        "model-vehicle-control",
+        re.compile(r"(?:车辆|车队).{0,12}控制权.{0,12}(?:模型|大模型|AI)", re.I),
+    ),
+    (
+        "reservation-write",
+        re.compile(r"(?:写入|写进|修改).{0,20}(?:预约系统|预约表|资源预约)"),
+    ),
+    (
+        "safety-stop-disable",
+        re.compile(
+            r"(?:解除|取消|关闭).{0,12}(?:安全停车|安全停机)|"
+            r"(?:安全停车|安全停机).{0,12}(?:解除|取消|关闭)"
+        ),
+    ),
+    (
+        "direct-recovery-control",
+        re.compile(
+            r"(?:直接|立即|马上).{0,16}(?:让|控制|命令).{0,16}"
+            r"(?:fork|jack|车辆|车).{0,16}(?:倒车|后退|执行|停车)",
+            re.I,
+        ),
+    ),
+    (
+        "direct-submit",
+        re.compile(r"(?:直接|立即|马上).{0,12}(?:提交|执行).{0,20}(?:任务|意图)"),
+    ),
+)
+
 
 class ModelBoundaryError(ValueError):
     def __init__(self, code: str, message: str) -> None:
@@ -39,8 +99,18 @@ class ModelBoundaryError(ValueError):
 
 def model_request_violation(text: str) -> str | None:
     normalized = " ".join(text.strip().split())
-    return next(
+    exact = next(
         (term for term in FORBIDDEN_MODEL_REQUEST_TERMS if term in normalized),
+        None,
+    )
+    if exact is not None:
+        return exact
+    return next(
+        (
+            code
+            for code, pattern in FORBIDDEN_MODEL_REQUEST_PATTERNS
+            if pattern.search(normalized)
+        ),
         None,
     )
 

@@ -139,6 +139,52 @@ python -m training.evaluate_intent_model data\finetuning\intent-sft-v1 `
 
 模型达到候选标准后，再把模型卡 `status` 从 `candidate` 改为 `active`。不要只用训练 loss 判断模型是否可用。
 
+## 8. 独立挑战集与基座对照
+
+为避免只看训练集或最终降级结果，项目提供不参与训练的人工改写挑战集：
+
+```powershell
+python -m training.evaluate_intent_challenge evals\intent-challenge-v1.json `
+  --base-url http://127.0.0.1:8000/v1 `
+  --model masp-intent-lora `
+  --output data\finetuning\challenge-lora.json
+```
+
+基座对照使用同一个服务入口，但不加载 adapter：
+
+```powershell
+python -m training.serve_intent_model `
+  --base-model Qwen/Qwen2.5-1.5B-Instruct `
+  --model-id qwen2.5-1.5b-base `
+  --host 127.0.0.1 `
+  --port 8000
+```
+
+挑战集包含 50 条均衡的正常请求（5 类意图各 10 条）、10 条越权/危险请求和 10 条缺参澄清请求。评测器记录模型未经修正的原始输出，不会替模型补写任务或资源槽位。结果分为两组：
+
+- `qualification.model`：请求成功率、JSON/schema 有效率、意图宏 F1、槽位匹配、MASP 校验和延迟，衡量微调模型的解析能力；
+- `qualification.system`：模型调用前的确定性安全门召回率和澄清准确率，衡量部署边界；
+- `diagnostics.rawSafetyPassRate`：模型自己拒绝危险请求的比例，仅作诊断，不能作为上线安全依据。
+
+在本机 RTX 5060 Laptop 8GB 显存上，同一挑战集的实测对照如下：
+
+| 指标 | Qwen 基座 | QLoRA adapter |
+| --- | ---: | ---: |
+| JSON 有效率 | 2% | 100% |
+| Schema 有效率 | 2% | 100% |
+| 意图准确率 | 0% | 94% |
+| 意图宏 F1 | 0 | 0.937 |
+| 任务/资源槽位精确率 | 0% | 100% |
+| MASP 校验通过率 | 2% | 98% |
+| P95 延迟 | 8555ms | 6592ms |
+| 模型原始安全率 | 0% | 0% |
+| 确定性安全门召回率 | 100% | 100% |
+| 澄清准确率 | 100% | 100% |
+
+QLoRA 通过模型和系统两组资格门；基座模型只通过系统组。QLoRA 的 50 条正常样本中有 3 条报告请求被分类为其他意图（`RPT-002`、`RPT-003`、`RPT-009`），这是当前已知的模型误差。两份完整 JSON 报告默认写入被 Git 忽略的 `data/finetuning/challenge-*.json`，便于本机复核。
+
+安全结论必须这样表述：模型本身不是可信执行者，危险请求即使被模型解析成 `CREATE_TASK` 或其他结构，也会在模型调用前被确定性安全门拦截，之后仍需 Schema、权威实体覆盖、MASP 校验、What-if 仿真和审批。模型原始安全率为 0% 是有意保留的风险证据，不应隐藏或改写成 100%。
+
 ## 9. 当前已完成实例
 
 本机 RTX 5060 Laptop（8GB 显存）已完成一次真实训练：
@@ -146,13 +192,13 @@ python -m training.evaluate_intent_model data\finetuning\intent-sft-v1 `
 - 数据集：766 条，train/valid/test 为 566/98/102，锁定 MASP 提交 `ab431c9ee3283071d1d13be0a174f2259b671687`；
 - 训练：约 36 分钟，4-bit NF4 QLoRA，2 epochs；Trainer 自动选择第 1 epoch 的最佳 checkpoint；
 - 训练指标：`train_loss=0.006366`，`eval_loss=0.005049`；
-- 端到端测试：模型输出率、Schema 有效率、精确字段匹配率、MASP 有效率、安全 holdout、澄清 holdout 均为 `1.0`；
+- 端到端测试：模型输出率、Schema 有效率、精确字段匹配率、MASP 有效率、安全 holdout、澄清 holdout 均为 `1.0`；这里的安全/澄清指标是经过确定性边界和降级链路后的系统结果，不代表模型原始拒答能力；
 - 本机延迟：平均约 `4855ms`，P95 约 `8582ms`；
 - adapter：`73.9MB`，模型卡状态为 `active`，SHA-256 已由应用健康接口复核。
 
 这组结果只代表当前仿真数据和单机环境，不等价于真实生产收益。训练产物位于被 Git 忽略的 `models/masp-intent-lora/`，重新部署时应通过模型制品仓库或文件包分发，并重新执行模型卡摘要校验。
 
-## 8. 代码入口
+## 10. 代码入口
 
 - `command_center/llm_provider.py`：DeepSeek、本地模型和自动模式路由；
 - `command_center/model_registry.py`：模型卡与 adapter 摘要校验；
@@ -161,3 +207,4 @@ python -m training.evaluate_intent_model data\finetuning\intent-sft-v1 `
 - `training/train_lora.py`：QLoRA 训练；
 - `training/serve_intent_model.py`：本地兼容 API；
 - `training/evaluate_intent_model.py`：测试集、安全集、澄清集与延迟评测。
+- `training/evaluate_intent_challenge.py`：基座与 QLoRA 的独立挑战集评测。

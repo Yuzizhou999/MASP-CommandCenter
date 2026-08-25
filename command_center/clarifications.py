@@ -13,6 +13,7 @@ from .engine_adapter import MaspAdapter
 
 TASK_TERMS = (
     "创建",
+    "新建",
     "新增",
     "插单",
     "安排",
@@ -24,6 +25,7 @@ TASK_TERMS = (
     "转运",
     "搬运",
     "急货",
+    "急活",
     "紧急任务",
 )
 BLOCK_TERMS = ("封闭", "封路", "检修", "停用", "禁行")
@@ -97,10 +99,10 @@ class ClarificationResolver:
 
     @staticmethod
     def _intent_type(message: str, pending: dict[str, Any] | None) -> IntentType | None:
-        if any(term in message for term in TASK_TERMS):
-            return IntentType.CREATE_TASK
         if any(term in message for term in BLOCK_TERMS):
             return IntentType.BLOCK_RESOURCE
+        if any(term in message for term in TASK_TERMS):
+            return IntentType.CREATE_TASK
         if pending is not None and not any(term in message for term in NEW_INTENT_TERMS):
             return IntentType(pending["intentType"])
         return None
