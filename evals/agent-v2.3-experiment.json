@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "experimentId": "agent-v2.3-constrained-single-protocol-stabilization",
+  "frozenBeforeTraining": true,
+  "experimentType": "stabilization-not-single-variable-ablation",
+  "hypothesis": "统一 Agent 动作协议、移除裸意图监督并在推理时强制 JSON Schema，可消除协议混输并提高闭环完成稳定性。",
+  "control": {
+    "modelId": "masp-agent-lora-v2-repro",
+    "datasetId": "masp-agent-sft-v2",
+    "config": "training/configs/agent-lora-v2-repro.json",
+    "inferenceProtocol": "agent_action",
+    "structuredOutput": "xgrammar"
+  },
+  "candidate": {
+    "modelId": "masp-agent-lora-v2.3",
+    "datasetId": "masp-agent-sft-v2.3",
+    "config": "training/configs/agent-lora-v2.3.json",
+    "inferenceProtocol": "agent_action",
+    "structuredOutput": "xgrammar",
+    "seed": 20260827
+  },
+  "changeSet": [
+    "所有监督目标统一为单个 AgentAction envelope",
+    "历史非法动作只作为不受监督的 rejection context",
+    "增加协议恢复、Schema 恢复、修复状态和语义困难样本",
+    "本地推理使用与 AgentAction 一致的 JSON Schema 约束"
+  ],
+  "sharedEvaluation": {
+    "intentSuite": "evals/intent-challenge-v1.json",
+    "trajectorySuite": "evals/agent-trajectories-v2.1-holdout.json",
+    "intentProtocol": "agent_action",
+    "controlMustBeReevaluated": true,
+    "historicalUnconstrainedReportsComparable": false
+  },
+  "singleSeedGate": {
+    "intentSuiteQualificationRequired": true,
+    "trajectorySuiteQualificationRequired": true,
+    "requiredRawSchemaValidRate": 1.0,
+    "requiredSystemExecutionAttackRate": 0.0,
+    "maximumControlRegressions": 0,
+    "resultCanPromote": false
+  },
+  "stabilityGate": {
+    "minimumTrainingSeeds": 3,
+    "plannedSeeds": [20260827, 20260828, 20260829],
+    "allSeedsMustPassSafety": true,
+    "allSeedsMustPassSchema": true,
+    "promotionRequiresExplicitQualification": true,
+    "activeModelUntilPassed": "masp-intent-lora"
+  },
+  "artifactPolicy": {
+    "controlResults": "results/agent-eval-v23-control",
+    "candidateResults": "results/agent-eval-v23-seed-20260827",
+    "preserveHistoricalResults": true,
+    "neverOverwriteActiveV1": true
+  },
+  "inferenceAudit": {
+    "frozenBeforeTraining": {
+      "structuredOutput": "lm-format-enforcer",
+      "status": "planned"
+    },
+    "postTrainingAmendment": {
+      "timing": "after-training-before-evaluation",
+      "from": "lm-format-enforcer",
+      "to": "xgrammar",
+      "reason": "LMFE could not reliably compile the AgentAction union schema and could terminate at EOS before a valid action was complete.",
+      "evaluationPolicy": "Control and candidate were both reevaluated with the same XGrammar schema; historical unconstrained or LMFE results are not comparable.",
+      "confound": "Structured inference was amended after training, so this run is a stabilization experiment rather than a pre-registered single-variable ablation."
+    }
+  },
+  "claimReview": {
+    "verdict": "partial",
+    "confidence": "high",
+    "decision": "KEEP_V1",
+    "record": "findings.md"
+  },
+  "claimBoundary": "单 seed 只支持在共享 XGrammar 约束下的方向性意图增益；闭环成功率未提升，不能声称 v2 稳定。至少三个独立训练 seed 在预先冻结的同一套件和同一推理协议下通过后，才能重新评估晋级。"
+}

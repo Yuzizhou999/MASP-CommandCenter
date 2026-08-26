@@ -35,6 +35,7 @@ from .agent_protocol import (
     AgentActionType,
     AgentObservation,
     action_messages,
+    agent_action_response_schema,
 )
 from .settings import Settings
 
@@ -170,6 +171,12 @@ class DeepSeekProvider:
         )
         self._aggregate = self._empty_telemetry()
         self._runs: dict[str, dict[str, Any]] = {}
+
+    def _response_format(
+        self, name: str, schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        del name, schema
+        return {"type": "json_object"}
 
     @property
     def configured(self) -> bool:
@@ -520,7 +527,9 @@ class DeepSeekProvider:
             ]
             payload["tool_choice"] = "auto"
         else:
-            payload["response_format"] = {"type": "json_object"}
+            payload["response_format"] = self._response_format(
+                "agent_action", agent_action_response_schema()
+            )
 
         prompt_tokens = 0
         completion_tokens = 0
@@ -728,7 +737,10 @@ class DeepSeekProvider:
                 payload={
                     "model": self.settings.deepseek_model,
                     "temperature": 0,
-                    "response_format": {"type": "json_object"},
+                    "response_format": self._response_format(
+                        "dispatch_intent",
+                        DispatchIntent.model_json_schema(by_alias=True),
+                    ),
                     "messages": intent_training_messages(
                         text,
                         world_revision=world_revision,

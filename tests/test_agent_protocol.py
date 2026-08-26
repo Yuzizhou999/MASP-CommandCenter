@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 
 import pytest
+from jsonschema import ValidationError as JsonSchemaValidationError
+from jsonschema import validate as validate_json_schema
 from pydantic import ValidationError
 
 from command_center.agent_protocol import (
@@ -11,6 +13,7 @@ from command_center.agent_protocol import (
     AgentBudgetExceeded,
     AgentBudgets,
     AgentBudgetTracker,
+    agent_action_response_schema,
     classify_validation,
 )
 from command_center.agent_runtime import (
@@ -50,6 +53,44 @@ def test_single_action_protocol_accepts_each_legal_action() -> None:
 def test_single_action_protocol_rejects_invalid_shapes(payload: dict) -> None:
     with pytest.raises((ValidationError, ValueError)):
         AgentAction.from_content(json.dumps(payload, ensure_ascii=False))
+
+
+def test_agent_generation_schema_enforces_action_and_intent_shapes() -> None:
+    schema = agent_action_response_schema()
+    validate_json_schema(
+        {
+            "action": "PROPOSE_INTENT",
+            "intent": {"intentType": "QUERY_STATUS", "reason": "查询状态"},
+        },
+        schema,
+    )
+    validate_json_schema(
+        {
+            "action": "CALL_TOOL",
+            "tool": "get_world_snapshot",
+            "arguments": {},
+        },
+        schema,
+    )
+
+    invalid = [
+        {"action": "REQUEST_CLARIFICATION", "question": "哪里？"},
+        {"action": "PROPOSE_INTENT", "intent": {"intentType": "DELETE_ALL"}},
+    ]
+    for payload in invalid:
+        with pytest.raises(JsonSchemaValidationError):
+            validate_json_schema(payload, schema)
+
+
+def test_agent_generation_schema_has_strict_action_branches() -> None:
+    schema = agent_action_response_schema()
+    branches = schema["oneOf"]
+    assert len(branches) == 7
+    assert {row["properties"]["action"]["const"] for row in branches} == {
+        "CALL_TOOL",
+        "REQUEST_CLARIFICATION",
+        "PROPOSE_INTENT",
+    }
 
 
 def test_budget_tracker_enforces_independent_limits() -> None:

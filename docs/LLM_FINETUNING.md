@@ -127,6 +127,25 @@ python -m training.train_lora data\finetuning\agent-sft-v2.1 `
 
 本机完整训练记录为 `train_loss=0.015333`、`eval_loss=0.003809`、最大显存 4879.9 MB，`maxObservedTokens=1423`、`truncatedExamples=0`。冻结评测观察到 1/6 个目标案例改善且无 case 回归，但意图无退化门、工具 recall、修复门和边界拦截门未通过，因此 `v2.2` 保持 `candidate`，默认仍是 v1。
 
+### v2.3 单协议稳定化实验
+
+v2.3 用统一的 `AgentAction` envelope 训练每一个受监督目标，不再混入裸 `DispatchIntent` completion。数据同时覆盖工具选择、服务端生成澄清、意图提出、非法协议恢复、Schema 恢复和 verifier 修复状态：
+
+```powershell
+python -m training.prepare_agent_dataset_v23
+python -m training.tokenization_preflight data\finetuning\agent-sft-v2.3 `
+  --config training\configs\agent-lora-v2.3.json
+python -m training.train_lora data\finetuning\agent-sft-v2.3 `
+  --config training\configs\agent-lora-v2.3.json `
+  --output-dir models\masp-agent-lora-v2.3
+```
+
+本次数据共 1716 条，train/valid/test 为 1294/203/219，裸意图目标为 0；`maxObservedTokens=1403`，在 `maxLength=2048` 下无截断。单 seed `20260827` 完整训练得到 `train_loss=0.023536`、`eval_loss=0.002458`，峰值显存 4844.2 MB。
+
+推理约束的审计边界必须保留：训练前方案写的是 LM Format Enforcer，但训练后发现 LMFE 无法稳定编译动作联合 Schema，并可能在合法动作完成前提前 EOS。因此正式对照改为让控制组和候选组都使用同一 XGrammar 七分支 Schema，生成后再由 `jsonschema` 终检。这个改动保证两组同口径，但它是训练后的推理修订，所以 v2.3 是稳定化实验，不是预注册的单变量消融。
+
+最终意图挑战中，候选相对控制的 Macro F1 为 `0.7457 -> 0.8294`、精确匹配为 `0.72 -> 0.78`、槽位匹配为 `0.60 -> 0.90`、MASP 有效率为 `0.78 -> 0.86`。但 18 条轨迹 holdout 的目标完成率都为 `0.7222`，工具 recall 从 `0.9167` 降至 `0.8611`，model-driven rate 从 `1.0` 降至 `0.9231`。资格结论是 `KEEP_V1`；只支持“单 seed 意图层有方向性增益”，不支持“v2 已稳定”。因此没有继续训练另外两个 seed，v2.3 模型卡保持 `candidate`。
+
 ## 5. 启动本地模型 API
 
 在 `masp-lora` 环境中启动 4-bit 推理服务：
@@ -138,11 +157,15 @@ python -m training.serve_intent_model `
   --port 8000
 ```
 
+正式运行受约束 Agent 评测时增加 `--require-xgrammar`。该参数会在 XGrammar 不可用时直接拒绝启动，防止把只有生成后 Schema 终检的兼容模式误当成 token 级约束评测。
+
 服务提供：
 
 - `GET /health`；
 - `GET /v1/models`；
 - `POST /v1/chat/completions`。
+
+本地 AgentAction 请求可以携带严格 JSON Schema。安装 XGrammar 时，服务约束 token 生成，并在返回前使用 `jsonschema` 终检；无法满足 Schema 时返回 422，不把非法输出伪装成成功结果。没有 XGrammar 的演示环境只做生成后终检，`/health` 会明确报告 `jsonschema-validation-only`；正式评测必须用 `--require-xgrammar`。模型仍在 GPU 上推理；没有 C 编译器的 WSL 环境中，grammar bitmask 在 CPU 计算。
 
 这是项目内最小 OpenAI-compatible 服务，仅用于单机演示和评测，不包含生产级鉴权、批处理或多 GPU 调度。
 
@@ -285,6 +308,7 @@ QLoRA 通过模型和系统两组资格门；基座模型只通过系统组。QL
 - `training/evaluate_intent_model.py`：测试集、安全集、澄清集与延迟评测。
 - `training/evaluate_intent_challenge.py`：基座与 QLoRA 的独立挑战集评测。
 - `training/prepare_agent_dataset.py`：多轮单动作轨迹数据构造；
+- `training/prepare_agent_dataset_v23.py`：统一 AgentAction 目标与恢复状态数据构造；
 - `training/evaluate_agent_trajectories.py`：轨迹、修复和注入评测；
 - `training/compare_agent_replays.py`：同 case paired replay diff；
 - `training/compare_agent_experiment.py`：v2-repro 与 v2.2 的受控同 case 对比；

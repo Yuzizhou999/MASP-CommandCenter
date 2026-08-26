@@ -167,14 +167,37 @@ def validate_agent_trajectory(example: dict[str, Any]) -> dict[str, Any]:
     ):
         raise ValueError("Agent 轨迹中的 user/assistant 必须交替出现")
 
-    actions: list[AgentAction] = []
-    for row in messages:
+    actions: list[AgentAction | None] = []
+    allow_invalid_context = bool(
+        (metadata or {}).get("allowInvalidUnsupervisedActions")
+    )
+    for message_index, row in enumerate(messages):
         if row.get("role") != "assistant":
             continue
         content = row.get("content")
         if not isinstance(content, str):
             raise ValueError("assistant 动作必须是 JSON 字符串")
-        actions.append(AgentAction.from_content(content))
+        try:
+            actions.append(AgentAction.from_content(content))
+        except (ValueError, TypeError, json.JSONDecodeError):
+            if not allow_invalid_context or message_index + 1 >= len(messages):
+                raise
+            next_message = messages[message_index + 1]
+            try:
+                observation = json.loads(str(next_message.get("content") or ""))
+            except json.JSONDecodeError:
+                raise ValueError(
+                    "非法历史动作后必须紧跟 protocol.invalid_action observation"
+                ) from None
+            if (
+                next_message.get("role") != "user"
+                or (observation.get("observation") or {}).get("code")
+                != "protocol.invalid_action"
+            ):
+                raise ValueError(
+                    "非法历史动作后必须紧跟 protocol.invalid_action observation"
+                )
+            actions.append(None)
     if not actions:
         raise ValueError("Agent 轨迹没有 assistant 动作")
 
@@ -189,6 +212,8 @@ def validate_agent_trajectory(example: dict[str, Any]) -> dict[str, Any]:
         or len(supervised) != len(set(supervised))
     ):
         raise ValueError("superviseAssistantIndices 必须引用有效且不重复的动作")
+    if any(actions[index] is None for index in supervised):
+        raise ValueError("非法历史动作不能作为监督目标")
 
     terminal = actions[-1].action
     expected_terminal = str((metadata or {}).get("expectedTerminalState") or "")

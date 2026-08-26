@@ -77,7 +77,11 @@ Agent 模型使用人工独立标注的 `evals/agent-trajectories-v1.json`。每
 
 2026-08-26 又完成了 v2.2 失败驱动数据的受控实验。控制组 `v2-repro` 使用 v2 数据和原 v2 全部超参数，先在 2048 token、零截断条件下复现：原始 Schema 合法率 96%，18 条 v2.1 holdout 的目标成功率 66.7%，满足预先冻结的复现容差。候选 `v2.2` 只把训练数据替换为增加 34 条失败驱动样本的 v2.1 数据，其他训练参数不变。候选目标成功率升至 72.2%，目标案例 `AH-INJ-003` 改善，6 个目标案例和 12 个非目标案例均无回归；系统级攻击成功率仍为 0。与此同时，意图宏 F1 从 0.9577 降至 0.9460、精确匹配率从 94% 降至 92%，工具 recall 从 91.7% 降至 86.1%，边界拦截召回率仍为 50%，修复成功率仍为 25%。受控方向性门和正式资格门均未通过，结论仍是 `KEEP_V1`。18 条 holdout 只支持方向性观察，不构成统计显著性证据。
 
-稳定报告保存在 `results/intent-eval-v1/`、`results/intent-eval-v2/`、`results/agent-eval-v1/` 和 `results/agent-eval-v2/`。v2.2 受控实验另保存在 `results/intent-eval-v2-repro/`、`results/intent-eval-v22/`、`results/agent-eval-v2-repro/` 和 `results/agent-eval-v22/`。`qualification.json` 是唯一晋级结论，`controlled-experiment.json` 和 `paired-replay.json` 用于定位逐 case 的改进与退化。
+2026-08-27 完成 v2.3 单动作协议稳定化实验。v2.3 的 1716 条样本全部使用 `AgentAction` envelope，裸意图目标和 token 截断均为 0。控制和候选在同一 XGrammar 七分支 Schema 下重新评测；候选的意图 Macro F1 从 `0.7457` 提高到 `0.8294`，精确匹配从 `0.72` 提高到 `0.78`，槽位匹配从 `0.60` 提高到 `0.90`，MASP 有效率从 `0.78` 提高到 `0.86`。但闭环目标完成率仍为 `0.7222`，工具 recall 从 `0.9167` 退化到 `0.8611`，model-driven rate 从 `1.0` 退化到 `0.9231`；`AH-INJ-003` 改善，`AH-QRY-001` 回归，系统级攻击执行率保持 0。独立 result-to-claim 审查结论为 `partial`，正式资格仍为 `KEEP_V1`。
+
+v2.3 的结构化推理实现不是训练前完全冻结的单一变量。冻结方案原写 LM Format Enforcer，训练完成后因其不能稳定处理动作联合 Schema、会提前 EOS，才改为 XGrammar；两组都按相同约束重跑，因此组间比较有效，但不能把结果归因于某一个数据改动。单 seed 和 18 条 holdout 也不支持“稳定”结论，故未继续另外两个 seed。
+
+稳定报告保存在 `results/intent-eval-v1/`、`results/intent-eval-v2/`、`results/agent-eval-v1/` 和 `results/agent-eval-v2/`。v2.2 受控实验另保存在 `results/intent-eval-v2-repro/`、`results/intent-eval-v22/`、`results/agent-eval-v2-repro/` 和 `results/agent-eval-v22/`。v2.3 证据位于 `results/intent-eval-v23-control/`、`results/intent-eval-v23-seed-20260827/`、`results/agent-eval-v23-control/` 和 `results/agent-eval-v23-seed-20260827/`。`qualification.json` 是唯一晋级结论，`experiment-summary.json`、`controlled-experiment.json` 和 `paired-replay.json` 用于定位逐 case 的改进与退化。
 
 Agent run 存储另有固定并发基准。2026-08-25 在 50 run、12 worker 下，旧 JSON 整体重写实现完成 50/50，吞吐 1.555 runs/s；SQLite WAL + append-only events 完成 50/50，吞吐 6.039 runs/s，总耗时加速 3.884 倍。稳定报告为 `results/store-benchmark/latest.json`。
 

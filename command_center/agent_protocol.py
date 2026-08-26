@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from enum import Enum
 from time import perf_counter
@@ -8,6 +9,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .contracts import DispatchIntent, IntentValidation, ValidationIssue
+
+
+SUPPORTED_AGENT_INTENT_TYPES = (
+    "QUERY_STATUS",
+    "EXPLAIN_DECISION",
+    "CREATE_TASK",
+    "BLOCK_RESOURCE",
+    "GENERATE_REPORT",
+)
 
 
 class AgentActionType(str, Enum):
@@ -57,6 +67,69 @@ class AgentAction(BaseModel):
         if not isinstance(payload, dict):
             raise ValueError("Agent action must be a JSON object")
         return cls.model_validate(payload)
+
+
+def agent_action_response_schema() -> dict[str, Any]:
+    """Strict XGrammar schema for the local single-action protocol."""
+
+    intent_schema = copy.deepcopy(DispatchIntent.model_json_schema(by_alias=True))
+    definitions = intent_schema.pop("$defs", {})
+    intent_type = definitions.get("IntentType")
+    if isinstance(intent_type, dict):
+        intent_type["enum"] = list(SUPPORTED_AGENT_INTENT_TYPES)
+
+    def proposal_branch(name: str) -> dict[str, Any]:
+        branch = copy.deepcopy(intent_schema)
+        properties = branch["properties"]
+        properties["intentType"] = {"const": name}
+        required = list(branch.get("required") or [])
+        if name == "CREATE_TASK":
+            required.append("task")
+            properties.pop("resourceBlock", None)
+            properties.pop("query", None)
+        elif name == "BLOCK_RESOURCE":
+            required.append("resourceBlock")
+            properties.pop("task", None)
+            properties.pop("query", None)
+        else:
+            properties.pop("task", None)
+            properties.pop("resourceBlock", None)
+        branch["required"] = list(dict.fromkeys(required))
+        return {
+            "type": "object",
+            "properties": {
+                "action": {"const": "PROPOSE_INTENT"},
+                "intent": branch,
+            },
+            "required": ["action", "intent"],
+            "additionalProperties": False,
+        }
+
+    return {
+        "$defs": definitions,
+        "oneOf": [
+            {
+                "type": "object",
+                "properties": {
+                    "action": {"const": "CALL_TOOL"},
+                    "tool": {"type": "string", "minLength": 1},
+                    "arguments": {"type": "object"},
+                },
+                "required": ["action", "tool", "arguments"],
+                "additionalProperties": False,
+            },
+            {
+                "type": "object",
+                "properties": {"action": {"const": "REQUEST_CLARIFICATION"}},
+                "required": ["action"],
+                "additionalProperties": False,
+            },
+            *[
+                proposal_branch(name)
+                for name in SUPPORTED_AGENT_INTENT_TYPES
+            ],
+        ],
+    }
 
 
 class AgentObservation(BaseModel):

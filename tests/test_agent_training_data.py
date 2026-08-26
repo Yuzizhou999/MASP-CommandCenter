@@ -5,7 +5,25 @@ from pathlib import Path
 
 import pytest
 
-from training.intent_dataset import file_sha256, validate_example, write_jsonl
+from command_center.agent_protocol import AgentAction
+from command_center.contracts import DispatchIntent, IntentType
+from command_center.knowledge import KnowledgeBase
+from training.intent_dataset import (
+    build_example,
+    file_sha256,
+    validate_example,
+    write_jsonl,
+)
+from training.prepare_agent_dataset_v23 import (
+    PROTOCOL_ID,
+    _extra_clarification_rows as _v23_clarification_rows,
+    _intent_rows as _v23_intent_rows,
+    _protocol_recovery_rows as _v23_protocol_recovery_rows,
+    _schema_repair_row as _v23_schema_repair_row,
+    _search_routing_rows as _v23_search_routing_rows,
+    _semantic_rows as _v23_semantic_rows,
+    _validation_repair_row as _v23_validation_repair_row,
+)
 from training.train_lora import (
     _checkpoint_training_arguments,
     tokenize_conversation,
@@ -222,6 +240,39 @@ def test_trajectory_rejects_model_authored_clarification_text() -> None:
         validate_example(row)
 
 
+def test_trajectory_allows_rejected_invalid_action_only_as_unsupervised_context() -> None:
+    row = _trajectory(supervise=[1])
+    row["messages"][2]["content"] = '{"action":"DELETE_ALL"}'
+    row["messages"][3]["content"] = json.dumps(
+        {
+            "observation": {
+                "sequence": 2,
+                "kind": "TOOL_REJECTION",
+                "code": "protocol.invalid_action",
+                "summary": "invalid action",
+                "data": {},
+                "trusted": True,
+            }
+        }
+    )
+    row["metadata"]["allowInvalidUnsupervisedActions"] = True
+
+    assert validate_example(row)["valid"] is True
+
+    row["metadata"]["superviseAssistantIndices"] = [0, 1]
+    with pytest.raises(ValueError, match="不能作为监督目标"):
+        validate_example(row)
+
+
+def test_trajectory_rejects_invalid_context_without_rejection_observation() -> None:
+    row = _trajectory(supervise=[1])
+    row["messages"][2]["content"] = '{"action":"DELETE_ALL"}'
+    row["metadata"]["allowInvalidUnsupervisedActions"] = True
+
+    with pytest.raises(ValueError, match="必须紧跟"):
+        validate_example(row)
+
+
 def test_v21_failure_driven_rows_have_expected_terminal_actions() -> None:
     rows = [
         *_explanation_rows(),
@@ -273,3 +324,71 @@ def test_v21_failure_driven_requests_do_not_copy_frozen_gold_text() -> None:
     }
 
     assert training_requests.isdisjoint(gold_requests)
+
+
+def _intent_source_example() -> dict:
+    return build_example(
+        example_id="v23-source",
+        text="安排叉车从 AP1123 运到 AP2121",
+        scenario_id="interactive-multi-fleet",
+        world_revision=42,
+        intent_type=IntentType.CREATE_TASK,
+        source="test",
+        split_key="v23-source",
+        template_id="v23-test",
+        resolved_task={
+            "pickupNodeId": "fork:AP1123",
+            "dropoffNodeId": "fork:AP2121",
+            "requiredRobotGroup": "fork",
+            "payloadType": "pallet",
+        },
+    ).as_dict()
+
+
+def test_v23_retention_uses_agent_envelope_and_only_supervises_final_action(
+    tmp_path: Path,
+) -> None:
+    converted, retention = _v23_intent_rows(
+        _intent_source_example(), KnowledgeBase(tmp_path / "knowledge")
+    )
+
+    assert validate_example(converted)["valid"] is True
+    assert validate_example(retention)["valid"] is True
+    assert retention["metadata"]["protocol"] == PROTOCOL_ID
+    assert retention["metadata"]["superviseAssistantIndices"] == [1]
+    final = AgentAction.from_content(retention["messages"][-1]["content"])
+    assert final.action.value == "PROPOSE_INTENT"
+    assert final.intent["intentType"] == "CREATE_TASK"
+
+
+def test_v23_state_recovery_rows_never_supervise_bad_context() -> None:
+    source = _intent_source_example()
+    validation_row = _v23_validation_repair_row(source, 0)
+    schema_row = _v23_schema_repair_row(source, 0)
+    protocol_row = next(iter(_v23_protocol_recovery_rows()))
+
+    for row in (validation_row, schema_row, protocol_row):
+        assert validate_example(row)["valid"] is True
+        assert row["metadata"]["protocol"] == PROTOCOL_ID
+
+    validation_draft = AgentAction.from_content(
+        validation_row["messages"][4]["content"]
+    )
+    assert validation_draft.intent is not None
+    DispatchIntent.model_validate(validation_draft.intent)
+    assert validation_row["metadata"]["superviseAssistantIndices"] == [0, 2]
+    assert protocol_row["metadata"]["superviseAssistantIndices"] == [1, 2]
+    assert protocol_row["metadata"]["allowInvalidUnsupervisedActions"] is True
+
+
+def test_v23_authored_rows_all_use_single_action_protocol() -> None:
+    rows = [
+        *_v23_protocol_recovery_rows(),
+        *_v23_clarification_rows(),
+        *_v23_search_routing_rows(),
+        *_v23_semantic_rows(),
+    ]
+
+    assert len(rows) == 68
+    assert all(validate_example(row)["valid"] is True for row in rows)
+    assert all(row["metadata"]["protocol"] == PROTOCOL_ID for row in rows)

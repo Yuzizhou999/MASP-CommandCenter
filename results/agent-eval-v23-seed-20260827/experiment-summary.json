@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "agent-v2.3-constrained-single-protocol-stabilization",
+  "generatedAt": "2026-08-27",
+  "controlModel": "masp-agent-lora-v2-repro",
+  "candidateModel": "masp-agent-lora-v2.3",
+  "candidateSeed": 20260827,
+  "dataset": {
+    "id": "masp-agent-sft-v2.3",
+    "totalExamples": 1716,
+    "splits": {
+      "train": 1294,
+      "valid": 203,
+      "test": 219
+    },
+    "bareIntentTargets": 0,
+    "maxLength": 2048,
+    "maxObservedTokens": 1403,
+    "truncatedExamples": 0
+  },
+  "training": {
+    "trainLoss": 0.023536,
+    "evalLoss": 0.002458,
+    "gpuMaxMemoryAllocatedMb": 4844.202,
+    "adapterSha256": "8526d9b4ab9e3dc7c32865e61c580130737ba92df9d872ecf95127cc068caa51"
+  },
+  "inference": {
+    "actualStructuredOutput": "xgrammar",
+    "amendedAfterTraining": true,
+    "originalFrozenPlan": "lm-format-enforcer",
+    "comparisonPolicy": "Control and candidate were reevaluated with the same strict seven-branch AgentAction schema."
+  },
+  "intentChallenge": {
+    "suite": "evals/intent-challenge-v1.json",
+    "caseCount": 50,
+    "metrics": {
+      "rawJsonValidRate": {"control": 1.0, "candidate": 1.0},
+      "rawSchemaValidRate": {"control": 0.84, "candidate": 0.86},
+      "rawIntentMacroF1": {"control": 0.7457, "candidate": 0.8294},
+      "rawExactMatchRate": {"control": 0.72, "candidate": 0.78},
+      "rawSlotExactMatchRate": {"control": 0.60, "candidate": 0.90},
+      "rawMaspValidRate": {"control": 0.78, "candidate": 0.86},
+      "p95LatencyMs": {"control": 5906.228, "candidate": 6000.384}
+    }
+  },
+  "trajectoryHoldout": {
+    "suite": "evals/agent-trajectories-v2.1-holdout.json",
+    "caseCount": 18,
+    "metrics": {
+      "goalSuccessRate": {"control": 0.722222, "candidate": 0.722222},
+      "toolPrecision": {"control": 0.916667, "candidate": 0.916667},
+      "toolRecall": {"control": 0.916667, "candidate": 0.861111},
+      "clarificationAccuracy": {"control": 0.888889, "candidate": 0.888889},
+      "repairSuccessRate": {"control": 0.50, "candidate": 0.50},
+      "modelDrivenRate": {"control": 1.0, "candidate": 0.923077},
+      "systemExecutionAttackRate": {"control": 0.0, "candidate": 0.0}
+    },
+    "caseChanges": {
+      "improved": ["AH-INJ-003"],
+      "regressed": ["AH-QRY-001"],
+      "toolRecallRegressions": ["AH-EXP-001", "AH-BLK-001"],
+      "fallbackRegressions": ["AH-BLK-002"]
+    }
+  },
+  "resultToClaim": {
+    "verdict": "partial",
+    "confidence": "high",
+    "supportedClaim": "One v2.3 seed shows directional intent-layer gains under a shared post-training XGrammar-constrained AgentAction evaluation while deterministic system-level safety blocking is preserved.",
+    "unsupportedClaim": "The evidence does not show stable or promotable closed-loop behavior.",
+    "limitations": [
+      "Only one candidate training seed was evaluated.",
+      "The trajectory holdout contains 18 cases.",
+      "The inference constraint changed from LMFE to XGrammar after training.",
+      "The experiment does not isolate individual data and decoding changes."
+    ]
+  },
+  "qualification": {
+    "decision": "KEEP_V1",
+    "passed": false,
+    "activeModel": "masp-intent-lora",
+    "additionalSeedsRun": false
+  },
+  "evidence": {
+    "intentControl": "results/intent-eval-v23-control/intent-challenge-latest.json",
+    "intentCandidate": "results/intent-eval-v23-seed-20260827/intent-challenge-latest.json",
+    "trajectoryControl": "results/agent-eval-v23-control/agent-trajectory-eval-latest.json",
+    "trajectoryCandidate": "results/agent-eval-v23-seed-20260827/agent-trajectory-eval-latest.json",
+    "qualification": "results/agent-eval-v23-seed-20260827/qualification.json"
+  }
+}

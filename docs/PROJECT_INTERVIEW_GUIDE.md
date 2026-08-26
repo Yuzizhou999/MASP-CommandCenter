@@ -56,13 +56,15 @@
 - 支持可恢复的目标执行 Agent；
 - 支持 MASP 仿真、资源冲突检测和审批闭环；
 - 支持证据约束的故障诊断和计划解释；
-- 支持群车策略模型提出候选优先级，但候选仍由 MASP 校验。
+- 支持群车策略模型提出候选优先级，但候选仍由 MASP 校验；
+- 做过统一单动作协议的 QLoRA v2.3 实验，意图层有方向性增益，但闭环门槛未通过，因此没有替换 v1。
 
 不要说：
 
 - DeepSeek 自己保证了调度安全；
 - AI 已经控制真实车辆；
 - 仿真吞吐就是现场生产收益；
+- v2.3 已经稳定或已经上线；
 - 系统已经具备企业级身份权限和生产准入。
 
 ## 3. 总体架构
@@ -230,19 +232,20 @@ RECEIVED
 
 这一层的核心设计是：模型可以理解表达方式，但实体是否存在、是否唯一、属于哪种车型，由服务端目录和 MASP 决定。
 
-### 第 5 步：DeepSeek 生成结构化调度意图
+### 第 5 步：模型生成结构化调度意图
 
 在参数已解析后，Provider 调用 OpenAI 兼容的：
 
 ```text
-POST {DEEPSEEK_BASE_URL}/chat/completions
+POST {MODEL_BASE_URL}/chat/completions
 ```
 
 请求使用：
 
 - `temperature=0`，降低结构化输出的不稳定性；
-- `response_format={"type":"json_object"}`；
-- `DispatchIntent.model_json_schema()` 作为输出契约；
+- DeepSeek 使用 `json_object` 后由服务端解析和校验；
+- 本地 loop driver 使用 XGrammar 强制七分支 `AgentAction` JSON Schema，并用 `jsonschema` 终检；
+- linear v1 使用 `DispatchIntent`，loop v2 使用单动作 envelope；
 - 系统 Prompt 明确禁止生成路径、预约和安全解除；
 - 用户内容中包含请求、当前 `worldRevision`、权威参数、检索证据和 Schema。
 
@@ -446,6 +449,8 @@ SIMULATE(COMPLETED)
 ```
 
 任何一层失败都不能直接执行。`extra=forbid` 可以拒绝契约中不存在的额外字段，降低模型偷偷携带未定义动作参数的风险。
+
+XGrammar 解决的是结构合法性，不是业务正确性。v2.3 实测 JSON 合法率达到 100%，但原始 Schema 有效率只有 86%，原因包括模型选择了当前评测不期望的合法动作。因此受约束解码不能替代工具轨迹 gold、权威实体检查和 MASP verifier。
 
 ### 5.5 为什么 Prompt 不是唯一安全机制
 
@@ -853,7 +858,13 @@ $env:MASP_TEST_ENGINE_ROOT='E:\project\MASP-locked'
 
 建议回答：
 
-> 下一步不是先做多 Agent，而是把 SQLite 迁移到 PostgreSQL 和队列 worker，增加真实运维查询与更大规模注入集，并监控目标完成率、工具 precision/recall、无效调用、修复成功、过度澄清、model-driven rate、成本和 P95 延迟。模型或 prompt 更新必须先做轨迹 replay diff，再过 v1 无退化与系统安全双门槛。
+> Agent 模型侧会先扩大真正未见过的轨迹集，并把单动作监督、移除裸意图、受约束解码和恢复样本分别做消融，再决定是否投入三 seed 稳定性训练。系统侧再把 SQLite 迁移到 PostgreSQL 和队列 worker。模型或 prompt 更新必须先做轨迹 replay diff，再过 v1 无退化与系统安全双门槛。
+
+### Q24：v2.3 解决了什么，为什么仍没有上线？
+
+建议回答：
+
+> v2.3 把 1716 条训练样本统一成单个 AgentAction 协议，移除了裸意图监督，并保证 2048 token 下零截断。与控制组在同一 XGrammar 约束下对比，意图 Macro F1 从 0.7457 提升到 0.8294，槽位匹配从 0.60 提升到 0.90；但 18 条闭环 holdout 的目标完成率仍是 0.7222，工具 recall 还从 0.9167 降到 0.8611。独立 claim 审查只给出 partial，资格脚本输出 KEEP_V1，所以我停止了后续 seed，保留 v1 为默认。这说明结构化输出变稳不等于工具策略和闭环目标已经变稳。
 
 ## 13. 面试时容易说错的地方
 

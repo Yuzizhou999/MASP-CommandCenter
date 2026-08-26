@@ -32,6 +32,18 @@ class OpenAICompatibleLocalProvider(DeepSeekProvider):
         super().__init__(adapted)
         self.runtime_settings = settings
 
+    def _response_format(
+        self, name: str, schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": name,
+                "strict": True,
+                "schema": schema,
+            },
+        }
+
     def plan_context_tools(
         self,
         text: str,

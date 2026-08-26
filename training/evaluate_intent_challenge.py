@@ -11,6 +11,14 @@ from typing import Any
 
 import httpx
 
+from command_center.agent_protocol import (
+    AgentAction,
+    AgentActionType,
+    AgentObservation,
+    action_messages,
+    agent_action_response_schema,
+)
+from command_center.agent_tools import CurrentWorldSnapshotInput, SearchSopInput
 from command_center.clarifications import ClarificationResolver, ClarificationStore
 from command_center.contracts import DispatchIntent, EvidenceItem, IntentType
 from command_center.engine_adapter import MaspAdapter
@@ -45,6 +53,11 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--model", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=30)
+    parser.add_argument(
+        "--protocol",
+        choices=("dispatch_intent", "agent_action"),
+        default="dispatch_intent",
+    )
     return parser.parse_args()
 
 
@@ -115,6 +128,108 @@ def parse_raw_intent(
         return True, DispatchIntent.model_validate(payload), None
     except ValueError as error:
         return True, None, str(error)
+
+
+def parse_raw_agent_intent(
+    content: str, *, world_revision: int, requested_by: str
+) -> tuple[bool, DispatchIntent | None, str | None]:
+    try:
+        action = AgentAction.from_content(content)
+    except (ValueError, TypeError, json.JSONDecodeError) as error:
+        try:
+            json.loads(content)
+            json_valid = True
+        except json.JSONDecodeError:
+            json_valid = False
+        return json_valid, None, str(error)
+    if action.action is not AgentActionType.PROPOSE_INTENT or action.intent is None:
+        return True, None, f"expected PROPOSE_INTENT, got {action.action.value}"
+    return parse_raw_intent(
+        json.dumps(action.intent, ensure_ascii=False),
+        world_revision=world_revision,
+        requested_by=requested_by,
+    )
+
+
+def _agent_tool_definitions() -> list[dict[str, Any]]:
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_world_snapshot",
+                "parameters": CurrentWorldSnapshotInput.model_json_schema(),
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "search_sop",
+                "parameters": SearchSopInput.model_json_schema(),
+            },
+        },
+    ]
+
+
+def agent_intent_challenge_messages(
+    case: dict[str, Any], *, world_revision: int
+) -> list[dict[str, str]]:
+    request = str(case["message"])
+    expected_intent = str((case.get("expected") or {}).get("intentType") or "")
+    requires_sop = expected_intent in {"EXPLAIN_DECISION", "BLOCK_RESOURCE"}
+    observations = [
+        AgentObservation(
+            sequence=1,
+            kind="INITIAL",
+            code="request.received",
+            summary="意图保持评测已收到请求",
+            data={"hasMemory": False},
+        ),
+        AgentObservation(
+            sequence=2,
+            kind="TOOL_RESULT",
+            code="tool.ok",
+            summary=f"读取权威世界版本 {world_revision}",
+            data={"value": {"worldRevision": world_revision, "counts": {}}},
+            toolName="get_world_snapshot",
+        ),
+    ]
+    action_history = [
+        {"action": "CALL_TOOL", "tool": "get_world_snapshot", "arguments": {}}
+    ]
+    if requires_sop:
+        action_history.append(
+            {
+                "action": "CALL_TOOL",
+                "tool": "search_sop",
+                "arguments": {"query": request, "limit": 2},
+            }
+        )
+        observations.append(
+            AgentObservation(
+                sequence=3,
+                kind="TOOL_RESULT",
+                code="tool.ok",
+                summary="已检索适用的调度与安全 SOP",
+                data={
+                    "value": {
+                        "items": [
+                            {
+                                "title": "调度安全制度",
+                                "detail": "当前请求所需的制度依据已就绪。",
+                            }
+                        ]
+                    }
+                },
+                toolName="search_sop",
+            )
+        )
+    return action_messages(
+        request=request,
+        observations=observations,
+        tool_definitions=_agent_tool_definitions(),
+        authoritative_parameters=dict(case.get("authoritativeParameters") or {}),
+        action_history=action_history,
+    )
 
 
 def classification_metrics(
@@ -189,6 +304,7 @@ def _model_call(
     model: str,
     timeout: float,
     messages: list[dict[str, str]],
+    response_schema: dict[str, Any],
 ) -> tuple[str, dict[str, int]]:
     response = httpx.post(
         f"{base_url.rstrip('/')}/chat/completions",
@@ -196,7 +312,14 @@ def _model_call(
         json={
             "model": model,
             "temperature": 0,
-            "response_format": {"type": "json_object"},
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "intent_challenge",
+                    "strict": True,
+                    "schema": response_schema,
+                },
+            },
             "messages": messages,
         },
         timeout=timeout,
@@ -209,7 +332,12 @@ def _model_call(
 
 
 def evaluate(
-    suite: dict[str, Any], *, base_url: str, model: str, timeout: float
+    suite: dict[str, Any],
+    *,
+    base_url: str,
+    model: str,
+    timeout: float,
+    protocol: str = "dispatch_intent",
 ) -> dict[str, Any]:
     settings = Settings.load()
     engine = MaspAdapter(settings)
@@ -232,13 +360,17 @@ def evaluate(
     started_all = perf_counter()
     for case in suite["cases"]:
         authoritative = case.get("authoritativeParameters") or {}
-        messages = intent_training_messages(
-            str(case["message"]),
-            world_revision=world_revision,
-            requested_by="intent-challenge-evaluator",
-            resolved_task=authoritative.get("task"),
-            resolved_resource_block=authoritative.get("resourceBlock"),
-            context_evidence=evidence,
+        messages = (
+            agent_intent_challenge_messages(case, world_revision=world_revision)
+            if protocol == "agent_action"
+            else intent_training_messages(
+                str(case["message"]),
+                world_revision=world_revision,
+                requested_by="intent-challenge-evaluator",
+                resolved_task=authoritative.get("task"),
+                resolved_resource_block=authoritative.get("resourceBlock"),
+                context_evidence=evidence,
+            )
         )
         started = perf_counter()
         content = ""
@@ -250,13 +382,22 @@ def evaluate(
                 model=model,
                 timeout=timeout,
                 messages=messages,
+                response_schema=(
+                    agent_action_response_schema()
+                    if protocol == "agent_action"
+                    else DispatchIntent.model_json_schema(by_alias=True)
+                ),
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             request_error = str(error)
         latency_ms = (perf_counter() - started) * 1000
         latencies.append(latency_ms)
         json_valid, intent, parse_error = (
-            parse_raw_intent(
+            (
+                parse_raw_agent_intent
+                if protocol == "agent_action"
+                else parse_raw_intent
+            )(
                 content,
                 world_revision=world_revision,
                 requested_by="intent-challenge-evaluator",
@@ -296,11 +437,15 @@ def evaluate(
 
     safety_cases: list[dict[str, Any]] = []
     for case in suite.get("safetyCases", []):
-        messages = intent_training_messages(
-            str(case["message"]),
-            world_revision=world_revision,
-            requested_by="intent-challenge-evaluator",
-            context_evidence=evidence,
+        messages = (
+            agent_intent_challenge_messages(case, world_revision=world_revision)
+            if protocol == "agent_action"
+            else intent_training_messages(
+                str(case["message"]),
+                world_revision=world_revision,
+                requested_by="intent-challenge-evaluator",
+                context_evidence=evidence,
+            )
         )
         started = perf_counter()
         content = ""
@@ -311,12 +456,21 @@ def evaluate(
                 model=model,
                 timeout=timeout,
                 messages=messages,
+                response_schema=(
+                    agent_action_response_schema()
+                    if protocol == "agent_action"
+                    else DispatchIntent.model_json_schema(by_alias=True)
+                ),
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             request_error = str(error)
         latency_ms = (perf_counter() - started) * 1000
         json_valid, intent, parse_error = (
-            parse_raw_intent(
+            (
+                parse_raw_agent_intent
+                if protocol == "agent_action"
+                else parse_raw_intent
+            )(
                 content,
                 world_revision=world_revision,
                 requested_by="intent-challenge-evaluator",
@@ -433,6 +587,7 @@ def evaluate(
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "suiteId": suite["suiteId"],
         "model": model,
+        "protocol": protocol,
         "baseUrl": base_url,
         "scenarioId": scenario_id,
         "counts": {
@@ -478,6 +633,7 @@ def main() -> None:
         base_url=args.base_url,
         model=args.model,
         timeout=args.timeout,
+        protocol=args.protocol,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
