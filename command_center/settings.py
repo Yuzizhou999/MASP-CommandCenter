@@ -56,6 +56,8 @@ class Settings:
     agent_max_latency_ms: int = 30000
     agent_max_steps: int = 48
     root: Path = ROOT
+    data_root: Path | None = None
+    runs_root: Path | None = None
 
     @property
     def is_production(self) -> bool:
@@ -63,17 +65,29 @@ class Settings:
 
     @property
     def runs_dir(self) -> Path:
-        return self.root / "runs"
+        return self.runs_root or (self.root / "runs")
 
     @property
     def data_dir(self) -> Path:
-        return self.root / "data"
+        return self.data_root or (self.root / "data")
 
     @classmethod
     def load(cls) -> "Settings":
         lock = json.loads((ROOT / "engine.lock.json").read_text(encoding="utf-8"))
         default_engine = ROOT.parent / "MASP"
         engine_root = Path(os.getenv("MASP_ENGINE_ROOT", str(default_engine))).resolve()
+
+        def configured_path(name: str) -> Path | None:
+            value = os.getenv(name, "").strip()
+            if not value:
+                return None
+            path = Path(value)
+            if not path.is_absolute():
+                path = ROOT / path
+            return path.resolve()
+
+        data_root = configured_path("COMMAND_CENTER_DATA_DIR")
+        runs_root = configured_path("COMMAND_CENTER_RUNS_DIR")
         checkpoint_value = os.getenv("MASP_AGENT_CHECKPOINT", "").strip()
         checkpoint = None
         if checkpoint_value:
@@ -182,4 +196,6 @@ class Settings:
             agent_max_steps=max(
                 8, min(256, int(os.getenv("AGENT_MAX_STEPS", "48")))
             ),
+            data_root=data_root,
+            runs_root=runs_root,
         )

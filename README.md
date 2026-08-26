@@ -85,6 +85,15 @@ Copy-Item .env.example .env
 .\scripts\start.ps1 -SkipBuild
 ```
 
+面试演示时可同时启动冻结 v1 与候选 v2。默认配置和 v1 工件不会被修改，v2 使用独立的数据与仿真输出目录：
+
+```powershell
+.\scripts\start-dual-demo.ps1
+```
+
+- [http://127.0.0.1:8877](http://127.0.0.1:8877)：v1 `linear` 稳定意图识别演示；
+- [http://127.0.0.1:8878](http://127.0.0.1:8878)：v2 `loop` 候选模型闭环与工具调用演示。
+
 现场网络不稳定或不准备调用 DeepSeek 时，可显式使用离线降级：
 
 ```powershell

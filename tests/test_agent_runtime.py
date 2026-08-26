@@ -48,6 +48,7 @@ def test_chat_returns_bounded_tool_trace(isolated_settings) -> None:
         "validate_dispatch_intent",
     }
     assert all(step.read_only for step in tool_steps)
+    assert all(step.observation_code == "tool.ok" for step in tool_steps)
     assert trace.steps[-1].state == "COMPLETED"
 
 

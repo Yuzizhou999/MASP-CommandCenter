@@ -20,6 +20,13 @@ def test_health_exposes_model_and_safety_boundary() -> None:
     }
     assert payload["agentPolicy"]["modelId"] == "masp-ppo-priority"
     assert payload["agentPolicy"]["safetyController"].startswith("MASP Top-K")
+    assert payload["agentRuntime"]["mode"] in {"linear", "loop"}
+    assert payload["agentRuntime"]["strategy"] in {
+        "LINEAR_PIPELINE",
+        "ACTION_PROTOCOL_LOOP",
+    }
+    assert payload["agentRuntime"]["budgets"]["maxToolCalls"] >= 1
+    assert payload["agentRuntime"]["budgets"]["maxTotalTokens"] >= 128
 
 
 def test_agent_policy_status_does_not_expose_server_path() -> None:

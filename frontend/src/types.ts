@@ -31,6 +31,32 @@ export interface Health {
     model: string;
     configured: boolean;
     mode: string;
+    capability?: string;
+    agentCapability?: string;
+    registration?: {
+      modelId?: string;
+      version?: string;
+      baseModel?: string;
+      trainingMethod?: string;
+      status?: "candidate" | "active" | "retired";
+      valid?: boolean;
+      adapterPresent?: boolean;
+      adapterSha256Matches?: boolean;
+    } | null;
+  };
+  agentRuntime: {
+    mode: "linear" | "loop";
+    strategy: "LINEAR_PIPELINE" | "ACTION_PROTOCOL_LOOP";
+    budgets: {
+      maxDecisions: number;
+      maxToolCalls: number;
+      maxRepairAttempts: number;
+      maxTotalTokens: number;
+      maxEstimatedCostUsd: number;
+      maxLatencyMs: number;
+      maxSteps: number;
+    };
+    storageNamespace: string;
   };
   agentPolicy: AgentModelStatus;
   safety: {

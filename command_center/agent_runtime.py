@@ -181,6 +181,7 @@ class BoundedAgentRun:
                 status="FAILED",
                 tool_name=name,
                 read_only=tool.read_only,
+                observation_code="tool.failed",
             )
             raise
         self._append(
@@ -190,6 +191,7 @@ class BoundedAgentRun:
             duration_ms=(perf_counter() - started) * 1000,
             tool_name=name,
             read_only=tool.read_only,
+            observation_code="tool.ok",
         )
         return result
 

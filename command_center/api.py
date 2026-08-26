@@ -154,11 +154,30 @@ app.add_middleware(
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     status = engine.engine_status()
+    model_status = provider.status()
     return {
         "status": "ok" if status["allowed"] else "degraded",
         "environment": settings.app_env,
         "engine": status,
-        "model": provider.status(),
+        "model": model_status,
+        "agentRuntime": {
+            "mode": settings.agent_runtime_mode,
+            "strategy": (
+                "ACTION_PROTOCOL_LOOP"
+                if settings.agent_runtime_mode == "loop"
+                else "LINEAR_PIPELINE"
+            ),
+            "budgets": {
+                "maxDecisions": settings.agent_max_decisions,
+                "maxToolCalls": settings.agent_max_tool_calls,
+                "maxRepairAttempts": settings.agent_max_repair_attempts,
+                "maxTotalTokens": settings.agent_max_total_tokens,
+                "maxEstimatedCostUsd": settings.agent_max_estimated_cost_usd,
+                "maxLatencyMs": settings.agent_max_latency_ms,
+                "maxSteps": settings.agent_max_steps,
+            },
+            "storageNamespace": settings.data_dir.name,
+        },
         "agentPolicy": engine.agent_model_status().model_dump(
             by_alias=True, mode="json"
         ),

@@ -34,6 +34,7 @@ import {
 } from "@fluentui/react-icons";
 import { api } from "./api";
 import { ApprovalsPanel } from "./components/ApprovalsPanel";
+import { AgentLoopDemo } from "./components/AgentLoopDemo";
 import { AgentPolicyPanel } from "./components/AgentPolicyPanel";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { DispatchReplayPanel } from "./components/DispatchReplayPanel";
@@ -63,10 +64,11 @@ import type {
   WhatIfMode,
 } from "./types";
 
-type View = "command" | "designer" | "simulations" | "incidents" | "evaluation" | "approvals" | "operations";
+type View = "command" | "agent" | "designer" | "simulations" | "incidents" | "evaluation" | "approvals" | "operations";
 
 const viewItems: Array<{ id: View; label: string; icon: ReactElement }> = [
   { id: "command", label: "调度总览", icon: <Home20Regular /> },
+  { id: "agent", label: "Agent 闭环", icon: <Bot20Regular /> },
   { id: "designer", label: "场景设计", icon: <Wrench20Regular /> },
   { id: "simulations", label: "方案仿真", icon: <Play20Regular /> },
   { id: "incidents", label: "异常诊断", icon: <ShieldError20Regular /> },
@@ -152,6 +154,9 @@ export default function App() {
           api.incidents(),
         ]);
       setHealth(nextHealth);
+      if (nextHealth.agentRuntime.mode === "loop") {
+        setView("agent");
+      }
       setScenarios(nextScenarios);
       setMap(nextMap);
       setRuns(nextRuns);
@@ -277,6 +282,10 @@ export default function App() {
         setNotice(
           current.response.state === "CLARIFICATION_REQUIRED"
             ? "参数尚不完整，请在对话中补充缺失信息"
+            : current.response.state === "BLOCKED"
+              ? "确定性安全边界已阻断该请求"
+              : current.response.state === "BUDGET_EXCEEDED"
+                ? "Agent 达到硬预算上限，已安全终止"
             : current.response.fallbackUsed
               ? "DeepSeek 不可用，已使用确定性本地解析"
               : "Agent run 已完成并通过轨迹评测",
@@ -812,7 +821,7 @@ export default function App() {
             <h1>{viewItems.find((item) => item.id === view)?.label}</h1>
             <p>场景 {selectedScenario} | 世界版本 <span className="mono">{snapshot?.worldRevision ?? "-"}</span></p>
           </div>
-          <div className="demo-actions">
+          {view === "command" && <div className="demo-actions">
             <Button
               appearance="secondary"
               icon={<VehicleTruck20Regular />}
@@ -845,7 +854,7 @@ export default function App() {
             >
               运营报告
             </Button>
-          </div>
+          </div>}
         </div>
 
         {error && (
@@ -906,6 +915,23 @@ export default function App() {
               onToggleVehicle={toggleReplayVehicle}
             />
           </div>
+        )}
+
+        {health && view === "agent" && (
+          <AgentLoopDemo
+            health={health}
+            response={chatResponse}
+            agentRun={agentRun}
+            run={currentIntentRun}
+            approval={currentApproval}
+            busy={busy}
+            onSend={handleChat}
+            onAgentApproval={handleAgentApproval}
+            onAgentCancel={handleAgentCancel}
+            onSimulate={handleSimulate}
+            onCreateApproval={handleCreateApproval}
+            onCommit={handleCommit}
+          />
         )}
 
         {snapshot && map && view === "simulations" && (

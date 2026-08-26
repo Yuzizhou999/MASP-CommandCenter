@@ -79,3 +79,17 @@ def test_settings_default_to_frozen_linear_runtime(
     settings = Settings.load()
 
     assert settings.agent_runtime_mode == "linear"
+
+
+def test_settings_supports_isolated_runtime_directories(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _prepare_root(tmp_path)
+    monkeypatch.setattr(settings_module, "ROOT", tmp_path)
+    monkeypatch.setenv("COMMAND_CENTER_DATA_DIR", "data/agent-demo-v2")
+    monkeypatch.setenv("COMMAND_CENTER_RUNS_DIR", "runs/agent-demo-v2")
+
+    settings = Settings.load()
+
+    assert settings.data_dir == (tmp_path / "data" / "agent-demo-v2").resolve()
+    assert settings.runs_dir == (tmp_path / "runs" / "agent-demo-v2").resolve()

@@ -32,6 +32,7 @@ interface AssistantPanelProps {
   run?: SimulationSummary | null;
   approval?: Approval | null;
   busy?: string | null;
+  showTrace?: boolean;
   onSend: (message: string) => Promise<void>;
   onAgentApproval: (approved: boolean) => Promise<void>;
   onAgentCancel: () => Promise<void>;
@@ -149,6 +150,7 @@ export function AssistantPanel({
   run,
   approval,
   busy,
+  showTrace = true,
   onSend,
   onAgentApproval,
   onAgentCancel,
@@ -234,7 +236,7 @@ export function AssistantPanel({
 
             {agentRun.workflow && <WorkflowProgress workflow={agentRun.workflow} />}
 
-            {agentRun.traceSteps.length > 0 && (
+            {showTrace && agentRun.traceSteps.length > 0 && (
               <ol className="agent-trace-list agent-trace-live-list" aria-label="实时 Agent 轨迹">
                 {agentRun.traceSteps.map((step) => (
                   <li key={step.stepId} className={`agent-trace-step agent-trace-${step.status.toLowerCase()}`}>
@@ -358,7 +360,7 @@ export function AssistantPanel({
               </div>
             )}
 
-            {response.agentTrace && (
+            {showTrace && response.agentTrace && (
               <Accordion collapsible className="agent-trace-accordion">
                 <AccordionItem value="agent-trace">
                   <AccordionHeader icon={<Bot24Regular />}>

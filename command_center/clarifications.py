@@ -29,6 +29,31 @@ TASK_TERMS = (
     "紧急任务",
 )
 BLOCK_TERMS = ("封闭", "封路", "检修", "停用", "禁行")
+READ_ONLY_RESOURCE_QUERY_TERMS = (
+    "哪些",
+    "什么",
+    "如何",
+    "怎么",
+    "为什么",
+    "流程",
+    "规范",
+    "规则",
+    "要求",
+    "SOP",
+    "sop",
+)
+EXPLICIT_BLOCK_COMMAND_TERMS = (
+    "请封闭",
+    "请封路",
+    "请停用",
+    "请禁行",
+    "立即封闭",
+    "立即封路",
+    "立即停用",
+    "执行封闭",
+    "执行封路",
+    "执行停用",
+)
 NEW_INTENT_TERMS = (
     "报告",
     "总结",
@@ -99,7 +124,17 @@ class ClarificationResolver:
 
     @staticmethod
     def _intent_type(message: str, pending: dict[str, Any] | None) -> IntentType | None:
-        if any(term in message for term in BLOCK_TERMS):
+        has_block_term = any(term in message for term in BLOCK_TERMS)
+        is_explicit_block_command = any(
+            term in message for term in EXPLICIT_BLOCK_COMMAND_TERMS
+        ) or bool(re.search(r"(?:封闭|封路|停用|禁行).{0,8}\d+\s*(?:分钟|秒)", message))
+        if (
+            has_block_term
+            and any(term in message for term in READ_ONLY_RESOURCE_QUERY_TERMS)
+            and not is_explicit_block_command
+        ):
+            return None
+        if has_block_term:
             return IntentType.BLOCK_RESOURCE
         if any(term in message for term in TASK_TERMS):
             return IntentType.CREATE_TASK
