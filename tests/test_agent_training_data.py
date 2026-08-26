@@ -6,7 +6,10 @@ from pathlib import Path
 import pytest
 
 from training.intent_dataset import file_sha256, validate_example, write_jsonl
-from training.train_lora import tokenize_conversation
+from training.train_lora import (
+    _checkpoint_training_arguments,
+    tokenize_conversation,
+)
 from training.tokenization_preflight import (
     inspect_dataset_tokenization,
     require_transformers_4,
@@ -111,6 +114,23 @@ def test_transformers_major_version_is_pinned() -> None:
     require_transformers_4("4.57.6")
     with pytest.raises(RuntimeError, match="只允许项目锁定的 4.x"):
         require_transformers_4("5.12.1")
+
+
+def test_checkpoint_arguments_preserve_default_epoch_behavior() -> None:
+    assert _checkpoint_training_arguments(None) == {
+        "save_strategy": "epoch",
+        "load_best_model_at_end": True,
+    }
+
+
+def test_checkpoint_arguments_support_bounded_training_sessions() -> None:
+    assert _checkpoint_training_arguments(20) == {
+        "save_strategy": "steps",
+        "save_steps": 20,
+        "load_best_model_at_end": False,
+    }
+    with pytest.raises(ValueError, match="必须是正整数"):
+        _checkpoint_training_arguments(0)
 
 
 def test_dataset_tokenization_preflight_reports_lengths(tmp_path: Path) -> None:

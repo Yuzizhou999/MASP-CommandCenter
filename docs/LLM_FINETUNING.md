@@ -100,6 +100,33 @@ python -m training.train_lora data\finetuning\agent-sft-v2 `
 
 训练器会监督多轮会话中选定的 assistant turn；故意构造的非法动作可通过 `superviseAssistantIndices` 排除。`manifest.json` 固定数据摘要、MASP commit、生成策略和 gold 隔离声明。
 
+训练前必须对全部 split 做 token 预检，不能通过尾部截断静默丢弃 system prompt、用户请求或权威参数：
+
+```powershell
+python -m training.tokenization_preflight data\finetuning\agent-sft-v2 `
+  --config training\configs\agent-lora-v2.json `
+  --output models\masp-agent-lora-v2\tokenization-preflight.json
+```
+
+只要任一样本超过 `maxLength`，预检和训练都会直接失败并报告 `exampleId`、类别和实际 token 数。当前 v2/v2.1 数据最大长度为 1423，配置固定为 2048，不发生截断。训练环境要求 `transformers 4.x`；预检会拒绝 5.x，避免聊天模板返回类型变化造成错误长度统计。
+
+默认仍按 epoch 保存 checkpoint 并加载最佳模型。只有运行环境存在明确的会话时限时，才传入 `--checkpoint-steps N` 改为定步保存；恢复时使用 `--resume-from-checkpoint`。这个选项不改变未传参时的历史训练行为。
+
+### v2.2 失败驱动受控实验
+
+v2.2 不直接与历史单次训练数字归因比较。先从 `agent-lora-v2.json` 复制控制配置，用原 v2 数据训练 `v2-repro`；再用相同学习率 `1.5e-4`、梯度累积 16、seed `20260825` 和 2048 token 训练 v2.2，唯一数据变量是 v2.1 新增的 34 条失败驱动样本：
+
+```powershell
+python -m training.prepare_agent_dataset_v21
+python -m training.tokenization_preflight data\finetuning\agent-sft-v2.1 `
+  --config training\configs\agent-lora-v2.2.json
+python -m training.train_lora data\finetuning\agent-sft-v2.1 `
+  --config training\configs\agent-lora-v2.2.json `
+  --output-dir models\masp-agent-lora-v2.2
+```
+
+本机完整训练记录为 `train_loss=0.015333`、`eval_loss=0.003809`、最大显存 4879.9 MB，`maxObservedTokens=1423`、`truncatedExamples=0`。冻结评测观察到 1/6 个目标案例改善且无 case 回归，但意图无退化门、工具 recall、修复门和边界拦截门未通过，因此 `v2.2` 保持 `candidate`，默认仍是 v1。
+
 ## 5. 启动本地模型 API
 
 在 `masp-lora` 环境中启动 4-bit 推理服务：
@@ -260,4 +287,5 @@ QLoRA 通过模型和系统两组资格门；基座模型只通过系统组。QL
 - `training/prepare_agent_dataset.py`：多轮单动作轨迹数据构造；
 - `training/evaluate_agent_trajectories.py`：轨迹、修复和注入评测；
 - `training/compare_agent_replays.py`：同 case paired replay diff；
+- `training/compare_agent_experiment.py`：v2-repro 与 v2.2 的受控同 case 对比；
 - `training/qualify_agent_candidate.py`：v1 无退化与 v2 新增量的双层晋级门。

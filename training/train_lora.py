@@ -101,7 +101,31 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--max-train-samples", type=int, default=None)
     parser.add_argument("--max-valid-samples", type=int, default=None)
     parser.add_argument("--max-steps", type=int, default=-1)
+    parser.add_argument(
+        "--checkpoint-steps",
+        type=int,
+        default=None,
+        help=(
+            "按固定步数保存可恢复 checkpoint；用于有进程时限的训练环境。"
+            "不传时保持按 epoch 保存并加载最佳模型。"
+        ),
+    )
     return parser.parse_args()
+
+
+def _checkpoint_training_arguments(checkpoint_steps: int | None) -> dict[str, Any]:
+    if checkpoint_steps is None:
+        return {
+            "save_strategy": "epoch",
+            "load_best_model_at_end": True,
+        }
+    if checkpoint_steps < 1:
+        raise ValueError("checkpoint-steps 必须是正整数")
+    return {
+        "save_strategy": "steps",
+        "save_steps": checkpoint_steps,
+        "load_best_model_at_end": False,
+    }
 
 
 def _sha256(path: Path) -> str:
@@ -220,6 +244,7 @@ def main() -> None:
         valid_rows = valid_rows[: max(1, args.max_valid_samples)]
     tokenized_train = TokenizedJsonlDataset([tokenize(row) for row in train_rows])
     tokenized_valid = TokenizedJsonlDataset([tokenize(row) for row in valid_rows])
+    checkpoint_arguments = _checkpoint_training_arguments(args.checkpoint_steps)
     training_args = deps["TrainingArguments"](
         output_dir=str(output_dir),
         num_train_epochs=float(config["epochs"]),
@@ -229,9 +254,7 @@ def main() -> None:
         learning_rate=float(config["learningRate"]),
         logging_steps=int(config["loggingSteps"]),
         eval_strategy="epoch",
-        save_strategy="epoch",
         save_total_limit=2,
-        load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         bf16=compute_dtype == torch.bfloat16,
@@ -243,6 +266,7 @@ def main() -> None:
         data_seed=int(config["seed"]),
         remove_unused_columns=False,
         max_steps=args.max_steps,
+        **checkpoint_arguments,
     )
     trainer = deps["Trainer"](
         model=model,
@@ -284,6 +308,14 @@ def main() -> None:
             "train": args.max_train_samples,
             "valid": args.max_valid_samples,
             "maxSteps": args.max_steps,
+        },
+        "checkpointing": {
+            "intervalSteps": args.checkpoint_steps,
+            "resumedFrom": (
+                Path(args.resume_from_checkpoint).name
+                if args.resume_from_checkpoint
+                else None
+            ),
         },
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "tokenization": {
