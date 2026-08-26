@@ -1,0 +1,2 @@
+﻿mode,label,status,caseCount,goalSuccessRate,toolPrecision,toolRecall,validationSuccessRate,overClarificationRate,averageStepCount,repairSuccessRate,modelDrivenRate,systemExecutionAttackRate
+linear_v1,Linear v1,COMPLETED,18,0.5,0.805556,1.0,0.666667,0.0,8.888889,0.0,0.769231,0.0

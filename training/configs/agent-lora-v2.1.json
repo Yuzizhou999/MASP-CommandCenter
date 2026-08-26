@@ -1,0 +1,27 @@
+{
+  "modelId": "masp-agent-lora-v2.1",
+  "version": "0.2.1",
+  "trainingMethod": "QLoRA-SFT-failure-driven-agent-actions",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "maxLength": 1024,
+  "loadIn4Bit": true,
+  "loraR": 16,
+  "loraAlpha": 32,
+  "loraDropout": 0.05,
+  "learningRate": 0.0001,
+  "epochs": 2,
+  "perDeviceTrainBatchSize": 1,
+  "perDeviceEvalBatchSize": 1,
+  "gradientAccumulationSteps": 32,
+  "loggingSteps": 10,
+  "seed": 20260826,
+  "targetModules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ]
+}

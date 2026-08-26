@@ -55,9 +55,7 @@ class CompletionOnlyCollator:
             labels.append(row["labels"] + [-100] * padding)
         return {
             "input_ids": self.torch.tensor(input_ids, dtype=self.torch.long),
-            "attention_mask": self.torch.tensor(
-                attention_masks, dtype=self.torch.long
-            ),
+            "attention_mask": self.torch.tensor(attention_masks, dtype=self.torch.long),
             "labels": self.torch.tensor(labels, dtype=self.torch.long),
         }
 
@@ -122,8 +120,21 @@ def tokenize_conversation(
             labels[start:end] = full_ids[start:end]
         assistant_ordinal += 1
 
-    input_ids = full_ids[:max_length]
-    labels = labels[:max_length]
+    if len(full_ids) > max_length:
+        # Keep the terminal supervised action visible for long multi-turn traces.
+        # A prefix-only cut can leave an example with no learning target at all.
+        supervised_positions = [
+            index for index, value in enumerate(labels) if value != -100
+        ]
+        if not supervised_positions:
+            raise ValueError("样本没有可监督的 assistant token")
+        end = min(len(full_ids), supervised_positions[-1] + 1)
+        start = max(0, end - max_length)
+        input_ids = full_ids[start:end]
+        labels = labels[start:end]
+    else:
+        input_ids = full_ids
+        labels = labels
     if all(value == -100 for value in labels):
         raise ValueError("样本截断后没有保留受监督的 assistant token，请增大 maxLength")
     return {
@@ -180,9 +191,7 @@ def main() -> None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
 
-    compute_dtype = (
-        torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-    )
+    compute_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
     quantization_config = None
     if bool(config.get("loadIn4Bit", True)):
         quantization_config = deps["BitsAndBytesConfig"](

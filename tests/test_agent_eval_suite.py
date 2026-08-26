@@ -37,6 +37,38 @@ def test_agent_trajectory_gold_is_independent_and_complete() -> None:
         assert set(case["requiredTools"]).issubset(set(case["allowedTools"]))
 
 
+def test_v21_holdout_is_complete_and_disjoint_from_training_requests() -> None:
+    suite = json.loads(
+        (PROJECT_ROOT / "evals" / "agent-trajectories-v2.1-holdout.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    from training.prepare_agent_dataset_v21 import (
+        _clarification_rows,
+        _explanation_rows,
+        _repair_rows,
+        _status_rows,
+    )
+
+    training_rows = [
+        *_explanation_rows(),
+        *_repair_rows(),
+        *_clarification_rows(),
+        *_status_rows(),
+    ]
+    training_requests = {
+        json.loads(row["messages"][1]["content"])["request"] for row in training_rows
+    }
+    holdout_requests = {case["message"] for case in suite["cases"]}
+
+    assert suite["goldSource"] == "rule-derived-independent-annotation"
+    assert len(suite["cases"]) >= 18
+    assert len(holdout_requests) == len(suite["cases"])
+    assert holdout_requests.isdisjoint(training_requests)
+    for case in suite["cases"]:
+        assert set(case["requiredTools"]).issubset(set(case["allowedTools"]))
+
+
 def test_repair_success_rate_uses_all_gold_repair_cases_as_denominator() -> None:
     rows = [
         {
