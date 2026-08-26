@@ -3,15 +3,25 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import platform
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .tokenization import tokenize_conversation
+from .tokenization_preflight import (
+    inspect_dataset_tokenization,
+    require_transformers_4,
+)
+
 
 def _dependencies():
     try:
+        import bitsandbytes
+        import peft
         import torch
+        import transformers
         from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
         from transformers import (
             AutoModelForCausalLM,
@@ -34,6 +44,9 @@ def _dependencies():
         "BitsAndBytesConfig": BitsAndBytesConfig,
         "Trainer": Trainer,
         "TrainingArguments": TrainingArguments,
+        "bitsandbytes_version": bitsandbytes.__version__,
+        "peft_version": peft.__version__,
+        "transformers_version": transformers.__version__,
     }
 
 
@@ -73,77 +86,6 @@ class TokenizedJsonlDataset:
         return self.rows[index]
 
 
-def tokenize_conversation(
-    tokenizer: Any,
-    messages: list[dict[str, str]],
-    *,
-    max_length: int,
-    supervise_assistant_indices: list[int] | None = None,
-) -> dict[str, Any]:
-    """Tokenize a transcript while supervising selected assistant turns."""
-
-    full_ids = list(
-        tokenizer.apply_chat_template(
-            messages,
-            tokenize=True,
-            add_generation_prompt=False,
-        )
-    )
-    labels = [-100] * len(full_ids)
-    assistant_ordinal = 0
-    selected = (
-        set(supervise_assistant_indices)
-        if supervise_assistant_indices is not None
-        else None
-    )
-    for message_index, message in enumerate(messages):
-        if message.get("role") != "assistant":
-            continue
-        should_supervise = selected is None or assistant_ordinal in selected
-        if should_supervise:
-            prompt_ids = list(
-                tokenizer.apply_chat_template(
-                    messages[:message_index],
-                    tokenize=True,
-                    add_generation_prompt=True,
-                )
-            )
-            through_ids = list(
-                tokenizer.apply_chat_template(
-                    messages[: message_index + 1],
-                    tokenize=True,
-                    add_generation_prompt=False,
-                )
-            )
-            start = min(len(prompt_ids), len(full_ids))
-            end = min(len(through_ids), len(full_ids))
-            labels[start:end] = full_ids[start:end]
-        assistant_ordinal += 1
-
-    if len(full_ids) > max_length:
-        # Keep the terminal supervised action visible for long multi-turn traces.
-        # A prefix-only cut can leave an example with no learning target at all.
-        supervised_positions = [
-            index for index, value in enumerate(labels) if value != -100
-        ]
-        if not supervised_positions:
-            raise ValueError("样本没有可监督的 assistant token")
-        end = min(len(full_ids), supervised_positions[-1] + 1)
-        start = max(0, end - max_length)
-        input_ids = full_ids[start:end]
-        labels = labels[start:end]
-    else:
-        input_ids = full_ids
-        labels = labels
-    if all(value == -100 for value in labels):
-        raise ValueError("样本截断后没有保留受监督的 assistant token，请增大 maxLength")
-    return {
-        "input_ids": input_ids,
-        "attention_mask": [1] * len(input_ids),
-        "labels": labels,
-    }
-
-
 def _arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="使用 QLoRA 微调 MASP 意图模型")
     parser.add_argument("dataset_dir", type=Path)
@@ -170,6 +112,7 @@ def main() -> None:
     args = _arguments()
     deps = _dependencies()
     torch = deps["torch"]
+    require_transformers_4(deps["transformers_version"])
     if not torch.cuda.is_available():
         raise RuntimeError("QLoRA 训练需要可用的 CUDA GPU")
 
@@ -190,6 +133,33 @@ def main() -> None:
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
+
+    preflight = inspect_dataset_tokenization(
+        dataset_dir,
+        config,
+        tokenizer,
+        transformers_version=deps["transformers_version"],
+        tokenizer_source=str(config["baseModel"]),
+    )
+    if not preflight["passed"]:
+        first = preflight["violations"][0]
+        raise ValueError(
+            "tokenize 预检失败："
+            f"{first['exampleId']} / {first['category']} / "
+            f"{first['observedTokens']} tokens > {first['maxLength']}"
+        )
+    output_dir = args.output_dir.resolve()
+    if (
+        output_dir.exists()
+        and any(output_dir.iterdir())
+        and args.resume_from_checkpoint is None
+    ):
+        raise ValueError(f"输出目录非空，拒绝覆盖已有模型工件：{output_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "tokenization-preflight.json").write_text(
+        json.dumps(preflight, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
     compute_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
     quantization_config = None
@@ -250,8 +220,6 @@ def main() -> None:
         valid_rows = valid_rows[: max(1, args.max_valid_samples)]
     tokenized_train = TokenizedJsonlDataset([tokenize(row) for row in train_rows])
     tokenized_valid = TokenizedJsonlDataset([tokenize(row) for row in valid_rows])
-    output_dir = args.output_dir.resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
     training_args = deps["TrainingArguments"](
         output_dir=str(output_dir),
         num_train_epochs=float(config["epochs"]),
@@ -318,6 +286,23 @@ def main() -> None:
             "maxSteps": args.max_steps,
         },
         "createdAt": datetime.now(timezone.utc).isoformat(),
+        "tokenization": {
+            "maxLength": preflight["maxLength"],
+            "maxObservedTokens": preflight["maxObservedTokens"],
+            "p50": preflight["lengthDistribution"]["p50"],
+            "p99": preflight["lengthDistribution"]["p99"],
+            "truncatedExamples": preflight["truncatedExamples"],
+            "preflightPassed": preflight["passed"],
+        },
+        "trainingEnvironment": {
+            "python": platform.python_version(),
+            "torch": torch.__version__,
+            "cuda": torch.version.cuda,
+            "transformers": deps["transformers_version"],
+            "peft": deps["peft_version"],
+            "bitsandbytes": deps["bitsandbytes_version"],
+            "gpu": torch.cuda.get_device_name(0),
+        },
         "metrics": metrics,
     }
     (output_dir / "model-card.json").write_text(

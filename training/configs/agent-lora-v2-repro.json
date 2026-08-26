@@ -1,0 +1,27 @@
+{
+  "modelId": "masp-agent-lora-v2-repro",
+  "version": "0.2.0",
+  "trainingMethod": "QLoRA-SFT-multitask-intent-and-agent-actions",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "maxLength": 2048,
+  "loadIn4Bit": true,
+  "loraR": 16,
+  "loraAlpha": 32,
+  "loraDropout": 0.05,
+  "learningRate": 0.00015,
+  "epochs": 2,
+  "perDeviceTrainBatchSize": 1,
+  "perDeviceEvalBatchSize": 1,
+  "gradientAccumulationSteps": 16,
+  "loggingSteps": 10,
+  "seed": 20260825,
+  "targetModules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ]
+}

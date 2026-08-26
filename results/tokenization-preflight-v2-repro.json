@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-26T09:15:38.701216+00:00",
+  "datasetId": "masp-agent-sft-v2",
+  "datasetManifestSha256": "f6af49473b2f31fdeb62819817e9a108e7bf2df76c25dd99905b60a7759843b6",
+  "tokenizerSource": "models\\masp-agent-lora-v2",
+  "transformersVersion": "4.57.6",
+  "maxLength": 2048,
+  "splitCounts": {
+    "train": 1182,
+    "valid": 196,
+    "test": 208
+  },
+  "lengthDistribution": {
+    "count": 1586,
+    "min": 686,
+    "p50": 1239.0,
+    "p95": 1368.0,
+    "p99": 1411.0,
+    "max": 1423
+  },
+  "maxObservedTokens": 1423,
+  "overMaxLengthExamples": 0,
+  "truncatedExamples": 0,
+  "violations": [],
+  "passed": true
+}
