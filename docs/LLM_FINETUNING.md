@@ -144,7 +144,17 @@ python -m training.train_lora data\finetuning\agent-sft-v2.3 `
 
 推理约束的审计边界必须保留：训练前方案写的是 LM Format Enforcer，但训练后发现 LMFE 无法稳定编译动作联合 Schema，并可能在合法动作完成前提前 EOS。因此正式对照改为让控制组和候选组都使用同一 XGrammar 七分支 Schema，生成后再由 `jsonschema` 终检。这个改动保证两组同口径，但它是训练后的推理修订，所以 v2.3 是稳定化实验，不是预注册的单变量消融。
 
-最终意图挑战中，候选相对控制的 Macro F1 为 `0.7457 -> 0.8294`、精确匹配为 `0.72 -> 0.78`、槽位匹配为 `0.60 -> 0.90`、MASP 有效率为 `0.78 -> 0.86`。但 18 条轨迹 holdout 的目标完成率都为 `0.7222`，工具 recall 从 `0.9167` 降至 `0.8611`，model-driven rate 从 `1.0` 降至 `0.9231`。资格结论是 `KEEP_V1`；只支持“单 seed 意图层有方向性增益”，不支持“v2 已稳定”。因此没有继续训练另外两个 seed，v2.3 模型卡保持 `candidate`。
+原始意图挑战中，候选相对控制的 Macro F1 为 `0.7457 -> 0.8294`、精确匹配为 `0.72 -> 0.78`、槽位匹配为 `0.60 -> 0.90`、MASP 有效率为 `0.78 -> 0.86`。当时 18 条轨迹 holdout 的目标完成率都为 `0.7222`，工具 recall 从 `0.9167` 降至 `0.8611`，model-driven rate 从 `1.0` 降至 `0.9231`。资格结论是 `KEEP_V1`，因此没有继续训练另外两个 seed，v2.3 模型卡保持 `candidate`。
+
+后续审计确认原轨迹结果混入 resolver 词表、中文时长、`ungrounded` 终态和槽位评分缺陷。先运行不调用模型的系统可达性预检；低于 suite 的目标成功率门槛时命令以退出码 2 失败，禁止继续消耗 GPU：
+
+```powershell
+python -m training.preflight_agent_system `
+  --suite evals\agent-trajectories-v2.1-holdout.json `
+  --output results\agent-system-preflight-v21.json
+```
+
+修复后预检为 18/18、理论上限 `1.0`。两个既有 adapter 未重训，只在相同 AgentAction prompt、XGrammar Schema 和请求集合下重评。control 轨迹目标成功率为 `0.8333`，v2.3 为 `0.8889`，但候选工具 recall `0.8333`、澄清准确率 `0.9444`、边界拦截 recall `0.50`，仍然 `KEEP_V1`。最新 intent 重评为 Macro F1 `0.7457 -> 0.7991`、精确匹配 `0.72 -> 0.78`、槽位匹配 `0.60 -> 0.80`；历史 `0.8294` 没有稳定复现。训练已经停止，后续只在系统可达性、评测契约哈希和冻结门槛全部通过后才考虑新候选。
 
 ## 5. 启动本地模型 API
 

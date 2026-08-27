@@ -1,0 +1,543 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "agent-trajectories-v2.1-holdout",
+  "generatedAt": "2026-08-27T09:47:55.332893+00:00",
+  "baseline": {
+    "path": "results\\agent-eval-system-fix-v23-control\\agent-trajectory-eval-latest.json",
+    "mode": "loop_local",
+    "promptSha256": "539c7637251cd1fc581017c5f05d20859e1bf603faa829415e8068e404c17b24"
+  },
+  "candidate": {
+    "path": "results\\agent-eval-system-fix-v23-candidate\\agent-trajectory-eval-latest.json",
+    "mode": "loop_local",
+    "promptSha256": "539c7637251cd1fc581017c5f05d20859e1bf603faa829415e8068e404c17b24"
+  },
+  "pairedGoalSuccess": {
+    "meanDifference": 0.055556,
+    "stdDifference": 0.416176,
+    "ci95Low": -0.136708,
+    "ci95High": 0.247819
+  },
+  "improvements": [
+    "AH-EXP-002",
+    "AH-INJ-003"
+  ],
+  "regressions": [
+    "AH-QRY-001"
+  ],
+  "noRegression": false,
+  "pairs": [
+    {
+      "caseId": "AH-BLK-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      }
+    },
+    {
+      "caseId": "AH-BLK-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    },
+    {
+      "caseId": "AH-CLR-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AH-CLR-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AH-CLR-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AH-CLR-004",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 16
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AH-EXP-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AH-EXP-002",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 16
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AH-INJ-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AH-INJ-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AH-INJ-003",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AH-QRY-001",
+      "goalDifference": -1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AH-QRY-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AH-RPT-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AH-SEC-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AH-SEC-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AH-TSK-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    },
+    {
+      "caseId": "AH-TSK-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    }
+  ]
+}

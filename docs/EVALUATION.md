@@ -71,7 +71,7 @@
 
 ## Agent 轨迹评测与当前结论
 
-Agent 模型使用人工独立标注的 `evals/agent-trajectories-v1.json`。每个 case 标注必需、允许和禁止工具、目标终态、意图类型、澄清要求、可修复校验项及注入属性。报告同时给出目标完成率、工具 precision/recall、澄清准确率、校验与修复成功率、无效调用、步数、模型驱动率和系统级攻击成功率；所有比例指标包含样本标准差与 95% 置信区间。规则 fallback 不计作模型驱动结果。
+Agent 模型使用人工独立标注的 `evals/agent-trajectories-v1.json`。每个 case 标注必需、允许和禁止工具、目标终态、意图类型、澄清要求、可修复校验项及注入属性。报告同时给出目标完成率、工具 precision/recall、澄清准确率、校验与修复成功率、无效调用、步数、模型驱动率和系统级攻击成功率；所有比例指标包含样本标准差与 95% 置信区间。`goalSuccess` 单独衡量终态、意图、权威槽位、澄清和安全结果，必需工具是否完整由独立的 `toolRecall` 硬门槛衡量，便于识别“结果碰巧正确但轨迹不完整”；两项必须同时过门。规则 fallback 不计作模型驱动结果。
 
 2026-08-25 的真实本地模型对照使用同一冻结意图挑战集和轨迹集。v1 与 v2 的原始意图准确率均为 94%；v2 的工具 precision/recall 均为 97.1%，系统边界拦截召回率 100%，系统级攻击成功率 0，但目标完成率只有 64.7%、修复成功率 50%、校验成功率 72.7%，且原始 Schema 合法率从 v1 的 100% 降至 96%。资格脚本据此输出 `KEEP_V1`。当前默认保持 `masp-intent-lora + linear`，`masp-agent-lora-v2` 仅登记为 candidate，不把训练 loss 或未通过门槛的结果包装成上线能力。
 
@@ -81,7 +81,11 @@ Agent 模型使用人工独立标注的 `evals/agent-trajectories-v1.json`。每
 
 v2.3 的结构化推理实现不是训练前完全冻结的单一变量。冻结方案原写 LM Format Enforcer，训练完成后因其不能稳定处理动作联合 Schema、会提前 EOS，才改为 XGrammar；两组都按相同约束重跑，因此组间比较有效，但不能把结果归因于某一个数据改动。单 seed 和 18 条 holdout 也不支持“稳定”结论，故未继续另外两个 seed。
 
-稳定报告保存在 `results/intent-eval-v1/`、`results/intent-eval-v2/`、`results/agent-eval-v1/` 和 `results/agent-eval-v2/`。v2.2 受控实验另保存在 `results/intent-eval-v2-repro/`、`results/intent-eval-v22/`、`results/agent-eval-v2-repro/` 和 `results/agent-eval-v22/`。v2.3 证据位于 `results/intent-eval-v23-control/`、`results/intent-eval-v23-seed-20260827/`、`results/agent-eval-v23-control/` 和 `results/agent-eval-v23-seed-20260827/`。`qualification.json` 是唯一晋级结论，`experiment-summary.json`、`controlled-experiment.json` 和 `paired-replay.json` 用于定位逐 case 的改进与退化。
+同日的回溯审计发现，上述 `0.7222` 还混入了确定性系统与评分缺陷：resolver 无法绑定 `AH-TSK-001`、`AH-BLK-002` 的冻结措辞，`ungrounded` 被错误终结为 `BLOCKED`，轨迹评分也没有校验任务/资源权威槽位。修复词表、中文时长、终态映射和槽位评分后，训练前可达性预检为 18/18、理论上限 `1.0`；确定性 driver 为 `0.8889`。预检只检查 resolver 对 gold 权威槽位的硬可达性，不把 `authoritativeParameters` 注入模型上下文。
+
+两个现有 adapter 在不重训的情况下重新通过同一 AgentAction/XGrammar 契约评测，控制组和候选组的 `evaluationContractSha256`、`requestPromptSetSha256` 与轨迹 prompt hash 均一致。修复后 control 的目标成功率为 `0.8333`，v2.3 为 `0.8889`；候选改善 `AH-EXP-002`、`AH-INJ-003`，回归 `AH-QRY-001`，并继续失败于 `AH-CLR-004`。候选工具 recall 为 `0.8333`、澄清准确率 `0.9444`、边界拦截 recall `0.50`，仍未达到资格门槛。新的 intent 重评中 control 复现 Macro F1 `0.7457`，候选为 `0.7991`；历史候选的 `0.8294` 未复现，因此只能表述为“对最终 AgentAction + XGrammar 契约有单次方向性适配”，不能表述为通用意图能力稳定提升。
+
+稳定报告保存在 `results/intent-eval-v1/`、`results/intent-eval-v2/`、`results/agent-eval-v1/` 和 `results/agent-eval-v2/`。v2.2 受控实验另保存在 `results/intent-eval-v2-repro/`、`results/intent-eval-v22/`、`results/agent-eval-v2-repro/` 和 `results/agent-eval-v22/`。v2.3 历史证据位于 `results/intent-eval-v23-control/`、`results/intent-eval-v23-seed-20260827/`、`results/agent-eval-v23-control/` 和 `results/agent-eval-v23-seed-20260827/`；系统修复后的正式重评使用 `results/*-system-fix-*` 独立目录，不覆盖历史失败实验。`qualification.json` 是唯一晋级结论，`experiment-summary.json`、`controlled-experiment.json` 和 `paired-replay.json` 用于定位逐 case 的改进与退化。
 
 Agent run 存储另有固定并发基准。2026-08-25 在 50 run、12 worker 下，旧 JSON 整体重写实现完成 50/50，吞吐 1.555 runs/s；SQLite WAL + append-only events 完成 50/50，吞吐 6.039 runs/s，总耗时加速 3.884 倍。稳定报告为 `results/store-benchmark/latest.json`。
 

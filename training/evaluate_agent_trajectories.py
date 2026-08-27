@@ -25,6 +25,12 @@ from command_center.llm_provider import OpenAICompatibleLocalProvider
 from command_center.orchestrator import DispatchOrchestrator
 from command_center.provider import DeepSeekProvider, SYSTEM_PROMPT
 from command_center.settings import Settings
+from training.preflight_agent_system import (
+    authority_matches,
+    expected_authority,
+    observed_intent_authority,
+    preflight_suite,
+)
 
 
 MODE_LABELS = {
@@ -203,6 +209,10 @@ def _score_case(case: dict[str, Any], response) -> dict[str, Any]:
     clarification = response.state == "CLARIFICATION_REQUIRED"
     expected_intent = case.get("expectedIntentType")
     actual_intent = response.intent.intent_type.value if response.intent else None
+    expected_slots = expected_authority(case)
+    observed_slots = observed_intent_authority(response.intent)
+    slot_expected = expected_slots is not None
+    slot_success = authority_matches(expected_slots, observed_slots)
     terminal_success = response.state == case["expectedTerminalState"]
     intent_success = expected_intent is None or actual_intent == expected_intent
     clarification_success = clarification == bool(case["shouldClarify"])
@@ -238,6 +248,7 @@ def _score_case(case: dict[str, Any], response) -> dict[str, Any]:
     goal_success = bool(
         terminal_success
         and intent_success
+        and slot_success
         and clarification_success
         and validation_success
         and not forbidden_called
@@ -264,6 +275,10 @@ def _score_case(case: dict[str, Any], response) -> dict[str, Any]:
         "goalSuccess": int(goal_success),
         "terminalSuccess": int(terminal_success),
         "intentSuccess": int(intent_success),
+        "slotExpected": slot_expected,
+        "slotSuccess": int(slot_success),
+        "expectedAuthority": expected_slots,
+        "observedAuthority": observed_slots,
         "clarificationAccuracy": int(clarification_success),
         "validationExpected": validation_expected,
         "validationSuccess": int(validation_success),
@@ -295,6 +310,7 @@ def _summarize(mode: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     ]
     fixable = [row for row in rows if row["repairExpected"]]
     validation_expected = [row for row in rows if row.get("validationExpected", True)]
+    slot_expected = [row for row in rows if row.get("slotExpected")]
     model_expected = [row for row in rows if row.get("modelDecisionExpected")]
     return {
         "mode": mode,
@@ -308,6 +324,9 @@ def _summarize(mode: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
             "clarificationAccuracy": _metric(rows, "clarificationAccuracy"),
             "validationSuccessRate": _metric(
                 validation_expected, "validationSuccess"
+            ),
+            "slotExactMatchRate": (
+                _metric(slot_expected, "slotSuccess") if slot_expected else None
             ),
             "overClarificationRate": _metric(rows, "overClarification"),
             "invalidToolCallMean": round(
@@ -454,7 +473,7 @@ def main() -> None:
 
     generated_at = datetime.now(timezone.utc)
     result = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "suiteId": suite["suiteId"],
         "goldSource": suite["goldSource"],
         "generatedAt": generated_at.isoformat(),
@@ -465,6 +484,7 @@ def main() -> None:
         "promptSha256ByMode": {
             mode: _prompt_sha(mode) for mode in requested_modes
         },
+        "systemReachabilityPreflight": preflight_suite(suite, settings),
         "systems": summaries,
         "cases": case_rows,
     }
@@ -491,6 +511,7 @@ def main() -> None:
                 "toolPrecision",
                 "toolRecall",
                 "validationSuccessRate",
+                "slotExactMatchRate",
                 "overClarificationRate",
                 "averageStepCount",
                 "repairSuccessRate",
@@ -512,6 +533,9 @@ def main() -> None:
                     "toolRecall": (metrics.get("toolRecall") or {}).get("mean"),
                     "validationSuccessRate": (
                         metrics.get("validationSuccessRate") or {}
+                    ).get("mean"),
+                    "slotExactMatchRate": (
+                        metrics.get("slotExactMatchRate") or {}
                     ).get("mean"),
                     "overClarificationRate": (
                         metrics.get("overClarificationRate") or {}

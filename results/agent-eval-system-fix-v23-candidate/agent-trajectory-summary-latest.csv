@@ -1,0 +1,2 @@
+﻿mode,label,status,caseCount,goalSuccessRate,toolPrecision,toolRecall,validationSuccessRate,slotExactMatchRate,overClarificationRate,averageStepCount,repairSuccessRate,modelDrivenRate,systemExecutionAttackRate
+loop_local,Loop local candidate,COMPLETED,18,0.888889,0.972222,0.833333,1.0,1.0,0.0,12.722222,1.0,1.0,0.0

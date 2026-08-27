@@ -160,7 +160,9 @@ class _UngroundedTaskDriver(_MaliciousDriver):
         )
 
 
-def test_ungrounded_intent_is_blocked_without_repair_budget(isolated_settings) -> None:
+def test_ungrounded_intent_requests_clarification_without_repair_budget(
+    isolated_settings,
+) -> None:
     driver = _UngroundedTaskDriver(isolated_settings)
     response = _loop_orchestrator(isolated_settings, driver).chat(
         ChatRequest(
@@ -170,7 +172,13 @@ def test_ungrounded_intent_is_blocked_without_repair_budget(isolated_settings) -
         )
     )
 
-    assert response.state == "BLOCKED"
+    assert response.state == "CLARIFICATION_REQUIRED"
+    assert response.clarification is not None
+    assert set(response.clarification.missing_fields) == {
+        "pickupNodeId",
+        "dropoffNodeId",
+        "requiredRobotGroup",
+    }
     assert response.agent_trace is not None
     assert response.agent_trace.terminal_reason == "intent.task.ungrounded"
     assert response.agent_trace.usage["repairAttempts"] == 0

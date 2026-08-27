@@ -20,15 +20,28 @@ TASK_TERMS = (
     "送到",
     "送去",
     "送过去",
+    "送往",
     "运到",
+    "运至",
     "运输",
     "转运",
     "搬运",
+    "移到",
+    "挪到",
     "急货",
     "急活",
     "紧急任务",
 )
-BLOCK_TERMS = ("封闭", "封路", "检修", "停用", "禁行")
+BLOCK_TERMS = (
+    "封闭",
+    "封路",
+    "检修",
+    "停用",
+    "禁行",
+    "暂停",
+    "暂时关闭",
+    "临时关闭",
+)
 READ_ONLY_RESOURCE_QUERY_TERMS = (
     "哪些",
     "什么",
@@ -162,11 +175,11 @@ class ClarificationResolver:
     def _field_reference(message: str, field: str) -> str | None:
         if field == "pickupNodeId":
             patterns = (
-                rf"(?:从|起点(?:是|为)?|取货点(?:是|为)?)\s*({NODE_PATTERN.pattern})",
+                rf"(?:从|把|将|起点(?:是|为)?|取货点(?:是|为)?)\s*({NODE_PATTERN.pattern})",
             )
         else:
             patterns = (
-                rf"(?:送到|运到|送往|终点(?:是|为)?|放货点(?:是|为)?|到)\s*({NODE_PATTERN.pattern})",
+                rf"(?:搬运至|送到|运到|送往|运至|移到|挪到|终点(?:是|为)?|放货点(?:是|为)?|至|到)\s*({NODE_PATTERN.pattern})",
             )
         for pattern in patterns:
             match = re.search(pattern, message, flags=re.IGNORECASE)
@@ -295,10 +308,48 @@ class ClarificationResolver:
         minute = re.search(r"(\d+)\s*分钟", message)
         if minute:
             return max(1, int(minute.group(1))) * 60000
+        chinese_minute = re.search(r"([零〇一二两三四五六七八九十百]+)\s*分钟", message)
+        if chinese_minute:
+            return ClarificationResolver._chinese_number(
+                chinese_minute.group(1)
+            ) * 60000
         second = re.search(r"(\d+)\s*秒", message)
         if second:
             return max(1, int(second.group(1))) * 1000
+        chinese_second = re.search(r"([零〇一二两三四五六七八九十百]+)\s*秒", message)
+        if chinese_second:
+            return ClarificationResolver._chinese_number(
+                chinese_second.group(1)
+            ) * 1000
         return 180000
+
+    @staticmethod
+    def _chinese_number(value: str) -> int:
+        digits = {
+            "零": 0,
+            "〇": 0,
+            "一": 1,
+            "二": 2,
+            "两": 2,
+            "三": 3,
+            "四": 4,
+            "五": 5,
+            "六": 6,
+            "七": 7,
+            "八": 8,
+            "九": 9,
+        }
+        if "百" in value:
+            head, tail = value.split("百", 1)
+            total = digits.get(head, 1) * 100
+            return max(1, total + ClarificationResolver._chinese_number(tail))
+        if "十" in value:
+            head, tail = value.split("十", 1)
+            total = digits.get(head, 1) * 10
+            return max(1, total + digits.get(tail, 0))
+        if not value:
+            return 0
+        return max(1, int("".join(str(digits[row]) for row in value)))
 
     def _block(self, conversation_id: str, combined: str) -> ResolvedRequest:
         resources = RESOURCE_PATTERN.findall(combined)

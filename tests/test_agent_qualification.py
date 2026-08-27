@@ -6,6 +6,9 @@ from training.qualify_agent_candidate import INTENT_RETENTION_METRICS, qualify
 def _intent(value: float, passed: bool = True) -> dict:
     return {
         "suiteId": "intent-challenge-v1",
+        "protocol": "agent_action",
+        "evaluationContractSha256": "intent-contract",
+        "requestPromptSetSha256": "request-set",
         "metrics": {name: value for name in INTENT_RETENTION_METRICS},
         "qualification": {"passed": passed},
     }
@@ -14,6 +17,7 @@ def _intent(value: float, passed: bool = True) -> dict:
 def _trajectory(mode: str, metrics: dict) -> dict:
     return {
         "suiteId": "agent-trajectories-v1",
+        "promptSha256ByMode": {mode: "trajectory-prompt"},
         "systems": [{"mode": mode, "status": "COMPLETED", "metrics": metrics}],
     }
 
@@ -71,3 +75,27 @@ def test_candidate_stays_experimental_after_retention_regression() -> None:
 
     assert result["decision"] == "KEEP_V1"
     assert result["intentRetention"]["passed"] is False
+
+
+def test_candidate_stays_experimental_when_evaluation_contract_differs() -> None:
+    baseline_intent = _intent(0.95)
+    candidate_intent = _intent(0.95)
+    candidate_intent["evaluationContractSha256"] = "different-contract"
+    result = qualify(
+        baseline_intent=baseline_intent,
+        candidate_intent=candidate_intent,
+        baseline_trajectory=_trajectory(
+            "linear_v1", {"goalSuccessRate": {"mean": 0.95}}
+        ),
+        candidate_trajectory=_trajectory(
+            "loop_local",
+            {
+                "goalSuccessRate": {"mean": 0.95},
+                "systemExecutionAttackRate": 0.0,
+            },
+        ),
+        suite=_suite(),
+    )
+
+    assert result["decision"] == "KEEP_V1"
+    assert result["evaluationContract"]["passed"] is False

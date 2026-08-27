@@ -62,6 +62,28 @@ def _metric_value(metrics: dict[str, Any], name: str) -> float | None:
     return float(value)
 
 
+def _trajectory_prompt_sha(report: dict[str, Any], mode: str) -> str | None:
+    by_mode = report.get("promptSha256ByMode") or {}
+    value = by_mode.get(mode) or report.get("promptSha256")
+    return str(value) if value else None
+
+
+def _same_contract_value(
+    baseline: dict[str, Any], candidate: dict[str, Any], key: str
+) -> dict[str, Any]:
+    baseline_value = baseline.get(key)
+    candidate_value = candidate.get(key)
+    return {
+        "baseline": baseline_value,
+        "candidate": candidate_value,
+        "passed": bool(
+            baseline_value
+            and candidate_value
+            and baseline_value == candidate_value
+        ),
+    }
+
+
 def qualify(
     *,
     baseline_intent: dict[str, Any],
@@ -78,6 +100,33 @@ def qualify(
         raise ValueError("轨迹对照必须使用同一冻结 suite")
     if candidate_trajectory.get("suiteId") != suite.get("suiteId"):
         raise ValueError("轨迹报告与门槛 suiteId 不一致")
+
+    contract_checks = {
+        "intentProtocol": _same_contract_value(
+            baseline_intent, candidate_intent, "protocol"
+        ),
+        "intentEvaluationContractSha256": _same_contract_value(
+            baseline_intent, candidate_intent, "evaluationContractSha256"
+        ),
+        "intentRequestPromptSetSha256": _same_contract_value(
+            baseline_intent, candidate_intent, "requestPromptSetSha256"
+        ),
+        "trajectoryPromptSha256": {
+            "baseline": _trajectory_prompt_sha(
+                baseline_trajectory, baseline_mode
+            ),
+            "candidate": _trajectory_prompt_sha(
+                candidate_trajectory, candidate_mode
+            ),
+        },
+    }
+    trajectory_prompt = contract_checks["trajectoryPromptSha256"]
+    trajectory_prompt["passed"] = bool(
+        trajectory_prompt["baseline"]
+        and trajectory_prompt["candidate"]
+        and trajectory_prompt["baseline"] == trajectory_prompt["candidate"]
+    )
+    contract_passed = all(row["passed"] for row in contract_checks.values())
 
     qualification = suite.get("qualification") or {}
     tolerance = float(qualification.get("intentNoRegressionTolerance", 0.01))
@@ -133,13 +182,22 @@ def qualify(
     trajectory_passed = bool(trajectory_checks) and all(
         row["passed"] for row in trajectory_checks.values()
     )
-    passed = candidate_native_qualification and retention_passed and trajectory_passed
+    passed = bool(
+        contract_passed
+        and candidate_native_qualification
+        and retention_passed
+        and trajectory_passed
+    )
     return {
         "schemaVersion": 1,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "suiteId": suite["suiteId"],
         "decision": "PROMOTE" if passed else "KEEP_V1",
         "passed": passed,
+        "evaluationContract": {
+            "checks": contract_checks,
+            "passed": contract_passed,
+        },
         "intentRetention": {
             "tolerance": tolerance,
             "candidateThresholdQualificationPassed": candidate_native_qualification,

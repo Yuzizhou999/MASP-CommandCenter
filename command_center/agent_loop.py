@@ -438,6 +438,23 @@ class AgentLoopExecutor:
                         resolved_resource_block=resolved.resource_block,
                     )
                 except ModelBoundaryError as error:
+                    if error.code in {
+                        "intent.task.ungrounded",
+                        "intent.resource.ungrounded",
+                    }:
+                        return self._clarification_response(
+                            request=request,
+                            trace_id=trace_id,
+                            run=run,
+                            clarification=self._ungrounded_clarification(
+                                error.code, resolved
+                            ),
+                            evidence=evidence,
+                            model=model,
+                            fallback_used=fallback_used,
+                            tracker=tracker,
+                            reason=error.code,
+                        )
                     terminal_reason = error.code
                     run.transition(
                         AgentState.BLOCKED,
@@ -684,6 +701,32 @@ class AgentLoopExecutor:
                 "intentType": resolved.intent_type.value
                 if resolved.intent_type is not None
                 else None
+            },
+        )
+
+    @staticmethod
+    def _ungrounded_clarification(
+        code: str, resolved: ResolvedRequest
+    ) -> ClarificationRequest:
+        if code == "intent.task.ungrounded":
+            missing = ["pickupNodeId", "dropoffNodeId", "requiredRobotGroup"]
+            question = "请明确任务的取货点、放货点和执行车型。"
+            intent_type = IntentType.CREATE_TASK.value
+        else:
+            missing = ["resourceIds"]
+            question = "请明确需要暂停或封闭的通道、工位或资源。"
+            intent_type = IntentType.BLOCK_RESOURCE.value
+        return ClarificationRequest(
+            code="MISSING_REQUIRED_FIELDS",
+            missingFields=missing,
+            questions=[question],
+            collectedParameters={
+                "intentType": intent_type,
+                "resolverIntentType": (
+                    resolved.intent_type.value
+                    if resolved.intent_type is not None
+                    else None
+                ),
             },
         )
 

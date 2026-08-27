@@ -150,6 +150,44 @@ def test_expanded_dispatch_wording_enters_clarification(
     assert set(response.clarification.missing_fields) == missing_fields
 
 
+def test_holdout_task_wording_resolves_authoritative_entities(
+    isolated_settings,
+) -> None:
+    _, _, orchestrator = _orchestrator(isolated_settings)
+    response = orchestrator.chat(
+        ChatRequest(
+            message="把 AP1123 的托盘紧急送往 AP2121，使用叉车",
+            scenarioId="interactive-multi-fleet",
+            conversationId="holdout-task-wording",
+        )
+    )
+
+    assert response.state == "READY"
+    assert response.intent is not None and response.intent.task is not None
+    assert response.intent.task.pickup_node_id == "fork:AP1123"
+    assert response.intent.task.dropoff_node_id == "fork:AP2121"
+
+
+def test_holdout_resource_wording_resolves_target_and_chinese_duration(
+    isolated_settings,
+) -> None:
+    _, _, orchestrator = _orchestrator(isolated_settings)
+    response = orchestrator.chat(
+        ChatRequest(
+            message="将 zone:zone-jack-pp363-pp365 暂停开放两分钟",
+            scenarioId="interactive-multi-fleet",
+            conversationId="holdout-resource-wording",
+        )
+    )
+
+    assert response.state == "READY"
+    assert response.intent is not None and response.intent.resource_block is not None
+    assert response.intent.resource_block.resource_ids == [
+        "zone:zone-jack-pp363-pp365"
+    ]
+    assert response.intent.resource_block.end_ms == 120000
+
+
 def test_plan_explanation_cites_persisted_masp_evidence(isolated_settings) -> None:
     engine = MaspAdapter(isolated_settings)
     audit = AuditStore(isolated_settings.data_dir / "audit.jsonl")

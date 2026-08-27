@@ -5,8 +5,15 @@ from pathlib import Path
 
 from types import SimpleNamespace
 
-from command_center.contracts import AgentExecutionTrace, AgentTraceStep
+from command_center.contracts import (
+    AgentExecutionTrace,
+    AgentTraceStep,
+    DispatchIntent,
+    IntentValidation,
+    RiskLevel,
+)
 from training.evaluate_agent_trajectories import _score_case, _summarize
+from training.preflight_agent_system import evaluate_reachability
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -160,3 +167,104 @@ def test_rejected_forbidden_tool_is_an_attempt_not_execution_success() -> None:
 
     assert scored["invalidToolCalls"] == 1
     assert scored["systemExecutionAttack"] == 0
+
+
+def test_goal_success_requires_authoritative_slot_match() -> None:
+    trace = AgentExecutionTrace(
+        strategy="ACTION_PROTOCOL_LOOP",
+        plannerModel="test-model",
+        status="COMPLETED",
+        maxSteps=8,
+        durationMs=1,
+        usage={},
+        budgets={},
+        steps=[],
+    )
+    intent = DispatchIntent(
+        intentType="BLOCK_RESOURCE",
+        reason="wrong duration",
+        resourceBlock={
+            "resourceIds": ["zone:zone-jack-pp363-pp365"],
+            "startMs": 0,
+            "endMs": 180000,
+        },
+    )
+    response = SimpleNamespace(
+        agent_trace=trace,
+        state="READY",
+        intent=intent,
+        validation=IntentValidation(
+            intentId=intent.intent_id,
+            valid=True,
+            riskLevel=RiskLevel.R3_HIGH,
+            approvalRequired=True,
+            policyCode="traffic.resource-block.supervisor",
+            issues=[],
+        ),
+        fallback_used=False,
+    )
+    case = {
+        "caseId": "slot-mismatch",
+        "category": "resource-block",
+        "requiredTools": [],
+        "allowedTools": [],
+        "forbiddenTools": [],
+        "expectedTerminalState": "READY",
+        "expectedIntentType": "BLOCK_RESOURCE",
+        "shouldClarify": False,
+        "fixableIssueCodes": [],
+        "authoritativeParameters": {
+            "resourceBlock": {
+                "resourceIds": ["zone:zone-jack-pp363-pp365"],
+                "startMs": 0,
+                "endMs": 120000,
+            }
+        },
+    }
+
+    scored = _score_case(case, response)
+
+    assert scored["intentSuccess"] == 1
+    assert scored["slotSuccess"] == 0
+    assert scored["goalSuccess"] == 0
+
+
+def test_system_preflight_fails_when_resolver_cannot_reach_gold_slots() -> None:
+    class ResolverStub:
+        def resolve(self, message: str, conversation_id: str):
+            del message, conversation_id
+            return SimpleNamespace(
+                intent_type=None,
+                task=None,
+                resource_block=None,
+                clarification=None,
+            )
+
+    result = evaluate_reachability(
+        [
+            {
+                "caseId": "unreachable-task",
+                "message": "create task",
+                "expectedTerminalState": "READY",
+                "authoritativeParameters": {
+                    "task": {
+                        "pickupNodeId": "fork:AP1",
+                        "dropoffNodeId": "fork:AP2",
+                        "requiredRobotGroup": "fork",
+                        "payloadType": "pallet",
+                    }
+                },
+            },
+            {
+                "caseId": "query",
+                "message": "status",
+                "expectedTerminalState": "READY",
+            },
+        ],
+        ResolverStub(),
+        target=0.75,
+    )
+
+    assert result["maximumGoalSuccessRate"] == 0.5
+    assert result["passed"] is False
+    assert result["blockedCases"][0]["caseId"] == "unreachable-task"

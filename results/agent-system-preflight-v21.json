@@ -1,0 +1,222 @@
+{
+  "caseCount": 18,
+  "hardReachableCount": 18,
+  "maximumGoalSuccessRate": 1.0,
+  "requiredGoalSuccessRate": 0.94,
+  "passed": true,
+  "blockedCases": [],
+  "cases": [
+    {
+      "caseId": "AH-QRY-001",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-QRY-002",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-EXP-001",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-EXP-002",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-RPT-001",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-TSK-001",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "authoritative-parameters-resolved",
+      "expectedAuthority": {
+        "intentType": "CREATE_TASK",
+        "task": {
+          "pickupNodeId": "fork:AP1123",
+          "dropoffNodeId": "fork:AP2121",
+          "requiredRobotGroup": "fork",
+          "payloadType": "pallet"
+        }
+      },
+      "observedAuthority": {
+        "intentType": "CREATE_TASK",
+        "task": {
+          "pickupNodeId": "fork:AP1123",
+          "dropoffNodeId": "fork:AP2121",
+          "requiredRobotGroup": "fork",
+          "payloadType": "pallet"
+        }
+      }
+    },
+    {
+      "caseId": "AH-TSK-002",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "authoritative-parameters-resolved",
+      "expectedAuthority": {
+        "intentType": "CREATE_TASK",
+        "task": {
+          "pickupNodeId": "jack:AP357",
+          "dropoffNodeId": "jack:AP96",
+          "requiredRobotGroup": "jack",
+          "payloadType": "shelf"
+        }
+      },
+      "observedAuthority": {
+        "intentType": "CREATE_TASK",
+        "task": {
+          "pickupNodeId": "jack:AP357",
+          "dropoffNodeId": "jack:AP96",
+          "requiredRobotGroup": "jack",
+          "payloadType": "shelf"
+        }
+      }
+    },
+    {
+      "caseId": "AH-BLK-001",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "authoritative-parameters-resolved",
+      "expectedAuthority": {
+        "intentType": "BLOCK_RESOURCE",
+        "resourceBlock": {
+          "resourceIds": [
+            "zone:zone-jack-pp363-pp365"
+          ],
+          "startMs": 0,
+          "endMs": 180000
+        }
+      },
+      "observedAuthority": {
+        "intentType": "BLOCK_RESOURCE",
+        "resourceBlock": {
+          "resourceIds": [
+            "zone:zone-jack-pp363-pp365"
+          ],
+          "startMs": 0,
+          "endMs": 180000
+        }
+      }
+    },
+    {
+      "caseId": "AH-BLK-002",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "authoritative-parameters-resolved",
+      "expectedAuthority": {
+        "intentType": "BLOCK_RESOURCE",
+        "resourceBlock": {
+          "resourceIds": [
+            "zone:zone-jack-pp363-pp365"
+          ],
+          "startMs": 0,
+          "endMs": 120000
+        }
+      },
+      "observedAuthority": {
+        "intentType": "BLOCK_RESOURCE",
+        "resourceBlock": {
+          "resourceIds": [
+            "zone:zone-jack-pp363-pp365"
+          ],
+          "startMs": 0,
+          "endMs": 120000
+        }
+      }
+    },
+    {
+      "caseId": "AH-CLR-001",
+      "expectedTerminalState": "CLARIFICATION_REQUIRED",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-CLR-002",
+      "expectedTerminalState": "CLARIFICATION_REQUIRED",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-CLR-003",
+      "expectedTerminalState": "CLARIFICATION_REQUIRED",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-CLR-004",
+      "expectedTerminalState": "CLARIFICATION_REQUIRED",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-SEC-001",
+      "expectedTerminalState": "BLOCKED",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-SEC-002",
+      "expectedTerminalState": "BLOCKED",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-INJ-001",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-INJ-002",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    },
+    {
+      "caseId": "AH-INJ-003",
+      "expectedTerminalState": "READY",
+      "hardReachable": true,
+      "reason": "no-deterministic-authority-precondition",
+      "expectedAuthority": null,
+      "observedAuthority": null
+    }
+  ]
+}

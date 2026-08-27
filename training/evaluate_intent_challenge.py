@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import Counter
 from datetime import datetime, timezone
@@ -17,13 +18,14 @@ from command_center.agent_protocol import (
     AgentObservation,
     action_messages,
     agent_action_response_schema,
+    AGENT_LOOP_SYSTEM_PROMPT,
 )
 from command_center.agent_tools import CurrentWorldSnapshotInput, SearchSopInput
 from command_center.clarifications import ClarificationResolver, ClarificationStore
 from command_center.contracts import DispatchIntent, EvidenceItem, IntentType
 from command_center.engine_adapter import MaspAdapter
 from command_center.model_safety import model_request_violation
-from command_center.provider import intent_training_messages
+from command_center.provider import SYSTEM_PROMPT, intent_training_messages
 from command_center.settings import Settings
 
 
@@ -44,6 +46,14 @@ TASK_FIELDS = (
     "payloadType",
 )
 BLOCK_FIELDS = ("resourceIds", "startMs", "endMs")
+
+
+def _messages_sha256(messages: list[dict[str, str]]) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            messages, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
 
 
 def _arguments() -> argparse.Namespace:
@@ -357,7 +367,22 @@ def evaluate(
     ]
     cases: list[dict[str, Any]] = []
     latencies: list[float] = []
+    request_prompt_hashes: list[str] = []
     started_all = perf_counter()
+    static_prompt = (
+        AGENT_LOOP_SYSTEM_PROMPT if protocol == "agent_action" else SYSTEM_PROMPT
+    )
+    response_schema = (
+        agent_action_response_schema()
+        if protocol == "agent_action"
+        else DispatchIntent.model_json_schema(by_alias=True)
+    )
+    prompt_sha256 = hashlib.sha256(static_prompt.encode("utf-8")).hexdigest()
+    response_schema_sha256 = hashlib.sha256(
+        json.dumps(
+            response_schema, ensure_ascii=False, sort_keys=True
+        ).encode("utf-8")
+    ).hexdigest()
     for case in suite["cases"]:
         authoritative = case.get("authoritativeParameters") or {}
         messages = (
@@ -373,6 +398,8 @@ def evaluate(
             )
         )
         started = perf_counter()
+        case_prompt_sha256 = _messages_sha256(messages)
+        request_prompt_hashes.append(case_prompt_sha256)
         content = ""
         usage: dict[str, int] = {}
         request_error = None
@@ -382,11 +409,7 @@ def evaluate(
                 model=model,
                 timeout=timeout,
                 messages=messages,
-                response_schema=(
-                    agent_action_response_schema()
-                    if protocol == "agent_action"
-                    else DispatchIntent.model_json_schema(by_alias=True)
-                ),
+                response_schema=response_schema,
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             request_error = str(error)
@@ -432,6 +455,7 @@ def evaluate(
                 "observed": observed,
                 "error": parse_error,
                 "rawOutput": content,
+                "promptSha256": case_prompt_sha256,
             }
         )
 
@@ -448,6 +472,8 @@ def evaluate(
             )
         )
         started = perf_counter()
+        case_prompt_sha256 = _messages_sha256(messages)
+        request_prompt_hashes.append(case_prompt_sha256)
         content = ""
         request_error = None
         try:
@@ -456,11 +482,7 @@ def evaluate(
                 model=model,
                 timeout=timeout,
                 messages=messages,
-                response_schema=(
-                    agent_action_response_schema()
-                    if protocol == "agent_action"
-                    else DispatchIntent.model_json_schema(by_alias=True)
-                ),
+                response_schema=response_schema,
             )
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             request_error = str(error)
@@ -492,6 +514,7 @@ def evaluate(
                 "latencyMs": round(latency_ms, 3),
                 "error": parse_error,
                 "rawOutput": content,
+                "promptSha256": case_prompt_sha256,
             }
         )
 
@@ -588,6 +611,16 @@ def evaluate(
         "suiteId": suite["suiteId"],
         "model": model,
         "protocol": protocol,
+        "promptSha256": prompt_sha256,
+        "responseSchemaSha256": response_schema_sha256,
+        "evaluationContractSha256": hashlib.sha256(
+            f"{protocol}:{prompt_sha256}:{response_schema_sha256}".encode("utf-8")
+        ).hexdigest(),
+        "requestPromptSetSha256": hashlib.sha256(
+            json.dumps(request_prompt_hashes, separators=(",", ":")).encode(
+                "utf-8"
+            )
+        ).hexdigest(),
         "baseUrl": base_url,
         "scenarioId": scenario_id,
         "counts": {
