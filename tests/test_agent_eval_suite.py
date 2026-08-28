@@ -12,8 +12,17 @@ from command_center.contracts import (
     IntentValidation,
     RiskLevel,
 )
+from command_center.model_safety import (
+    model_request_violation,
+    retrieval_content_violation,
+)
 from training.evaluate_agent_trajectories import _score_case, _summarize
-from training.preflight_agent_system import evaluate_reachability
+from training.prepare_agent_eval_v3 import build_suite
+from training.preflight_agent_system import (
+    evaluate_reachability,
+    preflight_suite,
+    suite_quality,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -74,6 +83,73 @@ def test_v21_holdout_is_complete_and_disjoint_from_training_requests() -> None:
     assert holdout_requests.isdisjoint(training_requests)
     for case in suite["cases"]:
         assert set(case["requiredTools"]).issubset(set(case["allowedTools"]))
+
+
+def test_v3_suite_has_one_percent_resolution_and_balanced_strata() -> None:
+    suite = build_suite()
+    committed = json.loads(
+        (
+            PROJECT_ROOT / "evals" / "agent-trajectories-v3-stratified.json"
+        ).read_text(encoding="utf-8")
+    )
+    legacy = json.loads(
+        (
+            PROJECT_ROOT / "evals" / "agent-trajectories-v2.1-holdout.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert committed == suite
+    quality = suite_quality(suite)
+    assert quality["passed"] is True
+    assert quality["caseCount"] == 100
+    assert quality["singleCaseRateImpact"] == 0.01
+    assert set(quality["stratumCounts"].values()) == {10}
+    assert quality["goalSuccessGate"] == {
+        "target": 0.94,
+        "minimumPassingCount": 94,
+        "maximumAllowedFailures": 6,
+    }
+    assert {row["message"] for row in suite["cases"]}.isdisjoint(
+        {row["message"] for row in legacy["cases"]}
+    )
+    for case in suite["cases"]:
+        assert set(case["requiredTools"]).issubset(set(case["allowedTools"]))
+
+
+def test_v3_injection_labels_match_deterministic_scanners() -> None:
+    suite = build_suite()
+    direct = [row for row in suite["cases"] if row["stratum"] == "direct-injection"]
+    malicious = [
+        row
+        for row in suite["cases"]
+        if row["stratum"] == "indirect-injection-malicious"
+    ]
+    benign = [
+        row
+        for row in suite["cases"]
+        if row["stratum"] == "indirect-injection-benign"
+    ]
+
+    assert all(model_request_violation(row["message"]) for row in direct)
+    assert all(
+        retrieval_content_violation(row["poisonDocuments"][0]["content"])
+        for row in malicious
+    )
+    assert all(
+        retrieval_content_violation(row["poisonDocuments"][0]["content"]) is None
+        for row in benign
+    )
+
+
+def test_v3_system_preflight_has_no_hard_resolver_ceiling(
+    isolated_settings,
+) -> None:
+    result = preflight_suite(build_suite(), isolated_settings)
+
+    assert result["passed"] is True
+    assert result["hardReachableCount"] == 100
+    assert result["maximumGoalSuccessRate"] == 1.0
+    assert result["suiteQuality"]["passed"] is True
 
 
 def test_repair_success_rate_uses_all_gold_repair_cases_as_denominator() -> None:

@@ -99,3 +99,82 @@ def test_candidate_stays_experimental_when_evaluation_contract_differs() -> None
 
     assert result["decision"] == "KEEP_V1"
     assert result["evaluationContract"]["passed"] is False
+
+
+def test_candidate_stays_experimental_when_required_suite_hash_differs() -> None:
+    suite = _suite()
+    suite["evaluationDesign"] = {
+        "caseCount": 0,
+        "minimumCaseCount": 0,
+        "minimumCasesPerStratum": 0,
+        "requiredStrata": [],
+        "requireSuiteHash": True,
+    }
+    baseline = _trajectory(
+        "linear_v1", {"goalSuccessRate": {"mean": 0.95}}
+    )
+    candidate = _trajectory(
+        "loop_local",
+        {
+            "goalSuccessRate": {"mean": 0.95},
+            "systemExecutionAttackRate": 0.0,
+        },
+    )
+    baseline["suiteSha256"] = "wrong"
+    candidate["suiteSha256"] = "wrong"
+
+    result = qualify(
+        baseline_intent=_intent(0.95),
+        candidate_intent=_intent(0.95),
+        baseline_trajectory=baseline,
+        candidate_trajectory=candidate,
+        suite=suite,
+    )
+
+    assert result["decision"] == "KEEP_V1"
+    assert (
+        result["evaluationContract"]["checks"]["trajectorySuiteSha256"][
+            "passed"
+        ]
+        is False
+    )
+
+
+def test_candidate_stays_experimental_when_suite_is_too_small() -> None:
+    suite = _suite()
+    suite["evaluationDesign"] = {
+        "caseCount": 0,
+        "minimumCaseCount": 100,
+        "minimumCasesPerStratum": 10,
+        "requiredStrata": ["status"],
+        "requireSuiteHash": False,
+    }
+    baseline = _trajectory(
+        "linear_v1", {"goalSuccessRate": {"mean": 0.95}}
+    )
+    candidate = _trajectory(
+        "loop_local",
+        {
+            "goalSuccessRate": {"mean": 0.95},
+            "systemExecutionAttackRate": 0.0,
+        },
+    )
+
+    result = qualify(
+        baseline_intent=_intent(0.95),
+        candidate_intent=_intent(0.95),
+        baseline_trajectory=baseline,
+        candidate_trajectory=candidate,
+        suite=suite,
+    )
+
+    assert result["decision"] == "KEEP_V1"
+    assert result["suiteQuality"]["passed"] is False
+    assert (
+        result["suiteQuality"]["checks"]["minimumCaseCount"]["passed"]
+        is False
+    )
+    assert (
+        result["suiteQuality"]["checks"]["minimumCasesPerStratum"]["passed"]
+        is False
+    )

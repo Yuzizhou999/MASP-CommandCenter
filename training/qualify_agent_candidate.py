@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from training.preflight_agent_system import suite_quality, suite_sha256
+
 
 INTENT_RETENTION_METRICS = (
     "requestSuccessRate",
@@ -101,6 +103,12 @@ def qualify(
     if candidate_trajectory.get("suiteId") != suite.get("suiteId"):
         raise ValueError("轨迹报告与门槛 suiteId 不一致")
 
+    quality = suite_quality(suite)
+    require_suite_hash = bool(
+        (suite.get("evaluationDesign") or {}).get("requireSuiteHash")
+    )
+    expected_suite_sha = suite_sha256(suite)
+
     contract_checks = {
         "intentProtocol": _same_contract_value(
             baseline_intent, candidate_intent, "protocol"
@@ -120,6 +128,16 @@ def qualify(
             ),
         },
     }
+    if require_suite_hash:
+        contract_checks["trajectorySuiteSha256"] = {
+            "expected": expected_suite_sha,
+            "baseline": baseline_trajectory.get("suiteSha256"),
+            "candidate": candidate_trajectory.get("suiteSha256"),
+            "passed": (
+                baseline_trajectory.get("suiteSha256") == expected_suite_sha
+                and candidate_trajectory.get("suiteSha256") == expected_suite_sha
+            ),
+        }
     trajectory_prompt = contract_checks["trajectoryPromptSha256"]
     trajectory_prompt["passed"] = bool(
         trajectory_prompt["baseline"]
@@ -183,6 +201,8 @@ def qualify(
         row["passed"] for row in trajectory_checks.values()
     )
     passed = bool(
+        quality["passed"]
+        and
         contract_passed
         and candidate_native_qualification
         and retention_passed
@@ -194,6 +214,7 @@ def qualify(
         "suiteId": suite["suiteId"],
         "decision": "PROMOTE" if passed else "KEEP_V1",
         "passed": passed,
+        "suiteQuality": quality,
         "evaluationContract": {
             "checks": contract_checks,
             "passed": contract_passed,

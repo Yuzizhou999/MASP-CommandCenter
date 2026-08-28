@@ -85,6 +85,19 @@ v2.3 的结构化推理实现不是训练前完全冻结的单一变量。冻结
 
 两个现有 adapter 在不重训的情况下重新通过同一 AgentAction/XGrammar 契约评测，控制组和候选组的 `evaluationContractSha256`、`requestPromptSetSha256` 与轨迹 prompt hash 均一致。修复后 control 的目标成功率为 `0.8333`，v2.3 为 `0.8889`；候选改善 `AH-EXP-002`、`AH-INJ-003`，回归 `AH-QRY-001`，并继续失败于 `AH-CLR-004`。候选工具 recall 为 `0.8333`、澄清准确率 `0.9444`、边界拦截 recall `0.50`，仍未达到资格门槛。新的 intent 重评中 control 复现 Macro F1 `0.7457`，候选为 `0.7991`；历史候选的 `0.8294` 未复现，因此只能表述为“对最终 AgentAction + XGrammar 契约有单次方向性适配”，不能表述为通用意图能力稳定提升。
 
+2026-08-28 新增 `evals/agent-trajectories-v3-stratified.json`，把轨迹回归扩展为 100 条、10 个分层、每层 10 条。单条用例对总成功率的影响从 18 条套件的 `5.56%` 降到 `1%`；`goalSuccessRate >= 0.94` 对应至少通过 94/100，最多失败 6 条。资格脚本强制校验 suite SHA-256、总样本量和各层样本量；当前冻结 hash 为 `0415c20e86a14e703b0d9ade93818836be22e97dbf5fdd56292b81bb82040f43`。系统可达性预检为 100/100，上限 `1.0`。
+
+| 百例回归指标 | v2-repro control | v2.3 candidate |
+|---|---:|---:|
+| 目标完成率 | 0.760 | 0.810 |
+| 工具 precision | 0.940 | 0.955 |
+| 工具 recall | 0.915 | 0.885 |
+| 澄清准确率 | 0.910 | 0.920 |
+| 边界拦截 recall | 0.550 | 0.500 |
+| 系统级攻击执行率 | 0.000 | 0.000 |
+
+paired replay 记录 9 条改善、4 条回归，目标成功率差为 `+0.05`，95% 区间为 `[-0.0203, 0.1203]`，包含 0。v2.3 的主要短板是软歧义 `2/10`、良性间接注入语境 `3/10`、恶意间接注入语境 `7/10`，且工具 recall 退化。正式门禁继续输出 `KEEP_V1`。这套 suite 是在 v2.3 训练和既有缺陷分析后编写的 post-training stratified regression，不是训练前盲测；同层改写也存在相关性，因此不能把 100 条表述为 100 个独立重复实验。
+
 稳定报告保存在 `results/intent-eval-v1/`、`results/intent-eval-v2/`、`results/agent-eval-v1/` 和 `results/agent-eval-v2/`。v2.2 受控实验另保存在 `results/intent-eval-v2-repro/`、`results/intent-eval-v22/`、`results/agent-eval-v2-repro/` 和 `results/agent-eval-v22/`。v2.3 历史证据位于 `results/intent-eval-v23-control/`、`results/intent-eval-v23-seed-20260827/`、`results/agent-eval-v23-control/` 和 `results/agent-eval-v23-seed-20260827/`；系统修复后的正式重评使用 `results/*-system-fix-*` 独立目录，不覆盖历史失败实验。`qualification.json` 是唯一晋级结论，`experiment-summary.json`、`controlled-experiment.json` 和 `paired-replay.json` 用于定位逐 case 的改进与退化。
 
 Agent run 存储另有固定并发基准。2026-08-25 在 50 run、12 worker 下，旧 JSON 整体重写实现完成 50/50，吞吐 1.555 runs/s；SQLite WAL + append-only events 完成 50/50，吞吐 6.039 runs/s，总耗时加速 3.884 倍。稳定报告为 `results/store-benchmark/latest.json`。

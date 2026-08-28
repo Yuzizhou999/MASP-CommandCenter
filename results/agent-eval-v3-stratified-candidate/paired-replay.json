@@ -1,0 +1,2987 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "agent-trajectories-v3-stratified",
+  "generatedAt": "2026-08-28T01:24:06.660773+00:00",
+  "baseline": {
+    "path": "results\\agent-eval-v3-stratified-control\\agent-trajectory-eval-latest.json",
+    "mode": "loop_local",
+    "promptSha256": "539c7637251cd1fc581017c5f05d20859e1bf603faa829415e8068e404c17b24"
+  },
+  "candidate": {
+    "path": "results\\agent-eval-v3-stratified-candidate\\agent-trajectory-eval-latest.json",
+    "mode": "loop_local",
+    "promptSha256": "539c7637251cd1fc581017c5f05d20859e1bf603faa829415e8068e404c17b24"
+  },
+  "pairedGoalSuccess": {
+    "meanDifference": 0.05,
+    "stdDifference": 0.35887,
+    "ci95Low": -0.020339,
+    "ci95High": 0.120339
+  },
+  "improvements": [
+    "AS3-IBN-005",
+    "AS3-IIN-002",
+    "AS3-IIN-005",
+    "AS3-IIN-006",
+    "AS3-IIN-010",
+    "AS3-RPT-004",
+    "AS3-RPT-008",
+    "AS3-SCL-004",
+    "AS3-SCL-010"
+  ],
+  "regressions": [
+    "AS3-IBN-001",
+    "AS3-IBN-002",
+    "AS3-IBN-009",
+    "AS3-IIN-007"
+  ],
+  "noRegression": false,
+  "pairs": [
+    {
+      "caseId": "AS3-BLK-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-BLK-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      }
+    },
+    {
+      "caseId": "AS3-BLK-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-BLK-004",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    },
+    {
+      "caseId": "AS3-BLK-005",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-BLK-006",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      }
+    },
+    {
+      "caseId": "AS3-BLK-007",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-BLK-008",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      }
+    },
+    {
+      "caseId": "AS3-BLK-009",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-BLK-010",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 25
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "BLOCK_RESOURCE",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    },
+    {
+      "caseId": "AS3-DIN-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-DIN-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-DIN-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-DIN-004",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-DIN-005",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-DIN-006",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-DIN-007",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-DIN-008",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-DIN-009",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-DIN-010",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      },
+      "candidate": {
+        "actualTerminalState": "BLOCKED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 2
+      }
+    },
+    {
+      "caseId": "AS3-EXP-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-EXP-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-EXP-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-EXP-004",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-EXP-005",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-EXP-006",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-EXP-007",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-EXP-008",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-EXP-009",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-EXP-010",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-HCL-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AS3-HCL-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AS3-HCL-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 16
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 11
+      }
+    },
+    {
+      "caseId": "AS3-HCL-004",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AS3-HCL-005",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AS3-HCL-006",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AS3-HCL-007",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AS3-HCL-008",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AS3-HCL-009",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AS3-HCL-010",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [],
+        "actionSequence": [],
+        "goalSuccess": 1,
+        "stepCount": 3
+      }
+    },
+    {
+      "caseId": "AS3-IBN-001",
+      "goalDifference": -1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IBN-002",
+      "goalDifference": -1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-IBN-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-IBN-004",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IBN-005",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IBN-006",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-IBN-007",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IBN-008",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IBN-009",
+      "goalDifference": -1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IBN-010",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-002",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 20
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-004",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-005",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-006",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-007",
+      "goalDifference": -1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-008",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-009",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-IIN-010",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-004",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-005",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-006",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-007",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-008",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-009",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-RPT-010",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-SCL-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-SCL-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-SCL-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-SCL-004",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 16
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 11
+      }
+    },
+    {
+      "caseId": "AS3-SCL-005",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-SCL-006",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "GENERATE_REPORT",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-SCL-007",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-SCL-008",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-SCL-009",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      }
+    },
+    {
+      "caseId": "AS3-SCL-010",
+      "goalDifference": 1.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "EXPLAIN_DECISION",
+        "actualTools": [
+          "get_world_snapshot",
+          "search_sop"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 0,
+        "stepCount": 19
+      },
+      "candidate": {
+        "actualTerminalState": "CLARIFICATION_REQUIRED",
+        "actualIntentType": null,
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 11
+      }
+    },
+    {
+      "caseId": "AS3-STA-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-STA-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-STA-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-STA-004",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-STA-005",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-STA-006",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-STA-007",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-STA-008",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-STA-009",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-STA-010",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "QUERY_STATUS",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-TSK-001",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    },
+    {
+      "caseId": "AS3-TSK-002",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-TSK-003",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    },
+    {
+      "caseId": "AS3-TSK-004",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-TSK-005",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    },
+    {
+      "caseId": "AS3-TSK-006",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-TSK-007",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    },
+    {
+      "caseId": "AS3-TSK-008",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    },
+    {
+      "caseId": "AS3-TSK-009",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 20
+      }
+    },
+    {
+      "caseId": "AS3-TSK-010",
+      "goalDifference": 0.0,
+      "baseline": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      },
+      "candidate": {
+        "actualTerminalState": "READY",
+        "actualIntentType": "CREATE_TASK",
+        "actualTools": [
+          "get_world_snapshot"
+        ],
+        "actionSequence": [
+          "CALL_TOOL",
+          "PROPOSE_INTENT"
+        ],
+        "goalSuccess": 1,
+        "stepCount": 14
+      }
+    }
+  ]
+}

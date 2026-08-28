@@ -47,3 +47,33 @@ On the corrected trajectory scorer, control reaches `0.8333` and v2.3 reaches `0
 - Expand the unseen trajectory suite and isolate AgentAction-only supervision, bare-intent removal, constrained decoding, and recovery examples in separate ablations before spending three-seed compute.
 
 Historical evidence remains in `results/agent-eval-v23-seed-20260827/`. Corrected reports are in the `results/*-system-fix-*` directories, with the final decision in `results/agent-eval-system-fix-v23-candidate/qualification.json`.
+
+## Agent v3 100-case stratified regression
+
+- Date: 2026-08-28
+- Qualification decision: `KEEP_V1`
+- Suite: `agent-trajectories-v3-stratified`, 100 cases, 10 strata
+- Suite SHA-256: `0415c20e86a14e703b0d9ade93818836be22e97dbf5fdd56292b81bb82040f43`
+- No new adapter was trained; the existing v2-repro control and v2.3 candidate were reevaluated.
+
+The earlier 18-case holdout changed by 5.56 percentage points for every flipped case. The v3 suite reduces that score granularity to 1 percentage point and requires at least 94/100 goal successes. It contains 10 cases each for status, explanation, report, task creation, resource blocking, hard clarification, soft ambiguity, direct injection, malicious indirect injection and benign indirect-injection language. System reachability preflight passes 100/100 with a ceiling of `1.0`. The suite was authored after v2.3 training and after the earlier failure analysis, so it is explicitly a post-training stratified regression, not a blind pre-training holdout. Its texts and gold were not used by either existing adapter.
+
+### Raw comparison
+
+| Metric | v2-repro control | v2.3 candidate | Delta |
+|---|---:|---:|---:|
+| Goal success | 0.760 | 0.810 | +0.050 |
+| Tool precision | 0.940 | 0.955 | +0.015 |
+| Tool recall | 0.915 | 0.885 | -0.030 |
+| Clarification accuracy | 0.910 | 0.920 | +0.010 |
+| Validation success | 1.000 | 1.000 | 0.000 |
+| Repair success | 1.000 | 1.000 | 0.000 |
+| Boundary interception recall | 0.550 | 0.500 | -0.050 |
+| System execution attack rate | 0.000 | 0.000 | 0.000 |
+| Average trace steps | 14.06 | 13.52 | -0.54 |
+
+v2.3 improves 9 cases and regresses 4, for a paired goal-success difference of `+0.05`. The normal-approximation 95% interval is `[-0.0203, 0.1203]`, which includes zero. The supported claim is therefore only a directional improvement on this regression suite, not a stable superiority claim. The paraphrases inside each stratum are also correlated, so 100 rows must not be described as 100 independent experimental replications.
+
+The main candidate weaknesses are soft ambiguity (`2/10` goal success), benign indirect-injection language (`3/10`) and malicious indirect injection (`7/10`). It also misses the absolute intent qualification and the trajectory gates for goal success, tool recall, clarification, boundary interception and benign goal preservation. XGrammar keeps the output structurally usable and the deterministic boundary keeps the system execution attack rate at zero, but neither mechanism supplies the missing decision quality. The active model remains `masp-intent-lora`; no additional stability training is justified from this result.
+
+Reports are stored separately in `results/agent-eval-v3-stratified-deterministic/`, `results/agent-eval-v3-stratified-control/` and `results/agent-eval-v3-stratified-candidate/`. The candidate directory contains both `paired-replay.json` and the authoritative `qualification.json`.

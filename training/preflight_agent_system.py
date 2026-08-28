@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import tempfile
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +22,67 @@ TASK_AUTHORITY_FIELDS = (
     "payloadType",
 )
 RESOURCE_AUTHORITY_FIELDS = ("resourceIds", "startMs", "endMs")
+
+
+def suite_sha256(suite: dict[str, Any]) -> str:
+    encoded = json.dumps(
+        suite, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def suite_quality(suite: dict[str, Any]) -> dict[str, Any]:
+    cases = list(suite.get("cases") or [])
+    design = suite.get("evaluationDesign") or {}
+    counts = Counter(str(row.get("stratum") or row.get("category")) for row in cases)
+    configured = bool(design)
+    minimum_cases = int(design.get("minimumCaseCount", 0))
+    minimum_per_stratum = int(design.get("minimumCasesPerStratum", 0))
+    required_strata = [str(value) for value in design.get("requiredStrata") or []]
+    goal_rule = (
+        (suite.get("qualification") or {})
+        .get("trajectoryThresholds", {})
+        .get("goalSuccessRate", {})
+    )
+    goal_target = float(goal_rule.get("value", 0.0))
+    minimum_passing_count = math.ceil(goal_target * len(cases)) if cases else 0
+    checks = {
+        "minimumCaseCount": {
+            "actual": len(cases),
+            "minimum": minimum_cases,
+            "passed": not configured or len(cases) >= minimum_cases,
+        },
+        "minimumCasesPerStratum": {
+            "actual": min((counts.get(name, 0) for name in required_strata), default=0),
+            "minimum": minimum_per_stratum,
+            "passed": not configured
+            or all(counts.get(name, 0) >= minimum_per_stratum for name in required_strata),
+        },
+        "requiredStrata": {
+            "actual": sorted(counts),
+            "required": sorted(required_strata),
+            "passed": not configured or set(required_strata).issubset(counts),
+        },
+        "declaredCaseCount": {
+            "actual": len(cases),
+            "declared": design.get("caseCount"),
+            "passed": not configured or design.get("caseCount") == len(cases),
+        },
+    }
+    return {
+        "configured": configured,
+        "suiteSha256": suite_sha256(suite),
+        "caseCount": len(cases),
+        "singleCaseRateImpact": round(1 / len(cases), 6) if cases else None,
+        "goalSuccessGate": {
+            "target": goal_target,
+            "minimumPassingCount": minimum_passing_count,
+            "maximumAllowedFailures": len(cases) - minimum_passing_count,
+        },
+        "stratumCounts": dict(sorted(counts.items())),
+        "checks": checks,
+        "passed": all(row["passed"] for row in checks.values()),
+    }
 
 
 def expected_authority(case: dict[str, Any]) -> dict[str, Any] | None:
@@ -148,9 +212,11 @@ def preflight_suite(
         resolver = ClarificationResolver(
             ClarificationStore(Path(root) / "clarifications.json"), engine
         )
-        return evaluate_reachability(
+        result = evaluate_reachability(
             list(suite["cases"]), resolver, target=target
         )
+        result["suiteQuality"] = suite_quality(suite)
+        return result
 
 
 def _arguments() -> argparse.Namespace:

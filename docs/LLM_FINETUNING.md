@@ -248,6 +248,32 @@ python -m training.compare_agent_replays `
 
 最后运行 `training.qualify_agent_candidate`，同时输入 v1/v2 的 `intent-challenge-v1` 报告和轨迹报告。脚本只输出两种结论：`PROMOTE` 或 `KEEP_V1`。门槛包括 v1 各率指标退化不超过 1 个百分点、目标完成、工具 precision/recall、无效调用、修复成功、澄清，以及系统级注入攻击成功率必须为 0。
 
+当前正式轨迹回归使用 100 条分层 suite。先执行确定性可达性预检，再分别用同一个 XGrammar 服务契约回放 control 与 candidate：
+
+```powershell
+$env:MASP_ENGINE_ROOT='E:\project\MASP-locked'
+
+python -m training.preflight_agent_system `
+  --suite evals\agent-trajectories-v3-stratified.json `
+  --output results\agent-system-preflight-v3-stratified.json
+
+python -m training.evaluate_agent_trajectories `
+  --suite evals\agent-trajectories-v3-stratified.json `
+  --mode loop_local `
+  --local-base-url http://127.0.0.1:8002/v1 `
+  --local-candidate-model masp-agent-lora-v2-repro `
+  --output-dir results\agent-eval-v3-stratified-control
+
+python -m training.evaluate_agent_trajectories `
+  --suite evals\agent-trajectories-v3-stratified.json `
+  --mode loop_local `
+  --local-base-url http://127.0.0.1:8002/v1 `
+  --local-candidate-model masp-agent-lora-v2.3 `
+  --output-dir results\agent-eval-v3-stratified-candidate
+```
+
+每次模型回放前必须确认 `/health` 返回的 model 与命令中的 `--local-candidate-model` 一致。两份报告必须具有相同的 `suiteSha256`、`promptSha256ByMode.loop_local`，并与同一组 intent 报告的 `evaluationContractSha256` 和 `requestPromptSetSha256` 对齐。100 条 suite 将单条波动降为 1%，但它是训练后编写的分层回归，同层样本也不是完全独立；它适合做回归门禁，不应包装成盲测统计证明。
+
 ## 8. 独立挑战集与基座对照
 
 为避免只看训练集或最终降级结果，项目提供不参与训练的人工改写挑战集：
@@ -319,6 +345,8 @@ QLoRA 通过模型和系统两组资格门；基座模型只通过系统组。QL
 - `training/evaluate_intent_challenge.py`：基座与 QLoRA 的独立挑战集评测。
 - `training/prepare_agent_dataset.py`：多轮单动作轨迹数据构造；
 - `training/prepare_agent_dataset_v23.py`：统一 AgentAction 目标与恢复状态数据构造；
+- `training/prepare_agent_eval_v3.py`：生成 100 条、10 分层的冻结轨迹回归集；
+- `training/preflight_agent_system.py`：训练或评测前计算确定性系统可达上限与 suite 质量；
 - `training/evaluate_agent_trajectories.py`：轨迹、修复和注入评测；
 - `training/compare_agent_replays.py`：同 case paired replay diff；
 - `training/compare_agent_experiment.py`：v2-repro 与 v2.2 的受控同 case 对比；

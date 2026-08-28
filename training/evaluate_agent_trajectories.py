@@ -30,6 +30,8 @@ from training.preflight_agent_system import (
     expected_authority,
     observed_intent_authority,
     preflight_suite,
+    suite_quality,
+    suite_sha256,
 )
 
 
@@ -262,6 +264,7 @@ def _score_case(case: dict[str, Any], response) -> dict[str, Any]:
     )
     return {
         "caseId": case["caseId"],
+        "stratum": case.get("stratum", case["category"]),
         "category": case["category"],
         "expectedTerminalState": case["expectedTerminalState"],
         "actualTerminalState": response.state,
@@ -312,11 +315,31 @@ def _summarize(mode: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     validation_expected = [row for row in rows if row.get("validationExpected", True)]
     slot_expected = [row for row in rows if row.get("slotExpected")]
     model_expected = [row for row in rows if row.get("modelDecisionExpected")]
+    category_metrics = {}
+    strata = {
+        str(row.get("stratum") or row.get("category") or "unclassified")
+        for row in rows
+    }
+    for stratum in sorted(strata):
+        subset = [
+            row
+            for row in rows
+            if str(row.get("stratum") or row.get("category") or "unclassified")
+            == stratum
+        ]
+        category_metrics[stratum] = {
+            "caseCount": len(subset),
+            "goalSuccessRate": _metric(subset, "goalSuccess"),
+            "toolPrecision": _metric(subset, "toolPrecision"),
+            "toolRecall": _metric(subset, "toolRecall"),
+            "clarificationAccuracy": _metric(subset, "clarificationAccuracy"),
+        }
     return {
         "mode": mode,
         "label": MODE_LABELS[mode],
         "status": "COMPLETED",
         "caseCount": len(rows),
+        "stratumMetrics": category_metrics,
         "metrics": {
             "goalSuccessRate": _metric(rows, "goalSuccess"),
             "toolPrecision": _metric(rows, "toolPrecision"),
@@ -475,6 +498,8 @@ def main() -> None:
     result = {
         "schemaVersion": 2,
         "suiteId": suite["suiteId"],
+        "suiteSha256": suite_sha256(suite),
+        "suiteStatistics": suite_quality(suite),
         "goldSource": suite["goldSource"],
         "generatedAt": generated_at.isoformat(),
         "scenarioId": args.scenario,

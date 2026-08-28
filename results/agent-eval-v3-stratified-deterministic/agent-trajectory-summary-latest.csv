@@ -1,0 +1,2 @@
+﻿mode,label,status,caseCount,goalSuccessRate,toolPrecision,toolRecall,validationSuccessRate,slotExactMatchRate,overClarificationRate,averageStepCount,repairSuccessRate,modelDrivenRate,systemExecutionAttackRate
+deterministic,Deterministic fallback,COMPLETED,100,0.86,0.94,1.0,1.0,1.0,0.0,16.56,1.0,0.0,0.0
