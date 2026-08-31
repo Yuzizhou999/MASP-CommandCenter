@@ -6,6 +6,7 @@ from threading import Lock
 from typing import Any
 
 from .contracts import ApprovalStatus, DispatchIntent, new_id, utc_now
+from .storage import atomic_write_json
 
 
 class IntentStore:
@@ -51,10 +52,7 @@ class IntentStore:
                 if current.get("intent", {}).get("intentId") == intent.intent_id:
                     return current
             rows.append(record)
-            self.path.write_text(
-                json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            atomic_write_json(self.path, rows)
         return record
 
     def list(self) -> list[dict[str, Any]]:

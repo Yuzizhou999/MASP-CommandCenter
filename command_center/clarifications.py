@@ -9,6 +9,7 @@ from typing import Any
 
 from .contracts import ClarificationRequest, IntentType, utc_now
 from .engine_adapter import MaspAdapter
+from .storage import atomic_write_json
 
 TASK_TERMS = (
     "创建",
@@ -114,19 +115,13 @@ class ClarificationStore:
         with self._lock:
             rows = self._load()
             rows[conversation_id] = {**record, "updatedAt": utc_now().isoformat()}
-            self.path.write_text(
-                json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            atomic_write_json(self.path, rows)
 
     def clear(self, conversation_id: str) -> None:
         with self._lock:
             rows = self._load()
             if rows.pop(conversation_id, None) is not None:
-                self.path.write_text(
-                    json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
-                    encoding="utf-8",
-                )
+                atomic_write_json(self.path, rows)
 
 
 class ClarificationResolver:

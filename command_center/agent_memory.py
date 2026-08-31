@@ -14,6 +14,7 @@ from .contracts import (
     IntentValidation,
     utc_now,
 )
+from .storage import atomic_write_json
 
 
 class AgentMemoryStore:
@@ -103,10 +104,7 @@ class AgentMemoryStore:
                 updatedAt=utc_now(),
             )
             rows[conversation_id] = memory.model_dump(by_alias=True, mode="json")
-            self.path.write_text(
-                json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            atomic_write_json(self.path, rows)
         return memory
 
     @staticmethod

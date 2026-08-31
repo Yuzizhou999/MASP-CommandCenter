@@ -25,6 +25,7 @@ from .engine_adapter import MaspAdapter
 from .knowledge import KnowledgeBase
 from .model_safety import diagnosis_violation
 from .provider import DeepSeekProvider
+from .storage import atomic_write_json
 
 
 class IncidentStore:
@@ -48,10 +49,7 @@ class IncidentStore:
             item.model_dump(by_alias=True, mode="json")
             for item in sorted(self._items.values(), key=lambda row: row.created_at)
         ]
-        self.path.write_text(
-            json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        atomic_write_json(self.path, rows)
 
     def put(self, incident: IncidentRecord) -> IncidentRecord:
         with self._lock:

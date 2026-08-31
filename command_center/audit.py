@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -34,8 +35,11 @@ class AuditStore:
             sort_keys=True,
             separators=(",", ":"),
         )
-        with self._lock, self.path.open("a", encoding="utf-8") as stream:
+        with self._lock, self.path.open("a", encoding="utf-8", newline="\n") as stream:
             stream.write(encoded + "\n")
+            # 审计是安全叙事的证据链，落盘前不能停留在用户态缓冲里。
+            stream.flush()
+            os.fsync(stream.fileno())
         return event
 
     def latest(self, limit: int = 100) -> list[AuditEvent]:

@@ -10,6 +10,7 @@ from typing import Any
 from .audit import AuditStore
 from .contracts import new_id
 from .engine_adapter import MaspAdapter
+from .storage import atomic_write_json
 
 
 class ScenarioDraftConflict(ValueError):
@@ -35,11 +36,7 @@ class ScenarioDraftStore:
 
     @staticmethod
     def _write(path: Path, document: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(document, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        atomic_write_json(path, document)
 
     def _path(self, package_id: str) -> Path:
         if (

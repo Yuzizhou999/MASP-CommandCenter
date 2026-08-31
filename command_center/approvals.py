@@ -12,6 +12,7 @@ from .contracts import (
     IntentValidation,
     utc_now,
 )
+from .storage import atomic_write_json
 
 
 class ApprovalStore:
@@ -33,10 +34,7 @@ class ApprovalStore:
             item.model_dump(by_alias=True, mode="json")
             for item in sorted(self._items.values(), key=lambda row: row.created_at)
         ]
-        self.path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        atomic_write_json(self.path, payload)
 
     def create(
         self,
