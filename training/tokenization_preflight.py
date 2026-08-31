@@ -96,9 +96,7 @@ def inspect_dataset_tokenization(
                 tokenizer,
                 row["messages"],
                 max_length=max_length,
-                supervise_assistant_indices=metadata.get(
-                    "superviseAssistantIndices"
-                ),
+                supervise_assistant_indices=metadata.get("superviseAssistantIndices"),
             )
 
     return {

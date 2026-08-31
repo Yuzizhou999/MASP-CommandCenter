@@ -91,7 +91,10 @@ def test_invalid_package_reports_unreachable_task_and_duplicate_start() -> None:
     report = broken.validate()
     codes = {item.code for item in report.issues}
     assert "scenario.vehicle.start_duplicate" in codes
-    assert "scenario.task.workstation" in codes or "scenario.task.dropoff_unreachable" in codes
+    assert (
+        "scenario.task.workstation" in codes
+        or "scenario.task.dropoff_unreachable" in codes
+    )
 
 
 def test_compile_keeps_existing_runtime_contracts(tmp_path: Path) -> None:
@@ -113,7 +116,9 @@ def test_compile_keeps_existing_runtime_contracts(tmp_path: Path) -> None:
         "validation-report.json",
         "manifest.json",
     }
-    scenario = json.loads((tmp_path / "dispatch-scenario.json").read_text(encoding="utf-8"))
+    scenario = json.loads(
+        (tmp_path / "dispatch-scenario.json").read_text(encoding="utf-8")
+    )
     assert scenario["scenarioId"] == "test-realistic@1.0.0"
     assert len(scenario["tasks"]) == 32
     assert compiled.validation.valid

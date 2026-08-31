@@ -132,9 +132,7 @@ class Settings:
                 "DEEPSEEK_BASE_URL", "https://api.deepseek.com"
             ).rstrip("/"),
             deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
-            deepseek_timeout_seconds=float(
-                os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "30")
-            ),
+            deepseek_timeout_seconds=float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "30")),
             deepseek_max_retries=max(
                 0, min(5, int(os.getenv("DEEPSEEK_MAX_RETRIES", "2")))
             ),
@@ -152,9 +150,7 @@ class Settings:
                 0, float(os.getenv("DEEPSEEK_OUTPUT_COST_PER_MILLION", "1.10"))
             ),
             llm_provider=llm_provider,
-            local_llm_enabled=_as_bool(
-                os.getenv("LOCAL_LLM_ENABLED"), default=True
-            ),
+            local_llm_enabled=_as_bool(os.getenv("LOCAL_LLM_ENABLED"), default=True),
             local_llm_api_key=os.getenv("LOCAL_LLM_API_KEY", "local"),
             local_llm_base_url=os.getenv(
                 "LOCAL_LLM_BASE_URL", "http://127.0.0.1:8000/v1"
@@ -169,9 +165,7 @@ class Settings:
             agent_model_id=os.getenv(
                 "MASP_AGENT_MODEL_ID", "masp-ppo-priority"
             ).strip(),
-            agent_model_version=os.getenv(
-                "MASP_AGENT_MODEL_VERSION", "1.0.0"
-            ).strip(),
+            agent_model_version=os.getenv("MASP_AGENT_MODEL_VERSION", "1.0.0").strip(),
             agent_checkpoint=checkpoint,
             agent_device=os.getenv("MASP_AGENT_DEVICE", "cpu").strip().lower(),
             agent_torch_threads=max(
@@ -196,9 +190,7 @@ class Settings:
             agent_max_latency_ms=max(
                 100, int(os.getenv("AGENT_MAX_LATENCY_MS", "30000"))
             ),
-            agent_max_steps=max(
-                8, min(256, int(os.getenv("AGENT_MAX_STEPS", "48")))
-            ),
+            agent_max_steps=max(8, min(256, int(os.getenv("AGENT_MAX_STEPS", "48")))),
             data_root=data_root,
             runs_root=runs_root,
         )

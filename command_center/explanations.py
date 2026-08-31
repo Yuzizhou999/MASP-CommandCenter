@@ -194,8 +194,12 @@ class PlanExplanationService:
                     "traverseSegmentCount": len(traversals),
                     "waitSegmentCount": len(waits),
                     "resourceCount": len(resources),
-                    "startNodeId": traversals[0].get("startNodeId") if traversals else None,
-                    "endNodeId": traversals[-1].get("endNodeId") if traversals else None,
+                    "startNodeId": traversals[0].get("startNodeId")
+                    if traversals
+                    else None,
+                    "endNodeId": traversals[-1].get("endNodeId")
+                    if traversals
+                    else None,
                 },
             )
             findings.append(

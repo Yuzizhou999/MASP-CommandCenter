@@ -62,4 +62,3 @@ class IntentStore:
             return []
         with self._lock:
             return json.loads(self.path.read_text(encoding="utf-8"))[::-1]
-

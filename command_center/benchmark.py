@@ -70,9 +70,7 @@ class BenchmarkScenarioFactory:
         self.nodes = source["nodes"]
         self.tasks_by_group = {
             group: [
-                row
-                for row in self.base["tasks"]
-                if row["requiredRobotGroup"] == group
+                row for row in self.base["tasks"] if row["requiredRobotGroup"] == group
             ]
             for group in ("fork", "jack")
         }
@@ -178,9 +176,7 @@ class BenchmarkScenarioFactory:
 
         total_tasks = max(
             1,
-            math.ceil(
-                vehicle_count * ARRIVAL_TASKS_PER_VEHICLE[arrival_profile]
-            ),
+            math.ceil(vehicle_count * ARRIVAL_TASKS_PER_VEHICLE[arrival_profile]),
         )
         active_groups = [group for group, count in group_counts.items() if count]
         task_counts: dict[str, int] = {}
@@ -201,9 +197,7 @@ class BenchmarkScenarioFactory:
             rng = random.Random(
                 f"benchmark-tasks:{seed}:{group}:{arrival_profile}:{vehicle_count}"
             )
-            release_times = self._release_times(
-                task_counts[group], horizon_ms, rng
-            )
+            release_times = self._release_times(task_counts[group], horizon_ms, rng)
             templates = self.tasks_by_group[group]
             offset = rng.randrange(len(templates))
             for index, release_time in enumerate(release_times, start=1):
@@ -439,9 +433,7 @@ class BenchmarkRunner:
             request.seeds,
         )
         for vehicle_count, arrival_profile, fleet_mix, policy, seed in matrix:
-            case_id = (
-                f"v{vehicle_count}-{arrival_profile}-{fleet_mix}-{policy}-s{seed}"
-            )
+            case_id = f"v{vehicle_count}-{arrival_profile}-{fleet_mix}-{policy}-s{seed}"
             scenario: dict[str, Any] = {
                 "scenarioId": case_id,
                 "vehicles": [],
@@ -488,8 +480,7 @@ class BenchmarkRunner:
         conflict_cases = [
             row
             for row in cases
-            if float(row.get("safety", {}).get("reservationConflictRejections", 0))
-            > 0
+            if float(row.get("safety", {}).get("reservationConflictRejections", 0)) > 0
         ]
         timeout_cases = [
             row
@@ -541,9 +532,7 @@ class BenchmarkRunner:
             },
         }
         self._write_json(output_dir / "report.json", report)
-        (output_dir / "report.md").write_text(
-            self._markdown(report), encoding="utf-8"
-        )
+        (output_dir / "report.md").write_text(self._markdown(report), encoding="utf-8")
         if self.audit is not None:
             self.audit.append(
                 trace_id=new_id("trace"),

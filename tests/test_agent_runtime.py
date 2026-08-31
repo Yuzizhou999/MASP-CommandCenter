@@ -89,7 +89,9 @@ def test_direct_safety_violation_is_blocked_before_model_or_tools(
     assert response.intent is None
     assert response.agent_trace is not None
     assert response.agent_trace.terminal_reason == "policy.user_request_blocked"
-    assert response.agent_trace.steps[-1].observation_code == "policy.user_request_blocked"
+    assert (
+        response.agent_trace.steps[-1].observation_code == "policy.user_request_blocked"
+    )
     assert all(step.tool_name is None for step in response.agent_trace.steps)
 
 
@@ -100,9 +102,7 @@ def test_tool_registry_exposes_only_read_only_tools_to_model(isolated_settings) 
         scenario_id="interactive-multi-fleet",
     )
 
-    exposed = {
-        row["function"]["name"] for row in tools.model_definitions()
-    }
+    exposed = {row["function"]["name"] for row in tools.model_definitions()}
     assert exposed == {"get_world_snapshot", "search_sop"}
     assert "validate_dispatch_intent" not in exposed
     with pytest.raises(ValueError, match="不在允许列表"):
@@ -160,10 +160,13 @@ def test_deepseek_can_select_allowlisted_context_tools(
         scenario_id="interactive-multi-fleet",
     )
     monkeypatch.setattr(
-        "command_center.provider.httpx.post", lambda *args, **kwargs: _ToolCallingResponse()
+        "command_center.provider.httpx.post",
+        lambda *args, **kwargs: _ToolCallingResponse(),
     )
 
-    plan = provider.plan_context_tools("封闭通道前需要检查什么？", tools.model_definitions())
+    plan = provider.plan_context_tools(
+        "封闭通道前需要检查什么？", tools.model_definitions()
+    )
 
     assert plan.strategy == "MODEL_TOOL_CALLING"
     assert plan.model == configured.deepseek_model

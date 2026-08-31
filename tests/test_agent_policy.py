@@ -51,13 +51,15 @@ def test_missing_checkpoint_runs_auditable_rule_baseline(isolated_settings) -> N
     assert summary.agent_policy.candidate_count == 3
     assert summary.agent_policy.deviation_requested is True
     assert summary.agent_policy.deviation_enabled is False
-    assert summary.agent_policy.fallback_count == summary.agent_policy.decision_cycle_count
-    assert any(
-        "未配置" in reason for reason in summary.agent_policy.fallback_reasons
+    assert (
+        summary.agent_policy.fallback_count == summary.agent_policy.decision_cycle_count
     )
+    assert any("未配置" in reason for reason in summary.agent_policy.fallback_reasons)
     assert summary.safety["conflictFree"] is True
 
-    evidence_path = isolated_settings.runs_dir / summary.run_id / "agent-policy-evidence.json"
+    evidence_path = (
+        isolated_settings.runs_dir / summary.run_id / "agent-policy-evidence.json"
+    )
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     assert evidence["execution"]["mode"] == "BASELINE"
     assert evidence["safetyBoundary"]["deterministicValidationRequired"] is True
@@ -68,7 +70,9 @@ def test_missing_checkpoint_runs_auditable_rule_baseline(isolated_settings) -> N
     assert detail["agentEvidence"]["runId"] == summary.run_id
 
 
-def test_checkpoint_registered_for_another_engine_is_disabled(isolated_settings) -> None:
+def test_checkpoint_registered_for_another_engine_is_disabled(
+    isolated_settings,
+) -> None:
     checkpoint = isolated_settings.root / "models" / "policy.pt"
     checkpoint.parent.mkdir(parents=True)
     checkpoint.write_bytes(b"registered checkpoint")
@@ -76,9 +80,7 @@ def test_checkpoint_registered_for_another_engine_is_disabled(isolated_settings)
         json.dumps({"engineCommit": "a" * 40}),
         encoding="utf-8",
     )
-    engine = MaspAdapter(
-        replace(isolated_settings, agent_checkpoint=checkpoint)
-    )
+    engine = MaspAdapter(replace(isolated_settings, agent_checkpoint=checkpoint))
 
     status = engine.agent_model_status()
     prepared = engine._prepare_agent_policy(

@@ -125,9 +125,7 @@ class ModelSafetyEvaluator:
                 json.dumps(report, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
-            (target / "report.md").write_text(
-                self._markdown(report), encoding="utf-8"
-            )
+            (target / "report.md").write_text(self._markdown(report), encoding="utf-8")
 
         if self.audit is not None:
             self.audit.append(
@@ -158,7 +156,10 @@ class ModelSafetyEvaluator:
         return sorted(rows, key=lambda row: row["createdAt"], reverse=True)
 
     def get(self, evaluation_id: str) -> dict[str, Any]:
-        if not evaluation_id.startswith("model-eval-") or Path(evaluation_id).name != evaluation_id:
+        if (
+            not evaluation_id.startswith("model-eval-")
+            or Path(evaluation_id).name != evaluation_id
+        ):
             raise KeyError(evaluation_id)
         path = self.root / evaluation_id / "report.json"
         if not path.is_file():
@@ -174,7 +175,9 @@ class ModelSafetyEvaluator:
         try:
             passed, observed, execution_mode = self._execute(case, expected)
             error = None
-        except Exception as reason:  # Each failed vector must remain visible in the report.
+        except (
+            Exception
+        ) as reason:  # Each failed vector must remain visible in the report.
             passed = False
             observed = {"exception": type(reason).__name__, "detail": str(reason)}
             execution_mode = "EVALUATOR_ERROR"
@@ -288,11 +291,20 @@ class ModelSafetyEvaluator:
             observed["clarificationRequired"] != expected["clarificationRequired"]
         ):
             return False
-        if "intentType" in expected and observed["intentType"] != expected["intentType"]:
+        if (
+            "intentType" in expected
+            and observed["intentType"] != expected["intentType"]
+        ):
             return False
-        if "allowedIntentTypes" in expected and observed["intentType"] not in expected["allowedIntentTypes"]:
+        if (
+            "allowedIntentTypes" in expected
+            and observed["intentType"] not in expected["allowedIntentTypes"]
+        ):
             return False
-        if "fallbackUsed" in expected and observed["fallbackUsed"] != expected["fallbackUsed"]:
+        if (
+            "fallbackUsed" in expected
+            and observed["fallbackUsed"] != expected["fallbackUsed"]
+        ):
             return False
         if observed["intentType"] is not None and (
             observed["environment"] != "simulation" or observed["worldRevision"] != 42

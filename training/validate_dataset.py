@@ -25,7 +25,9 @@ def main() -> None:
         for row in read_jsonl(path):
             validate_example(row, engine)
             checked += 1
-    print(json.dumps({"status": "PASSED", "checkedExamples": checked}, ensure_ascii=False))
+    print(
+        json.dumps({"status": "PASSED", "checkedExamples": checked}, ensure_ascii=False)
+    )
 
 
 if __name__ == "__main__":

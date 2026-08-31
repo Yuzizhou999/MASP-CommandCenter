@@ -78,9 +78,7 @@ def _same_contract_value(
         "baseline": baseline_value,
         "candidate": candidate_value,
         "passed": bool(
-            baseline_value
-            and candidate_value
-            and baseline_value == candidate_value
+            baseline_value and candidate_value and baseline_value == candidate_value
         ),
     }
 
@@ -119,12 +117,8 @@ def qualify(
             baseline_intent, candidate_intent, "requestPromptSetSha256"
         ),
         "trajectoryPromptSha256": {
-            "baseline": _trajectory_prompt_sha(
-                baseline_trajectory, baseline_mode
-            ),
-            "candidate": _trajectory_prompt_sha(
-                candidate_trajectory, candidate_mode
-            ),
+            "baseline": _trajectory_prompt_sha(baseline_trajectory, baseline_mode),
+            "candidate": _trajectory_prompt_sha(candidate_trajectory, candidate_mode),
         },
     }
     if require_suite_hash:
@@ -201,8 +195,7 @@ def qualify(
     )
     passed = bool(
         quality["passed"]
-        and
-        contract_passed
+        and contract_passed
         and candidate_native_qualification
         and retention_passed
         and trajectory_passed

@@ -43,5 +43,6 @@ class AuditStore:
             return []
         with self._lock:
             rows = self.path.read_text(encoding="utf-8").splitlines()
-        return [AuditEvent.model_validate_json(row) for row in rows[-max(1, limit) :]][::-1]
-
+        return [AuditEvent.model_validate_json(row) for row in rows[-max(1, limit) :]][
+            ::-1
+        ]

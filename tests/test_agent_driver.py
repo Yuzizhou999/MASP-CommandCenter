@@ -75,7 +75,9 @@ def test_deterministic_driver_observes_before_next_action(isolated_settings) -> 
     assert second.action is not None and second.action.tool == "search_sop"
 
 
-def test_deepseek_native_tool_call_is_normalized(isolated_settings, monkeypatch) -> None:
+def test_deepseek_native_tool_call_is_normalized(
+    isolated_settings, monkeypatch
+) -> None:
     provider = DeepSeekProvider(replace(isolated_settings, deepseek_api_key="key"))
     monkeypatch.setattr(
         provider,
@@ -125,9 +127,7 @@ def test_local_v1_intent_output_has_transitional_wrapper(
     def post(**kwargs):
         captured.update(kwargs["payload"])
         return _Response(
-            {
-                "content": '{"intentType":"QUERY_STATUS","reason":"查询","query":"查询"}'
-            }
+            {"content": '{"intentType":"QUERY_STATUS","reason":"查询","query":"查询"}'}
         )
 
     monkeypatch.setattr(provider, "_post", post)
@@ -146,8 +146,7 @@ def test_local_v1_intent_output_has_transitional_wrapper(
     action_schema = captured["response_format"]["json_schema"]
     assert action_schema["name"] == "agent_action"
     assert {
-        row["properties"]["action"]["const"]
-        for row in action_schema["schema"]["oneOf"]
+        row["properties"]["action"]["const"] for row in action_schema["schema"]["oneOf"]
     } == {
         "CALL_TOOL",
         "REQUEST_CLARIFICATION",
@@ -155,7 +154,9 @@ def test_local_v1_intent_output_has_transitional_wrapper(
     }
 
 
-def test_multiple_native_tool_calls_are_rejected(isolated_settings, monkeypatch) -> None:
+def test_multiple_native_tool_calls_are_rejected(
+    isolated_settings, monkeypatch
+) -> None:
     provider = DeepSeekProvider(replace(isolated_settings, deepseek_api_key="key"))
     monkeypatch.setattr(
         provider,

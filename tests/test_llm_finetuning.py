@@ -51,9 +51,7 @@ def test_provider_factory_selects_deepseek_local_and_auto(
         create_llm_provider(isolated_settings), OpenAICompatibleLocalProvider
     )
 
-    deepseek = create_llm_provider(
-        replace(isolated_settings, llm_provider="deepseek")
-    )
+    deepseek = create_llm_provider(replace(isolated_settings, llm_provider="deepseek"))
     assert isinstance(deepseek, DeepSeekProvider)
     assert not isinstance(deepseek, OpenAICompatibleLocalProvider)
 

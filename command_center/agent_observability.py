@@ -76,13 +76,15 @@ class AgentObservabilityStore:
         total = len(events)
         durations = sorted(float(row.get("durationMs", 0)) for row in events)
         tool_counts = Counter(
-            str(name)
-            for row in events
-            for name in (row.get("toolNames") or [])
+            str(name) for row in events for name in (row.get("toolNames") or [])
         )
 
         def rate(predicate) -> float:
-            return round(sum(1 for row in events if predicate(row)) / total, 4) if total else 0.0
+            return (
+                round(sum(1 for row in events if predicate(row)) / total, 4)
+                if total
+                else 0.0
+            )
 
         p95_index = max(0, math.ceil(len(durations) * 0.95) - 1)
         return {
@@ -97,9 +99,7 @@ class AgentObservabilityStore:
                 lambda row: row.get("strategy") == "MODEL_TOOL_CALLING"
             ),
             "fallbackRate": rate(lambda row: bool(row.get("fallbackUsed"))),
-            "safetyBlockRate": rate(
-                lambda row: row.get("validationPassed") is False
-            ),
+            "safetyBlockRate": rate(lambda row: row.get("validationPassed") is False),
             "averageDurationMs": round(sum(durations) / len(durations), 3)
             if durations
             else 0.0,

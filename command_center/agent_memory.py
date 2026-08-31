@@ -71,7 +71,9 @@ class AgentMemoryStore:
 
             entities = {
                 key: set(values)
-                for key, values in (previous.confirmed_entities if previous else {}).items()
+                for key, values in (
+                    previous.confirmed_entities if previous else {}
+                ).items()
             }
             self._collect_entities(
                 entities,

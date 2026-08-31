@@ -163,21 +163,22 @@ def test_model_service_can_resolve_base_model_without_adapter(tmp_path: Path) ->
 def test_model_service_extracts_supported_response_schemas() -> None:
     assert response_json_schema({"type": "json_object"}) == {"type": "object"}
     schema = {"type": "object", "required": ["action"]}
-    assert response_json_schema(
-        {
-            "type": "json_schema",
-            "json_schema": {"name": "agent_action", "schema": schema},
-        }
-    ) == schema
+    assert (
+        response_json_schema(
+            {
+                "type": "json_schema",
+                "json_schema": {"name": "agent_action", "schema": schema},
+            }
+        )
+        == schema
+    )
 
 
 def test_model_service_rejects_invalid_response_formats() -> None:
     with pytest.raises(ValueError, match="unsupported"):
         response_json_schema({"type": "text"})
     with pytest.raises(ValueError, match="schema object"):
-        response_json_schema(
-            {"type": "json_schema", "json_schema": {"name": "broken"}}
-        )
+        response_json_schema({"type": "json_schema", "json_schema": {"name": "broken"}})
 
 
 def test_model_service_rejects_incomplete_or_schema_invalid_generation() -> None:
@@ -188,9 +189,9 @@ def test_model_service_rejects_incomplete_or_schema_invalid_generation() -> None
         "additionalProperties": False,
     }
 
-    assert validate_generated_json(
-        '{"action":"REQUEST_CLARIFICATION"}', schema
-    ) == {"action": "REQUEST_CLARIFICATION"}
+    assert validate_generated_json('{"action":"REQUEST_CLARIFICATION"}', schema) == {
+        "action": "REQUEST_CLARIFICATION"
+    }
     with pytest.raises(ValueError, match="incomplete JSON"):
         validate_generated_json('{"action":"REQUEST_CLARIFICATION"', schema)
     with pytest.raises(ValueError, match="requested schema"):
@@ -233,8 +234,7 @@ def test_challenge_normal_cases_do_not_trigger_model_request_gate() -> None:
     suite = load_suite(PROJECT_ROOT / "evals" / "intent-challenge-v1.json")
 
     assert all(
-        model_request_violation(row["message"]) is None
-        for row in suite["cases"]
+        model_request_violation(row["message"]) is None for row in suite["cases"]
     )
 
 
@@ -261,8 +261,6 @@ def test_challenge_clarification_states_match(
     observed = []
     for index, row in enumerate(suite["clarificationCases"]):
         result = resolver.resolve(row["message"], f"challenge-test-{index}")
-        observed.append(
-            "CLARIFICATION_REQUIRED" if result.clarification else "READY"
-        )
+        observed.append("CLARIFICATION_REQUIRED" if result.clarification else "READY")
 
     assert observed == [row["expected"]["state"] for row in suite["clarificationCases"]]

@@ -82,9 +82,10 @@ def test_benchmark_runner_writes_reproducible_statistics(isolated_settings) -> N
         / report["benchmarkId"]
         / "report.json"
     )
-    assert json.loads(report_path.read_text(encoding="utf-8"))["benchmarkId"] == report[
-        "benchmarkId"
-    ]
+    assert (
+        json.loads(report_path.read_text(encoding="utf-8"))["benchmarkId"]
+        == report["benchmarkId"]
+    )
     assert runner.get(report["benchmarkId"])["caseCount"] == 2
     assert runner.list()[0]["benchmarkId"] == report["benchmarkId"]
 

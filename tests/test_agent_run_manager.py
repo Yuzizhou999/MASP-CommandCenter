@@ -55,7 +55,9 @@ def _wait_for(manager: AgentRunManager, run_id: str, statuses: set[str]):
         if record.status in statuses:
             return record
         sleep(0.02)
-    raise AssertionError(f"Agent run did not reach {statuses}: {manager.get(run_id).status}")
+    raise AssertionError(
+        f"Agent run did not reach {statuses}: {manager.get(run_id).status}"
+    )
 
 
 def test_sqlite_store_completes_50_concurrent_runs(isolated_settings) -> None:
@@ -90,8 +92,7 @@ def test_sqlite_store_completes_50_concurrent_runs(isolated_settings) -> None:
     assert len({row.run_id for row in records}) == 50
     assert all(row.status == "COMPLETED" for row in records)
     assert all(
-        [event.event_id for event in row.events]
-        == list(range(1, len(row.events) + 1))
+        [event.event_id for event in row.events] == list(range(1, len(row.events) + 1))
         for row in records
     )
     manager.shutdown()
@@ -329,7 +330,10 @@ def test_goal_execution_pauses_after_simulation_and_approval_survives_restart(
     assert completed.workflow.approval_request.approval_id == approval_id
     assert completed.workflow.approval_request.status.value == "APPROVED"
     assert completed.workflow.commitment is not None
-    assert len(IntentStore(isolated_settings.data_dir / "committed-intents.json").list()) == 1
+    assert (
+        len(IntentStore(isolated_settings.data_dir / "committed-intents.json").list())
+        == 1
+    )
 
 
 def test_waiting_approval_survives_restart_after_original_deadline(

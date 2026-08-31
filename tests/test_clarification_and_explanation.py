@@ -132,7 +132,10 @@ def test_generic_resource_block_requires_target(isolated_settings) -> None:
 @pytest.mark.parametrize(
     ("message", "missing_fields"),
     [
-        ("新增一个紧急运输任务", {"pickupNodeId", "dropoffNodeId", "requiredRobotGroup"}),
+        (
+            "新增一个紧急运输任务",
+            {"pickupNodeId", "dropoffNodeId", "requiredRobotGroup"},
+        ),
         ("帮我把货送过去", {"pickupNodeId", "dropoffNodeId", "requiredRobotGroup"}),
         ("临时停用一条通道", {"resourceIds"}),
     ],
@@ -186,9 +189,7 @@ def test_holdout_resource_wording_resolves_target_and_chinese_duration(
 
     assert response.state == "READY"
     assert response.intent is not None and response.intent.resource_block is not None
-    assert response.intent.resource_block.resource_ids == [
-        "zone:zone-jack-pp363-pp365"
-    ]
+    assert response.intent.resource_block.resource_ids == ["zone:zone-jack-pp363-pp365"]
     assert response.intent.resource_block.end_ms == 120000
 
 

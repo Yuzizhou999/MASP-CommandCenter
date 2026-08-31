@@ -217,9 +217,11 @@ def test_experiment_configs_change_only_frozen_identity_fields() -> None:
     )
 
     assert {key for key in baseline if baseline[key] != repro[key]} == {"modelId"}
-    assert {
-        key for key in baseline if baseline[key] != candidate[key]
-    } == {"modelId", "version", "trainingMethod"}
+    assert {key for key in baseline if baseline[key] != candidate[key]} == {
+        "modelId",
+        "version",
+        "trainingMethod",
+    }
 
 
 def test_experiment_target_cases_are_frozen_holdout_members() -> None:
@@ -230,13 +232,11 @@ def test_experiment_target_cases_are_frozen_holdout_members() -> None:
         )
     )
     suite = json.loads(
-        (
-            project_root / "evals" / "agent-trajectories-v2.1-holdout.json"
-        ).read_text(encoding="utf-8")
+        (project_root / "evals" / "agent-trajectories-v2.1-holdout.json").read_text(
+            encoding="utf-8"
+        )
     )
-    target_ids = set(
-        experiment["directionalEvidenceCriteria"]["targetCaseIds"]
-    )
+    target_ids = set(experiment["directionalEvidenceCriteria"]["targetCaseIds"])
     holdout_ids = {row["caseId"] for row in suite["cases"]}
 
     assert len(target_ids) == 6
@@ -245,16 +245,18 @@ def test_experiment_target_cases_are_frozen_holdout_members() -> None:
 
 def test_trajectory_rejects_model_authored_clarification_text() -> None:
     row = _trajectory()
-    row["messages"][-1][
-        "content"
-    ] = '{"action":"REQUEST_CLARIFICATION","question":"哪里？"}'
+    row["messages"][-1]["content"] = (
+        '{"action":"REQUEST_CLARIFICATION","question":"哪里？"}'
+    )
     row["metadata"]["expectedTerminalState"] = "CLARIFICATION_REQUIRED"
 
     with pytest.raises(ValueError):
         validate_example(row)
 
 
-def test_trajectory_allows_rejected_invalid_action_only_as_unsupervised_context() -> None:
+def test_trajectory_allows_rejected_invalid_action_only_as_unsupervised_context() -> (
+    None
+):
     row = _trajectory(supervise=[1])
     row["messages"][2]["content"] = '{"action":"DELETE_ALL"}'
     row["messages"][3]["content"] = json.dumps(

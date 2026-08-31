@@ -122,8 +122,7 @@ def intent_request_payload(
             "resourceBlock": resolved_resource_block,
         },
         "retrievedContext": [
-            untrusted_retrieval_record(row)
-            for row in (context_evidence or [])
+            untrusted_retrieval_record(row) for row in (context_evidence or [])
         ],
         "schema": DispatchIntent.model_json_schema(by_alias=True),
     }
@@ -172,9 +171,7 @@ class DeepSeekProvider:
         self._aggregate = self._empty_telemetry()
         self._runs: dict[str, dict[str, Any]] = {}
 
-    def _response_format(
-        self, name: str, schema: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _response_format(self, name: str, schema: dict[str, Any]) -> dict[str, Any]:
         del name, schema
         return {"type": "json_object"}
 
@@ -334,9 +331,7 @@ class DeepSeekProvider:
         has_memory: bool = False,
     ) -> AgentToolPlan:
         """Let the model choose read-only context tools, with a deterministic fallback."""
-        fallback_calls = [
-            PlannedToolCall(name="get_world_snapshot", arguments={})
-        ]
+        fallback_calls = [PlannedToolCall(name="get_world_snapshot", arguments={})]
         if has_memory:
             fallback_calls.append(
                 PlannedToolCall(name="recall_conversation_memory", arguments={})
@@ -418,7 +413,9 @@ class DeepSeekProvider:
             if not calls:
                 return fallback
             if not any(call.name == "get_world_snapshot" for call in calls):
-                calls.insert(0, PlannedToolCall(name="get_world_snapshot", arguments={}))
+                calls.insert(
+                    0, PlannedToolCall(name="get_world_snapshot", arguments={})
+                )
             if has_memory and not any(
                 call.name == "recall_conversation_memory" for call in calls
             ):
@@ -600,7 +597,13 @@ class DeepSeekProvider:
                 completion_tokens=completion_tokens,
                 estimated_cost_usd=estimated_cost_usd,
             )
-        except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        except (
+            httpx.HTTPError,
+            KeyError,
+            TypeError,
+            ValueError,
+            json.JSONDecodeError,
+        ) as error:
             if isinstance(error, httpx.HTTPError):
                 self._mark_fallback()
                 return fallback
@@ -662,7 +665,8 @@ class DeepSeekProvider:
                 (
                     row
                     for row in observations
-                    if row.tool_name == "get_world_snapshot" and row.kind == "TOOL_RESULT"
+                    if row.tool_name == "get_world_snapshot"
+                    and row.kind == "TOOL_RESULT"
                 ),
                 None,
             )
@@ -677,7 +681,9 @@ class DeepSeekProvider:
                     world_revision=revision,
                     requested_by="agent-loop",
                     resolved_task=authoritative_parameters.get("task"),
-                    resolved_resource_block=authoritative_parameters.get("resourceBlock"),
+                    resolved_resource_block=authoritative_parameters.get(
+                        "resourceBlock"
+                    ),
                 )
                 proposal = intent.model_dump(
                     by_alias=True,
@@ -987,7 +993,9 @@ class DeepSeekProvider:
                     else []
                 )
                 if not resources:
-                    raise ValueError("resourceIds are required before parsing BLOCK_RESOURCE")
+                    raise ValueError(
+                        "resourceIds are required before parsing BLOCK_RESOURCE"
+                    )
                 resolved_resource_block = {
                     "resourceIds": resources,
                     "startMs": 0,
@@ -999,7 +1007,9 @@ class DeepSeekProvider:
                 requestedBy=requested_by,
                 basedOnWorldRevision=world_revision,
                 reason=normalized,
-                resourceBlock=ResourceBlockDraft.model_validate(resolved_resource_block),
+                resourceBlock=ResourceBlockDraft.model_validate(
+                    resolved_resource_block
+                ),
             )
         if any(term in normalized for term in ("报告", "总结", "班次")):
             return DispatchIntent(
@@ -1030,16 +1040,23 @@ class DeepSeekProvider:
             if resolved_task is None:
                 group = (
                     "jack"
-                    if any(term in normalized.lower() for term in ("jack", "搬运车", "顶升车", "料架"))
+                    if any(
+                        term in normalized.lower()
+                        for term in ("jack", "搬运车", "顶升车", "料架")
+                    )
                     else "fork"
-                    if any(term in normalized.lower() for term in ("fork", "叉车", "托盘"))
+                    if any(
+                        term in normalized.lower() for term in ("fork", "叉车", "托盘")
+                    )
                     else None
                 )
                 ap_ids = re.findall(
                     r"(?:fork:|jack:)?AP\d+", normalized, flags=re.IGNORECASE
                 )
                 if group is None or len(ap_ids) < 2:
-                    raise ValueError("task endpoints and requiredRobotGroup must be explicit")
+                    raise ValueError(
+                        "task endpoints and requiredRobotGroup must be explicit"
+                    )
                 prefix = f"{group}:"
                 pickup = ap_ids[0]
                 dropoff = ap_ids[1]

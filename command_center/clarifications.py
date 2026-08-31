@@ -150,7 +150,9 @@ class ClarificationResolver:
             return IntentType.BLOCK_RESOURCE
         if any(term in message for term in TASK_TERMS):
             return IntentType.CREATE_TASK
-        if pending is not None and not any(term in message for term in NEW_INTENT_TERMS):
+        if pending is not None and not any(
+            term in message for term in NEW_INTENT_TERMS
+        ):
             return IntentType(pending["intentType"])
         return None
 
@@ -228,8 +230,12 @@ class ClarificationResolver:
             for values in candidates.values()
             if values
         ]
-        inferred_groups = set.intersection(*candidate_groups) if candidate_groups else set()
-        group = explicit_group or (next(iter(inferred_groups)) if len(inferred_groups) == 1 else None)
+        inferred_groups = (
+            set.intersection(*candidate_groups) if candidate_groups else set()
+        )
+        group = explicit_group or (
+            next(iter(inferred_groups)) if len(inferred_groups) == 1 else None
+        )
         if group is not None:
             candidates = {
                 field: self.engine.resolve_node_reference(value, group) if value else []
@@ -254,7 +260,9 @@ class ClarificationResolver:
                 code = "AMBIGUOUS_ENTITY"
             elif len(values) > 1:
                 missing.append(field)
-                questions.append(f"{label} {raw} 对应多个车型，请明确使用叉车还是顶升车。")
+                questions.append(
+                    f"{label} {raw} 对应多个车型，请明确使用叉车还是顶升车。"
+                )
                 code = "AMBIGUOUS_ENTITY"
         if group is None:
             missing.append("requiredRobotGroup")
@@ -263,9 +271,7 @@ class ClarificationResolver:
                 code = "AMBIGUOUS_ENTITY"
 
         collected = {
-            key: values[0]
-            for key, values in candidates.items()
-            if len(values) == 1
+            key: values[0] for key, values in candidates.items() if len(values) == 1
         }
         if group:
             collected["requiredRobotGroup"] = group
@@ -309,17 +315,15 @@ class ClarificationResolver:
             return max(1, int(minute.group(1))) * 60000
         chinese_minute = re.search(r"([零〇一二两三四五六七八九十百]+)\s*分钟", message)
         if chinese_minute:
-            return ClarificationResolver._chinese_number(
-                chinese_minute.group(1)
-            ) * 60000
+            return (
+                ClarificationResolver._chinese_number(chinese_minute.group(1)) * 60000
+            )
         second = re.search(r"(\d+)\s*秒", message)
         if second:
             return max(1, int(second.group(1))) * 1000
         chinese_second = re.search(r"([零〇一二两三四五六七八九十百]+)\s*秒", message)
         if chinese_second:
-            return ClarificationResolver._chinese_number(
-                chinese_second.group(1)
-            ) * 1000
+            return ClarificationResolver._chinese_number(chinese_second.group(1)) * 1000
         return 180000
 
     @staticmethod
@@ -359,7 +363,9 @@ class ClarificationResolver:
             clarification = ClarificationRequest(
                 code="MISSING_REQUIRED_FIELDS",
                 missingFields=["resourceIds"],
-                questions=["请提供需要停用的通道、工位或资源编号，或在地图中选择目标。"],
+                questions=[
+                    "请提供需要停用的通道、工位或资源编号，或在地图中选择目标。"
+                ],
                 collectedParameters={"durationMs": self._duration_ms(combined)},
             )
             self.store.put(

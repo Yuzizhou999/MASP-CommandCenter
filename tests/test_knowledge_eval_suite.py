@@ -36,6 +36,5 @@ def test_default_retrieval_weights_meet_frozen_quality_gate() -> None:
         "mrr": 0.91,
     }
     assert all(
-        result[name] >= minimum
-        for name, minimum in suite["qualification"].items()
+        result[name] >= minimum for name, minimum in suite["qualification"].items()
     )

@@ -20,9 +20,7 @@ class LLMModelCard(BaseModel):
     adapter_file: str | None = Field(default=None, alias="adapterFile")
     adapter_sha256: str | None = Field(default=None, alias="adapterSha256")
     status: Literal["candidate", "active", "retired"] = "candidate"
-    run_scope: Literal["sanity", "full"] | None = Field(
-        default=None, alias="runScope"
-    )
+    run_scope: Literal["sanity", "full"] | None = Field(default=None, alias="runScope")
     sample_limits: dict[str, int | None] = Field(
         default_factory=dict, alias="sampleLimits"
     )

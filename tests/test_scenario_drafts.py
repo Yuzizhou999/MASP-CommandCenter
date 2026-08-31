@@ -29,40 +29,83 @@ def package_document() -> dict:
     bounds = map_document["metadata"]["bounds"]
     nodes = []
     for row in map_document["nodes"]:
-        nodes.append({
-            "id": row["id"], "type": row["type"], "x": row["x"], "y": row["y"],
-            "allowedRobotGroups": row["allowedRobotGroups"],
-            "waitAllowedByGroup": row.get("allowWaitByGroup", {}),
-            "positionsByGroup": row.get("positions", {}), "headings": row.get("headings", {}),
-            "propertiesByGroup": row.get("propertiesByGroup", {}), "capacity": row.get("capacity", 1),
-        })
+        nodes.append(
+            {
+                "id": row["id"],
+                "type": row["type"],
+                "x": row["x"],
+                "y": row["y"],
+                "allowedRobotGroups": row["allowedRobotGroups"],
+                "waitAllowedByGroup": row.get("allowWaitByGroup", {}),
+                "positionsByGroup": row.get("positions", {}),
+                "headings": row.get("headings", {}),
+                "propertiesByGroup": row.get("propertiesByGroup", {}),
+                "capacity": row.get("capacity", 1),
+            }
+        )
     edges = []
     for row in map_document["edges"]:
-        edges.append({
-            "id": row["id"], "name": row.get("name", row["id"]),
-            "startNodeId": row["start"], "endNodeId": row["end"],
-            "controlPoints": [row[key] for key in ("p0", "p1", "p2", "p3")],
-            "lengthM": row["length"], "motionDirection": row.get("motionDirection", 0),
-            "moveStyle": row.get("moveStyle", 0), "maxSpeedMps": row.get("maxSpeed"),
-            "loadedMaxSpeedMps": row.get("loadMaxSpeed"), "robotGroup": row["robotGroup"],
-        })
+        edges.append(
+            {
+                "id": row["id"],
+                "name": row.get("name", row["id"]),
+                "startNodeId": row["start"],
+                "endNodeId": row["end"],
+                "controlPoints": [row[key] for key in ("p0", "p1", "p2", "p3")],
+                "lengthM": row["length"],
+                "motionDirection": row.get("motionDirection", 0),
+                "moveStyle": row.get("moveStyle", 0),
+                "maxSpeedMps": row.get("maxSpeed"),
+                "loadedMaxSpeedMps": row.get("loadMaxSpeed"),
+                "robotGroup": row["robotGroup"],
+            }
+        )
     return {
-        "schemaVersion": 1, "packageId": "draft-api-test", "version": "1.0.0", "status": "draft",
+        "schemaVersion": 1,
+        "packageId": "draft-api-test",
+        "version": "1.0.0",
+        "status": "draft",
         "metadata": {"createdBy": "test"},
         "warehouseScene": {
-            "sceneId": "draft-api-scene", "name": "测试场景", "bounds": bounds,
-            "robotProfiles": profile["robotGroups"], "nodes": nodes, "edges": edges,
-            "workstations": workstations["workstations"], "vehicles": vehicles["vehicles"],
-            "recoveryNodes": traffic.get("recoveryNodes", []), "trafficZones": traffic.get("zones", []),
-            "safety": {"footprintMarginM": profile.get("simulationSafety", {}).get("footprintMargin", 0), "conflictSampleSpacingM": conflicts.get("metadata", {}).get("sampleSpacing", 0.25), "localizationErrorM": None, "communicationLatencyMs": None, "provisional": True},
+            "sceneId": "draft-api-scene",
+            "name": "测试场景",
+            "bounds": bounds,
+            "robotProfiles": profile["robotGroups"],
+            "nodes": nodes,
+            "edges": edges,
+            "workstations": workstations["workstations"],
+            "vehicles": vehicles["vehicles"],
+            "recoveryNodes": traffic.get("recoveryNodes", []),
+            "trafficZones": traffic.get("zones", []),
+            "safety": {
+                "footprintMarginM": profile.get("simulationSafety", {}).get(
+                    "footprintMargin", 0
+                ),
+                "conflictSampleSpacingM": conflicts.get("metadata", {}).get(
+                    "sampleSpacing", 0.25
+                ),
+                "localizationErrorM": None,
+                "communicationLatencyMs": None,
+                "provisional": True,
+            },
         },
-        "taskStream": {"streamId": "draft-api-stream", "seed": scenario["seed"], "endTimeMs": scenario["endTimeMs"], "tasks": scenario["tasks"], "events": []},
+        "taskStream": {
+            "streamId": "draft-api-stream",
+            "seed": scenario["seed"],
+            "endTimeMs": scenario["endTimeMs"],
+            "tasks": scenario["tasks"],
+            "events": [],
+        },
     }
 
 
 def store(isolated_settings):
     engine = MaspAdapter(isolated_settings)
-    return ScenarioDraftStore(isolated_settings.data_dir, engine, AuditStore(isolated_settings.data_dir / "audit.jsonl"))
+    return ScenarioDraftStore(
+        isolated_settings.data_dir,
+        engine,
+        AuditStore(isolated_settings.data_dir / "audit.jsonl"),
+    )
 
 
 def test_draft_lifecycle_and_revision_guard(isolated_settings) -> None:
@@ -85,9 +128,20 @@ def test_task_generation_compile_and_publish(isolated_settings) -> None:
     current = drafts.generate_tasks(
         "draft-api-test",
         {
-            "streamId": "draft-generated", "seed": 9, "endTimeMs": 120000, "maxTasks": 3,
+            "streamId": "draft-generated",
+            "seed": 9,
+            "endTimeMs": 120000,
+            "maxTasks": 3,
             "arrival": {"mode": "fixed_interval", "intervalMs": 30000},
-            "odPairs": [{"pickupNodeId": "fork:AP1123", "dropoffNodeId": "fork:AP1119", "requiredRobotGroup": "fork", "payloadType": "pallet", "weight": 1}],
+            "odPairs": [
+                {
+                    "pickupNodeId": "fork:AP1123",
+                    "dropoffNodeId": "fork:AP1119",
+                    "requiredRobotGroup": "fork",
+                    "payloadType": "pallet",
+                    "weight": 1,
+                }
+            ],
         },
         1,
         "operator",
@@ -97,7 +151,19 @@ def test_task_generation_compile_and_publish(isolated_settings) -> None:
     assert compiled["compiled"] is True
     published = drafts.publish("draft-api-test", "supervisor")
     assert published["status"] == "published"
-    assert json.loads((isolated_settings.data_dir / "scenario-builds" / "draft-api-test" / "1.0.0" / "published" / "manifest.json").read_text(encoding="utf-8"))["status"] == "published"
+    assert (
+        json.loads(
+            (
+                isolated_settings.data_dir
+                / "scenario-builds"
+                / "draft-api-test"
+                / "1.0.0"
+                / "published"
+                / "manifest.json"
+            ).read_text(encoding="utf-8")
+        )["status"]
+        == "published"
+    )
 
 
 def test_runtime_import_uses_selected_scenario_vehicles(isolated_settings) -> None:
@@ -111,6 +177,7 @@ def test_runtime_import_uses_selected_scenario_vehicles(isolated_settings) -> No
     assert len(document["warehouseScene"]["vehicles"]) == len(
         read("scenarios/explicit-single-vehicle.json")["vehicles"]
     )
-    assert document["warehouseScene"]["vehicles"][0]["vehicleId"] == read(
-        "scenarios/explicit-single-vehicle.json"
-    )["vehicles"][0]["vehicleId"]
+    assert (
+        document["warehouseScene"]["vehicles"][0]["vehicleId"]
+        == read("scenarios/explicit-single-vehicle.json")["vehicles"][0]["vehicleId"]
+    )

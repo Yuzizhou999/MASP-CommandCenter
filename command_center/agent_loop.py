@@ -75,9 +75,8 @@ def _proposal_authority_violation(
         proposed = proposal.get("resourceBlock")
         if isinstance(proposed, dict):
             for field in ("resourceIds", "startMs", "endMs"):
-                if (
-                    field in proposed
-                    and proposed[field] != resolved.resource_block.get(field)
+                if field in proposed and proposed[field] != resolved.resource_block.get(
+                    field
                 ):
                     return ModelBoundaryError(
                         "intent.resource.authority-mismatch",
@@ -153,9 +152,7 @@ class AgentLoopExecutor:
             detail=f"绑定会话 {request.conversation_id} 和场景 {request.scenario_id}",
         )
         started = perf_counter()
-        resolved = self.clarifications.resolve(
-            request.message, request.conversation_id
-        )
+        resolved = self.clarifications.resolve(request.message, request.conversation_id)
         run.transition(
             AgentState.PARAMETER_RESOLUTION,
             title="绑定权威业务参数",
@@ -217,9 +214,7 @@ class AgentLoopExecutor:
                     action_history=action_history,
                 )
                 decision_tokens = decision.prompt_tokens + decision.completion_tokens
-                tracker.consume_decision(
-                    decision_tokens, decision.estimated_cost_usd
-                )
+                tracker.consume_decision(decision_tokens, decision.estimated_cost_usd)
                 model = decision.model
                 fallback_used = fallback_used or decision.fallback_used
                 attempt = tracker.decisions
@@ -269,9 +264,7 @@ class AgentLoopExecutor:
                     continue
 
                 action = decision.action
-                action_history.append(
-                    action.model_dump(mode="json", exclude_none=True)
-                )
+                action_history.append(action.model_dump(mode="json", exclude_none=True))
                 run.record(
                     title=f"策略动作：{action.action.value}",
                     detail=(
@@ -349,7 +342,9 @@ class AgentLoopExecutor:
                     )
                     if tool.name == "get_world_snapshot":
                         snapshot = result.value
-                        evidence.append(tools.world_evidence(snapshot, request.scenario_id))
+                        evidence.append(
+                            tools.world_evidence(snapshot, request.scenario_id)
+                        )
                     elif tool.name == "search_sop":
                         evidence.extend(result.value)
                         quarantined = (result.metadata or {}).get("quarantined") or []
@@ -660,9 +655,7 @@ class AgentLoopExecutor:
             trace=trace,
             clarification=clarification,
         )
-        self._record_observability(
-            trace_id, request, trace, model, fallback_used, None
-        )
+        self._record_observability(trace_id, request, trace, model, fallback_used, None)
         response = ChatResponse(
             traceId=trace_id,
             conversationId=request.conversation_id,
@@ -683,9 +676,7 @@ class AgentLoopExecutor:
                 "request": request.message,
                 "scenarioId": request.scenario_id,
                 "reason": reason,
-                "clarification": clarification.model_dump(
-                    by_alias=True, mode="json"
-                ),
+                "clarification": clarification.model_dump(by_alias=True, mode="json"),
                 "agentTrace": trace.model_dump(by_alias=True, mode="json"),
             },
         )

@@ -133,9 +133,7 @@ class DispatchAgentTools:
 
     def model_definitions(self) -> list[dict[str, Any]]:
         return [
-            tool.definition()
-            for tool in self._tools.values()
-            if tool.model_selectable
+            tool.definition() for tool in self._tools.values() if tool.model_selectable
         ]
 
     def tool(self, name: str) -> AgentTool:
@@ -167,7 +165,11 @@ class DispatchAgentTools:
                 value=evidence,
                 summary=(
                     f"命中 {len(evidence)} 条 SOP："
-                    + ("、".join(row.title for row in evidence) if evidence else "无匹配")
+                    + (
+                        "、".join(row.title for row in evidence)
+                        if evidence
+                        else "无匹配"
+                    )
                     + (
                         f"；隔离 {len(screening.quarantined)} 条可疑检索内容"
                         if screening.quarantined

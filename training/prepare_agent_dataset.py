@@ -172,8 +172,7 @@ def _convert_intent_row(
                 summary=f"命中 {len(screened.accepted)} 条安全 SOP",
                 data={
                     "value": [
-                        untrusted_retrieval_record(item)
-                        for item in screened.accepted
+                        untrusted_retrieval_record(item) for item in screened.accepted
                     ],
                     "quarantined": [],
                 },
@@ -239,7 +238,9 @@ def _clarification_row(text: str, index: int, split: str) -> dict[str, Any]:
         authoritative_parameters={"task": None, "resourceBlock": None},
         action_history=[],
     )
-    messages.append(_assistant(AgentAction(action=AgentActionType.REQUEST_CLARIFICATION)))
+    messages.append(
+        _assistant(AgentAction(action=AgentActionType.REQUEST_CLARIFICATION))
+    )
     return {
         "messages": messages,
         "metadata": {
@@ -303,9 +304,7 @@ def _repair_row(source: dict[str, Any], index: int) -> dict[str, Any]:
         action_history=history,
     )
     messages.append(
-        _assistant(
-            AgentAction(action=AgentActionType.PROPOSE_INTENT, intent=correct)
-        )
+        _assistant(AgentAction(action=AgentActionType.PROPOSE_INTENT, intent=correct))
     )
     return {
         "messages": messages,
@@ -489,7 +488,9 @@ def main() -> None:
         (source_dir / "manifest.json").read_text(encoding="utf-8")
     )
     knowledge = KnowledgeBase(ROOT / "knowledge")
-    splits: dict[str, list[dict[str, Any]]] = {key: [] for key in ("train", "valid", "test")}
+    splits: dict[str, list[dict[str, Any]]] = {
+        key: [] for key in ("train", "valid", "test")
+    }
     source_rows: dict[str, list[dict[str, Any]]] = {}
     for split in splits:
         path = source_dir / source_manifest["files"][split]["path"]
@@ -509,7 +510,9 @@ def main() -> None:
         splits[split].append(_injection_row(text, index, split))
 
     task_train = [
-        row for row in source_rows["train"] if row["metadata"]["category"] == "CREATE_TASK"
+        row
+        for row in source_rows["train"]
+        if row["metadata"]["category"] == "CREATE_TASK"
     ]
     random.shuffle(task_train)
     splits["train"].extend(
@@ -541,9 +544,7 @@ def main() -> None:
             "sha256": file_sha256(path),
         }
     categories = Counter(
-        str(row["metadata"]["category"])
-        for rows in splits.values()
-        for row in rows
+        str(row["metadata"]["category"]) for rows in splits.values() for row in rows
     )
     manifest = {
         "schemaVersion": 1,

@@ -14,7 +14,9 @@ from command_center.contracts import IntentType
         "如何处理通道检修？",
     ],
 )
-def test_read_only_resource_questions_do_not_become_block_commands(message: str) -> None:
+def test_read_only_resource_questions_do_not_become_block_commands(
+    message: str,
+) -> None:
     assert ClarificationResolver._intent_type(message, pending=None) is None
 
 

@@ -98,7 +98,9 @@ def test_unconfigured_model_and_hallucinated_evidence_use_rule_fallback(
     incident_system,
 ) -> None:
     _, _, service, baseline = incident_system
-    incident = service.inject_vehicle_fault(FaultInjectionRequest(runId=baseline.run_id))
+    incident = service.inject_vehicle_fault(
+        FaultInjectionRequest(runId=baseline.run_id)
+    )
     diagnosed = service.diagnose(incident.incident_id)
     assert diagnosed.diagnosis is not None
     assert diagnosed.diagnosis.fallback_used is True
@@ -173,12 +175,20 @@ def test_what_if_runs_create_real_evidence_and_loaded_task_is_not_reassigned(
     assert engine.compare(list(incident.what_if_run_ids.values())).runs
 
     isolate_run_id = incident.what_if_run_ids[WhatIfMode.ISOLATE_REASSIGN.value]
-    isolate_root = isolated_root = Path(engine.get_run(isolate_run_id).manifest_path).parent
-    context = json.loads((isolate_root / "incident-context.json").read_text(encoding="utf-8"))
-    scenario = json.loads((isolated_root / "input-scenario.json").read_text(encoding="utf-8"))
+    isolate_root = isolated_root = Path(
+        engine.get_run(isolate_run_id).manifest_path
+    ).parent
+    context = json.loads(
+        (isolate_root / "incident-context.json").read_text(encoding="utf-8")
+    )
+    scenario = json.loads(
+        (isolated_root / "input-scenario.json").read_text(encoding="utf-8")
+    )
     assert context["manualTransferRequired"] is True
     assert context["removedTaskIds"] == incident.task_ids
-    assert not set(incident.task_ids).intersection(row["taskId"] for row in scenario["tasks"])
+    assert not set(incident.task_ids).intersection(
+        row["taskId"] for row in scenario["tasks"]
+    )
 
 
 def test_workstation_outage_freezes_real_resources_and_suspends_only_affected_tasks(
@@ -218,7 +228,9 @@ def test_workstation_outage_freezes_real_resources_and_suspends_only_affected_ta
     scenario = json.loads((root / "input-scenario.json").read_text(encoding="utf-8"))
     assert context["workstationId"] == incident.workstation_id
     assert context["suspendedTaskIds"] == incident.task_ids
-    assert not set(incident.task_ids).intersection(row["taskId"] for row in scenario["tasks"])
+    assert not set(incident.task_ids).intersection(
+        row["taskId"] for row in scenario["tasks"]
+    )
     assert suspended_run.safety["requiresApproval"] is True
 
 
@@ -244,9 +256,7 @@ def test_deadlock_injection_uses_masp_wait_graph_and_recovery_decision(
         "CONTROLLED_REVERSE",
         "SAFETY_STOP",
     }
-    incident = service.run_what_if(
-        incident.incident_id, WhatIfMode.CONTROLLED_REVERSE
-    )
+    incident = service.run_what_if(incident.incident_id, WhatIfMode.CONTROLLED_REVERSE)
     run = engine.get_run(incident.what_if_run_ids[WhatIfMode.CONTROLLED_REVERSE.value])
     assert run.status == "COMPLETED"
     assert run.policy == "deterministic_recovery"
@@ -260,16 +270,16 @@ def test_deadlock_injection_uses_masp_wait_graph_and_recovery_decision(
     assert unrecoverable.event_attributes["maxCycleLength"] == 4
     assert unrecoverable.event_attributes["recoveryAvailable"] is False
     with pytest.raises(ValueError, match="不支持处置模式"):
-        service.run_what_if(
-            unrecoverable.incident_id, WhatIfMode.CONTROLLED_REVERSE
-        )
+        service.run_what_if(unrecoverable.incident_id, WhatIfMode.CONTROLLED_REVERSE)
     stopped = service.run_what_if(unrecoverable.incident_id, WhatIfMode.SAFETY_STOP)
     stop_run = engine.get_run(stopped.what_if_run_ids[WhatIfMode.SAFETY_STOP.value])
     assert stop_run.safety["selectedAction"] == "safety_stop"
     assert stop_run.metrics["safeStopCount"] == 1
 
 
-def test_incident_api_endpoints_use_isolated_service(monkeypatch, incident_system) -> None:
+def test_incident_api_endpoints_use_isolated_service(
+    monkeypatch, incident_system
+) -> None:
     engine, store, service, baseline = incident_system
     approval_store = ApprovalStore(service.store.path.parent / "approvals.json")
     monkeypatch.setattr(api_module, "engine", engine)

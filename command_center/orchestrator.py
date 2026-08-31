@@ -104,7 +104,9 @@ class DispatchOrchestrator:
             on_step=on_step,
         )
         run.set_planner(
-            strategy="ACTION_PROTOCOL_LOOP" if mode == "loop" else "DETERMINISTIC_POLICY",
+            strategy="ACTION_PROTOCOL_LOOP"
+            if mode == "loop"
+            else "DETERMINISTIC_POLICY",
             model="deterministic-safety-boundary",
         )
         run.transition(
@@ -196,8 +198,7 @@ class DispatchOrchestrator:
             AgentState.PLANNING,
             title="制定上下文工具计划",
             detail=(
-                f"{plan.strategy} 选择 {len(plan.calls)} 个只读工具，"
-                "写操作未开放给模型"
+                f"{plan.strategy} 选择 {len(plan.calls)} 个只读工具，写操作未开放给模型"
             ),
             duration_ms=(perf_counter() - started) * 1000,
         )
@@ -212,9 +213,7 @@ class DispatchOrchestrator:
             result = run.execute_tool(tools, call.name, call.arguments)
             if call.name == "get_world_snapshot":
                 snapshot = result.value
-                evidence.append(
-                    tools.world_evidence(result.value, request.scenario_id)
-                )
+                evidence.append(tools.world_evidence(result.value, request.scenario_id))
             elif call.name == "search_sop":
                 evidence.extend(result.value)
                 for item in (result.metadata or {}).get("quarantined") or []:
@@ -232,9 +231,7 @@ class DispatchOrchestrator:
             raise RuntimeError("Agent 工具计划缺少强制世界快照")
 
         started = perf_counter()
-        resolved = self.clarifications.resolve(
-            request.message, request.conversation_id
-        )
+        resolved = self.clarifications.resolve(request.message, request.conversation_id)
         run.transition(
             AgentState.PARAMETER_RESOLUTION,
             title="解析并绑定业务实体",
@@ -448,4 +445,3 @@ class DispatchOrchestrator:
             memory=self.memory,
             conversation_id="catalog",
         ).catalog()
-

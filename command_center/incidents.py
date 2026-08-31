@@ -66,7 +66,9 @@ class IncidentStore:
         return item
 
     def list(self) -> list[IncidentRecord]:
-        return sorted(self._items.values(), key=lambda row: row.created_at, reverse=True)
+        return sorted(
+            self._items.values(), key=lambda row: row.created_at, reverse=True
+        )
 
 
 class IncidentService:
@@ -231,7 +233,9 @@ class IncidentService:
         incident = IncidentRecord(
             incidentType=IncidentType.VEHICLE_FAULT,
             severity=(
-                IncidentSeverity.CRITICAL if load_state == "loaded" else IncidentSeverity.HIGH
+                IncidentSeverity.CRITICAL
+                if load_state == "loaded"
+                else IncidentSeverity.HIGH
             ),
             scenarioId=detail["summary"]["scenarioId"],
             runId=request.run_id,
@@ -262,9 +266,7 @@ class IncidentService:
     ) -> IncidentRecord:
         detail = self._completed_run_detail(request.run_id)
         scenario = detail["scenario"]
-        workstations = {
-            row["nodeId"]: row for row in self.engine.workstation_catalog()
-        }
+        workstations = {row["nodeId"]: row for row in self.engine.workstation_catalog()}
         task_counts: dict[str, int] = {}
         for task in scenario.get("tasks", []):
             for node_id in (task["pickupNodeId"], task["dropoffNodeId"]):
@@ -412,10 +414,7 @@ class IncidentService:
         plan = decision.get("plan")
         vehicle_ids = list(wait_graph.get("blockedVehicleIds", []))
         resource_ids = sorted(
-            {
-                row["resourceId"]
-                for row in wait_graph.get("dependencies", [])
-            }
+            {row["resourceId"] for row in wait_graph.get("dependencies", [])}
             | set(decision.get("frozenResourceIds", []))
         )
         location_node_id = next(
@@ -471,7 +470,10 @@ class IncidentService:
                 ),
                 source="MASP:recovery-controller",
                 observedAtMs=wait_graph["analyzedAtMs"],
-                attributes={"plan": plan, "freezeReservationIds": decision["freezeReservationIds"]},
+                attributes={
+                    "plan": plan,
+                    "freezeReservationIds": decision["freezeReservationIds"],
+                },
             ),
             IncidentEvidence(
                 evidenceId="EV-005",
@@ -507,14 +509,22 @@ class IncidentService:
             modes.insert(0, WhatIfMode.CONTROLLED_REVERSE.value)
         incident = IncidentRecord(
             incidentType=IncidentType.DEADLOCK_RISK,
-            severity=(IncidentSeverity.HIGH if recovery_available else IncidentSeverity.CRITICAL),
+            severity=(
+                IncidentSeverity.HIGH
+                if recovery_available
+                else IncidentSeverity.CRITICAL
+            ),
             scenarioId=detail["summary"]["scenarioId"],
             runId=request.run_id,
             vehicleIds=vehicle_ids,
             resourceIds=resource_ids,
-            faultCode=("WAIT_GRAPH_CYCLE" if recovery_available else "DEADLOCK_SAFETY_STOP"),
+            faultCode=(
+                "WAIT_GRAPH_CYCLE" if recovery_available else "DEADLOCK_SAFETY_STOP"
+            ),
             faultAtMs=wait_graph["analyzedAtMs"],
-            recoveryDurationMs=max(0, recovery["scenario"]["endTimeMs"] - wait_graph["analyzedAtMs"]),
+            recoveryDurationMs=max(
+                0, recovery["scenario"]["endTimeMs"] - wait_graph["analyzedAtMs"]
+            ),
             locationNodeId=location_node_id,
             locationEdgeId=(scenario_case.get("evidenceEdgeIds") or [None])[0],
             eventAttributes={
@@ -530,7 +540,9 @@ class IncidentService:
         )
         return self._record_injection(incident, request.requested_by)
 
-    def diagnose(self, incident_id: str, actor: str = "demo-operator") -> IncidentRecord:
+    def diagnose(
+        self, incident_id: str, actor: str = "demo-operator"
+    ) -> IncidentRecord:
         incident = self.store.get(incident_id)
         query = {
             IncidentType.VEHICLE_FAULT: f"车辆故障 {incident.fault_code or ''} 安全停车 任务重派",
@@ -573,7 +585,9 @@ class IncidentService:
     ) -> IncidentRecord:
         incident = self.store.get(incident_id)
         if mode.value not in allowed_actions_for(incident):
-            raise ValueError(f"{incident.incident_type.value} 不支持处置模式 {mode.value}。")
+            raise ValueError(
+                f"{incident.incident_type.value} 不支持处置模式 {mode.value}。"
+            )
         summary = self.engine.simulate_incident_option(incident, mode)
         run_ids = dict(incident.what_if_run_ids)
         run_ids[mode.value] = summary.run_id
@@ -658,7 +672,13 @@ class IncidentService:
         ]
         if not candidates:
             raise ValueError("车辆计划中不存在可以安全注入故障的移动段。")
-        return min(candidates, key=lambda item: (abs(int(item[0]["endMs"]) - target_ms), int(item[0]["endMs"])))
+        return min(
+            candidates,
+            key=lambda item: (
+                abs(int(item[0]["endMs"]) - target_ms),
+                int(item[0]["endMs"]),
+            ),
+        )
 
     @staticmethod
     def _validate_diagnosis(

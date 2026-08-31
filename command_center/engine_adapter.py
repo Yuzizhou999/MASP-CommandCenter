@@ -86,7 +86,13 @@ class MaspAdapter:
                 raise ValueError("unsupported schema version")
             commit = str(manifest["commit"])
             hashes = dict(manifest["files"])
-        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+            json.JSONDecodeError,
+        ) as error:
             return {
                 "currentCommit": "",
                 "commitMatches": False,
@@ -133,7 +139,9 @@ class MaspAdapter:
         is_engine_worktree = bool(git_top_level) and (
             Path(git_top_level).resolve() == self.root.resolve()
         )
-        current = self._git(self.root, "rev-parse", "HEAD") if is_engine_worktree else ""
+        current = (
+            self._git(self.root, "rev-parse", "HEAD") if is_engine_worktree else ""
+        )
         if not current:
             bundle = self._bundle_status()
             if bundle is not None:
@@ -152,8 +160,10 @@ class MaspAdapter:
         dirty = bool(dirty_rows)
         allowed = matches and (
             not dirty
-            or (not self.settings.is_production
-            and self.settings.allow_dirty_development)
+            or (
+                not self.settings.is_production
+                and self.settings.allow_dirty_development
+            )
         )
         return {
             "root": str(self.root),
@@ -274,9 +284,7 @@ class MaspAdapter:
                 torch.set_num_threads(self.settings.agent_torch_threads)
                 # PyTorch only permits setting inter-op threads before work starts.
                 with suppress(RuntimeError):
-                    torch.set_num_interop_threads(
-                        self.settings.agent_torch_threads
-                    )
+                    torch.set_num_interop_threads(self.settings.agent_torch_threads)
                 from masp.rl_priority import load_checkpoint
 
                 payload = load_checkpoint(
@@ -342,8 +350,7 @@ class MaspAdapter:
         selected_agent_candidate_count = 0
         for cycle in cycles:
             candidates = {
-                row.get("candidateId"): row
-                for row in cycle.get("candidates", [])
+                row.get("candidateId"): row for row in cycle.get("candidates", [])
             }
             agent_candidate_count += sum(
                 row.get("strategy") == "rl" for row in candidates.values()
@@ -361,9 +368,7 @@ class MaspAdapter:
             if prepared["deviationEnabled"]
             else decision_cycle_count
         )
-        safety_fallback_count = int(
-            planning_summary.get("rlSafetyFallbackCount", 0)
-        )
+        safety_fallback_count = int(planning_summary.get("rlSafetyFallbackCount", 0))
         guardian_override_count = int(
             planning_summary.get("rlGuardianOverrideCount", 0)
         )
@@ -501,12 +506,8 @@ class MaspAdapter:
         return dashboard.build_bundle(
             run_dir,
             self.root / "generated" / "xiate-unified-scene-model.json",
-            motion_map_path=(
-                self.root / "generated" / "xiate-unified-map-model.json"
-            ),
-            conflicts_path=(
-                self.root / "generated" / "xiate-conflict-resources.json"
-            ),
+            motion_map_path=(self.root / "generated" / "xiate-unified-map-model.json"),
+            conflicts_path=(self.root / "generated" / "xiate-conflict-resources.json"),
             profiles_path=self.root / "config" / "robot-profiles.json",
             scheduler_path=self.root / "config" / "scheduler.json",
         )
@@ -526,9 +527,7 @@ class MaspAdapter:
         with self._simulation_lock:
             return self._deadlock_recovery_evidence_locked(deadlock_case)
 
-    def _deadlock_recovery_evidence_locked(
-        self, deadlock_case: str
-    ) -> dict[str, Any]:
+    def _deadlock_recovery_evidence_locked(self, deadlock_case: str) -> dict[str, Any]:
         root_text = str(self.root)
         if root_text not in sys.path:
             sys.path.insert(0, root_text)
@@ -859,7 +858,8 @@ class MaspAdapter:
                     )
                     topology.validate_task(task)
                     existing_ids = {
-                        row["taskId"] for row in self.load_scenario(scenario_id)["tasks"]
+                        row["taskId"]
+                        for row in self.load_scenario(scenario_id)["tasks"]
                     }
                     if task.task_id in existing_ids:
                         raise ValueError(f"任务ID {task.task_id} 已存在")
@@ -909,7 +909,9 @@ class MaspAdapter:
                 f"workstation:{row['id']}"
                 for row in assets["workstations"]["workstations"]
             )
-            for resource_id in (intent.resource_block.resource_ids if intent.resource_block else []):
+            for resource_id in (
+                intent.resource_block.resource_ids if intent.resource_block else []
+            ):
                 if resource_id not in valid_resources:
                     issues.append(
                         ValidationIssue(
@@ -1019,7 +1021,9 @@ class MaspAdapter:
             scenario = deepcopy(self.load_scenario(request.scenario_id))
             scenario["seed"] = request.seed
             if request.intent and request.intent.intent_type is IntentType.CREATE_TASK:
-                task_doc = request.intent.task.model_dump(by_alias=True, exclude_none=True)
+                task_doc = request.intent.task.model_dump(
+                    by_alias=True, exclude_none=True
+                )
                 scenario["tasks"].append(task_doc)
             if request.policy == "rl":
                 prepared_agent = self._prepare_agent_policy(
@@ -1056,9 +1060,7 @@ class MaspAdapter:
                             "modelId": prepared_agent["modelId"],
                             "modelVersion": prepared_agent["modelVersion"],
                             "checkpointSha256": prepared_agent["checkpointSha256"],
-                            "checkpointMetadata": prepared_agent[
-                                "checkpointMetadata"
-                            ],
+                            "checkpointMetadata": prepared_agent["checkpointMetadata"],
                         },
                         "execution": agent_evidence.model_dump(
                             by_alias=True, mode="json"
@@ -1121,7 +1123,8 @@ class MaspAdapter:
                     )
                 },
                 safety={
-                    "conflictFree": metrics.get("reservationConflictRejections", 0) == 0,
+                    "conflictFree": metrics.get("reservationConflictRejections", 0)
+                    == 0,
                     "reservationConflictRejections": metrics.get(
                         "reservationConflictRejections", 0
                     ),
@@ -1489,7 +1492,8 @@ class MaspAdapter:
                     )
                 },
                 safety={
-                    "conflictFree": metrics.get("reservationConflictRejections", 0) == 0,
+                    "conflictFree": metrics.get("reservationConflictRejections", 0)
+                    == 0,
                     "reservationConflictRejections": metrics.get(
                         "reservationConflictRejections", 0
                     ),
@@ -1557,7 +1561,9 @@ class MaspAdapter:
         source_dir: Path,
         started: float,
     ) -> SimulationSummary:
-        deadlock_case = str(incident.event_attributes.get("deadlockCase", "RECOVERABLE"))
+        deadlock_case = str(
+            incident.event_attributes.get("deadlockCase", "RECOVERABLE")
+        )
         recovery = self._deadlock_recovery_evidence_locked(deadlock_case)
         case = recovery["case"]
         decision = case["decision"]

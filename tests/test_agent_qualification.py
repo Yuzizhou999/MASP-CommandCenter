@@ -110,9 +110,7 @@ def test_candidate_stays_experimental_when_required_suite_hash_differs() -> None
         "requiredStrata": [],
         "requireSuiteHash": True,
     }
-    baseline = _trajectory(
-        "linear_v1", {"goalSuccessRate": {"mean": 0.95}}
-    )
+    baseline = _trajectory("linear_v1", {"goalSuccessRate": {"mean": 0.95}})
     candidate = _trajectory(
         "loop_local",
         {
@@ -133,9 +131,7 @@ def test_candidate_stays_experimental_when_required_suite_hash_differs() -> None
 
     assert result["decision"] == "KEEP_V1"
     assert (
-        result["evaluationContract"]["checks"]["trajectorySuiteSha256"][
-            "passed"
-        ]
+        result["evaluationContract"]["checks"]["trajectorySuiteSha256"]["passed"]
         is False
     )
 
@@ -149,9 +145,7 @@ def test_candidate_stays_experimental_when_suite_is_too_small() -> None:
         "requiredStrata": ["status"],
         "requireSuiteHash": False,
     }
-    baseline = _trajectory(
-        "linear_v1", {"goalSuccessRate": {"mean": 0.95}}
-    )
+    baseline = _trajectory("linear_v1", {"goalSuccessRate": {"mean": 0.95}})
     candidate = _trajectory(
         "loop_local",
         {
@@ -170,11 +164,5 @@ def test_candidate_stays_experimental_when_suite_is_too_small() -> None:
 
     assert result["decision"] == "KEEP_V1"
     assert result["suiteQuality"]["passed"] is False
-    assert (
-        result["suiteQuality"]["checks"]["minimumCaseCount"]["passed"]
-        is False
-    )
-    assert (
-        result["suiteQuality"]["checks"]["minimumCasesPerStratum"]["passed"]
-        is False
-    )
+    assert result["suiteQuality"]["checks"]["minimumCaseCount"]["passed"] is False
+    assert result["suiteQuality"]["checks"]["minimumCasesPerStratum"]["passed"] is False

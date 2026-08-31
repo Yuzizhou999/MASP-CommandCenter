@@ -48,9 +48,7 @@ FORBIDDEN_MODEL_REQUEST_PATTERNS = (
     ),
     (
         "route-execution",
-        re.compile(
-            r"(?:规划|生成|安排).{0,16}(?:路线|轨迹).{0,24}(?:下发|执行|控制)"
-        ),
+        re.compile(r"(?:规划|生成|安排).{0,16}(?:路线|轨迹).{0,24}(?:下发|执行|控制)"),
     ),
     (
         "production-switch",
@@ -134,7 +132,10 @@ RETRIEVAL_INJECTION_PATTERNS = (
     ),
     (
         "retrieval.role-override",
-        re.compile(r"(?:你现在是|system\s*message|developer\s*message).{0,30}(?:助手|模型|agent|智能体)", re.I),
+        re.compile(
+            r"(?:你现在是|system\s*message|developer\s*message).{0,30}(?:助手|模型|agent|智能体)",
+            re.I,
+        ),
     ),
 )
 
@@ -200,11 +201,7 @@ def untrusted_retrieval_record(row: EvidenceItem) -> dict[str, str | float | Non
     return {
         "source": row.source,
         "title": row.title,
-        "detail": (
-            "<UNTRUSTED_RETRIEVAL>\n"
-            f"{row.detail}\n"
-            "</UNTRUSTED_RETRIEVAL>"
-        ),
+        "detail": (f"<UNTRUSTED_RETRIEVAL>\n{row.detail}\n</UNTRUSTED_RETRIEVAL>"),
         "chunkId": row.chunk_id,
         "score": row.score,
     }

@@ -54,9 +54,7 @@ def _paired_rows(
                 "candidateGoalSuccess": candidate_success,
                 "outcome": outcome,
                 "controlTerminalState": control[case_id]["actualTerminalState"],
-                "candidateTerminalState": candidate[case_id][
-                    "actualTerminalState"
-                ],
+                "candidateTerminalState": candidate[case_id]["actualTerminalState"],
             }
         )
     return rows
@@ -93,9 +91,7 @@ def compare_experiment(
     control_cases = _cases(control_trajectory, mode)
     if set(existing_cases) != set(control_cases):
         raise ValueError("现存 v2 与控制组的轨迹 caseId 不一致")
-    target_ids = set(
-        spec["directionalEvidenceCriteria"]["targetCaseIds"]
-    )
+    target_ids = set(spec["directionalEvidenceCriteria"]["targetCaseIds"])
     paired = _paired_rows(
         control_cases,
         _cases(candidate_trajectory, mode),
@@ -148,32 +144,23 @@ def compare_experiment(
             "passed": all(row["passed"] for row in metric_checks.values()),
         },
     }
-    reproduction_passed = all(
-        row["passed"] for row in reproduction_checks.values()
-    )
+    reproduction_passed = all(row["passed"] for row in reproduction_checks.values())
 
     target_rows = [row for row in paired if row["target"]]
     non_target_rows = [row for row in paired if not row["target"]]
     directional_criteria = spec["directionalEvidenceCriteria"]
     target_wins = sum(row["outcome"] == "WIN" for row in target_rows)
-    target_regressions = sum(
-        row["outcome"] == "REGRESSION" for row in target_rows
-    )
+    target_regressions = sum(row["outcome"] == "REGRESSION" for row in target_rows)
     non_target_regressions = sum(
         row["outcome"] == "REGRESSION" for row in non_target_rows
     )
-    candidate_attack_rate = _metric(
-        candidate_system, "systemExecutionAttackRate"
-    )
-    candidate_boundary_recall = _metric(
-        candidate_system, "boundaryInterceptionRecall"
-    )
+    candidate_attack_rate = _metric(candidate_system, "systemExecutionAttackRate")
+    candidate_boundary_recall = _metric(candidate_system, "boundaryInterceptionRecall")
     directional_checks = {
         "targetWins": {
             "actual": target_wins,
             "minimum": int(directional_criteria["minimumTargetWins"]),
-            "passed": target_wins
-            >= int(directional_criteria["minimumTargetWins"]),
+            "passed": target_wins >= int(directional_criteria["minimumTargetWins"]),
         },
         "targetRegressions": {
             "actual": target_regressions,
@@ -183,9 +170,7 @@ def compare_experiment(
         },
         "nonTargetRegressions": {
             "actual": non_target_regressions,
-            "maximum": int(
-                directional_criteria["maximumNonTargetRegressions"]
-            ),
+            "maximum": int(directional_criteria["maximumNonTargetRegressions"]),
             "passed": non_target_regressions
             <= int(directional_criteria["maximumNonTargetRegressions"]),
         },
@@ -219,9 +204,7 @@ def compare_experiment(
             "passed": reproduction_passed,
         },
         "directionalEvidence": {
-            "targetSuccesses": sum(
-                row["candidateGoalSuccess"] for row in target_rows
-            ),
+            "targetSuccesses": sum(row["candidateGoalSuccess"] for row in target_rows),
             "targetCaseCount": len(target_rows),
             "targetWins": target_wins,
             "targetRegressions": target_regressions,

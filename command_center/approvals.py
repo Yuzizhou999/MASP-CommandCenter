@@ -69,7 +69,9 @@ class ApprovalStore:
             if current is None:
                 raise KeyError(approval_id)
             if current.status is not ApprovalStatus.PENDING:
-                raise ValueError(f"approval {approval_id} is already {current.status.value}")
+                raise ValueError(
+                    f"approval {approval_id} is already {current.status.value}"
+                )
             updated = current.model_copy(
                 update={
                     "status": (
@@ -93,5 +95,6 @@ class ApprovalStore:
         return item
 
     def list(self) -> list[ApprovalRequest]:
-        return sorted(self._items.values(), key=lambda row: row.created_at, reverse=True)
-
+        return sorted(
+            self._items.values(), key=lambda row: row.created_at, reverse=True
+        )

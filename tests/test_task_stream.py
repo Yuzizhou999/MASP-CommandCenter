@@ -95,14 +95,30 @@ def test_poisson_and_time_windows_are_supported() -> None:
             arrival={
                 "mode": "time_windows",
                 "windows": [
-                    {"startTimeMs": 0, "endTimeMs": 30000, "mode": "fixed_interval", "intervalMs": 15000},
-                    {"startTimeMs": 60000, "endTimeMs": 90000, "mode": "fixed_interval", "intervalMs": 10000},
+                    {
+                        "startTimeMs": 0,
+                        "endTimeMs": 30000,
+                        "mode": "fixed_interval",
+                        "intervalMs": 15000,
+                    },
+                    {
+                        "startTimeMs": 60000,
+                        "endTimeMs": 90000,
+                        "mode": "fixed_interval",
+                        "intervalMs": 10000,
+                    },
                 ],
             },
             maxTasks=10,
         ),
     )
-    assert [task["releaseTimeMs"] for task in windows.tasks] == [0, 15000, 60000, 70000, 80000]
+    assert [task["releaseTimeMs"] for task in windows.tasks] == [
+        0,
+        15000,
+        60000,
+        70000,
+        80000,
+    ]
 
 
 def test_unreachable_or_incompatible_od_is_filtered_and_empty_is_rejected() -> None:

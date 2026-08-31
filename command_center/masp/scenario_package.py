@@ -393,9 +393,19 @@ def validate_package(package: ScenarioPackage) -> PackageValidationReport:
         )
 
     for duplicate in _duplicates(str(item["id"]) for item in scene.nodes):
-        _issue(issues, "scenario.node.duplicate", "$.warehouseScene.nodes", f"duplicate node {duplicate!r}")
+        _issue(
+            issues,
+            "scenario.node.duplicate",
+            "$.warehouseScene.nodes",
+            f"duplicate node {duplicate!r}",
+        )
     for duplicate in _duplicates(str(item["id"]) for item in scene.edges):
-        _issue(issues, "scenario.edge.duplicate", "$.warehouseScene.edges", f"duplicate edge {duplicate!r}")
+        _issue(
+            issues,
+            "scenario.edge.duplicate",
+            "$.warehouseScene.edges",
+            f"duplicate edge {duplicate!r}",
+        )
 
     bounds = scene.bounds
     for index, node in enumerate(scene.nodes):
@@ -403,17 +413,37 @@ def validate_package(package: ScenarioPackage) -> PackageValidationReport:
         node_id = str(node["id"])
         node_groups = set(node["allowedRobotGroups"])
         if node["type"] not in NODE_TYPES:
-            _issue(issues, "scenario.node.type", f"{path}.type", f"node {node_id!r} has an unsupported type")
+            _issue(
+                issues,
+                "scenario.node.type",
+                f"{path}.type",
+                f"node {node_id!r} has an unsupported type",
+            )
         if not node_groups or not node_groups <= groups:
-            _issue(issues, "scenario.node.groups", f"{path}.allowedRobotGroups", f"node {node_id!r} has invalid groups")
+            _issue(
+                issues,
+                "scenario.node.groups",
+                f"{path}.allowedRobotGroups",
+                f"node {node_id!r} has invalid groups",
+            )
         x, y = float(node["x"]), float(node["y"])
         if not (float(bounds["minX"]) <= x <= float(bounds["maxX"])) or not (
             float(bounds["minY"]) <= y <= float(bounds["maxY"])
         ):
-            _issue(issues, "scenario.node.out_of_bounds", path, f"node {node_id!r} is outside scene bounds")
+            _issue(
+                issues,
+                "scenario.node.out_of_bounds",
+                path,
+                f"node {node_id!r} is outside scene bounds",
+            )
         wait_flags = node.get("waitAllowedByGroup", {})
         if set(wait_flags) != node_groups:
-            _issue(issues, "scenario.node.wait_policy", f"{path}.waitAllowedByGroup", f"node {node_id!r} requires one wait flag per group")
+            _issue(
+                issues,
+                "scenario.node.wait_policy",
+                f"{path}.waitAllowedByGroup",
+                f"node {node_id!r} requires one wait flag per group",
+            )
 
     for index, edge in enumerate(scene.edges):
         path = f"$.warehouseScene.edges[{index}]"
@@ -422,48 +452,124 @@ def validate_package(package: ScenarioPackage) -> PackageValidationReport:
         end_id = str(edge["endNodeId"])
         group = str(edge["robotGroup"])
         if start_id == end_id:
-            _issue(issues, "scenario.edge.self_loop", path, f"edge {edge_id!r} is a self loop")
+            _issue(
+                issues,
+                "scenario.edge.self_loop",
+                path,
+                f"edge {edge_id!r} is a self loop",
+            )
         if start_id not in nodes or end_id not in nodes:
-            _issue(issues, "scenario.edge.endpoint", path, f"edge {edge_id!r} references an unknown endpoint")
+            _issue(
+                issues,
+                "scenario.edge.endpoint",
+                path,
+                f"edge {edge_id!r} references an unknown endpoint",
+            )
             continue
         if group not in groups:
-            _issue(issues, "scenario.edge.group", f"{path}.robotGroup", f"edge {edge_id!r} has an unknown group")
-        elif group not in nodes[start_id]["allowedRobotGroups"] or group not in nodes[end_id]["allowedRobotGroups"]:
-            _issue(issues, "scenario.edge.endpoint_group", path, f"edge {edge_id!r} group is not allowed by both endpoints")
+            _issue(
+                issues,
+                "scenario.edge.group",
+                f"{path}.robotGroup",
+                f"edge {edge_id!r} has an unknown group",
+            )
+        elif (
+            group not in nodes[start_id]["allowedRobotGroups"]
+            or group not in nodes[end_id]["allowedRobotGroups"]
+        ):
+            _issue(
+                issues,
+                "scenario.edge.endpoint_group",
+                path,
+                f"edge {edge_id!r} group is not allowed by both endpoints",
+            )
         points = _edge_points(edge, nodes)
-        expected_start = nodes[start_id].get("positionsByGroup", {}).get(group, (nodes[start_id]["x"], nodes[start_id]["y"]))
-        expected_end = nodes[end_id].get("positionsByGroup", {}).get(group, (nodes[end_id]["x"], nodes[end_id]["y"]))
+        expected_start = (
+            nodes[start_id]
+            .get("positionsByGroup", {})
+            .get(group, (nodes[start_id]["x"], nodes[start_id]["y"]))
+        )
+        expected_end = (
+            nodes[end_id]
+            .get("positionsByGroup", {})
+            .get(group, (nodes[end_id]["x"], nodes[end_id]["y"]))
+        )
         if math.dist(points[0], _point(expected_start)) > 1e-6:
-            _issue(issues, "scenario.edge.geometry_start", f"{path}.controlPoints[0]", f"edge {edge_id!r} does not begin at its start node")
+            _issue(
+                issues,
+                "scenario.edge.geometry_start",
+                f"{path}.controlPoints[0]",
+                f"edge {edge_id!r} does not begin at its start node",
+            )
         if math.dist(points[-1], _point(expected_end)) > 1e-6:
-            _issue(issues, "scenario.edge.geometry_end", f"{path}.controlPoints[3]", f"edge {edge_id!r} does not end at its end node")
+            _issue(
+                issues,
+                "scenario.edge.geometry_end",
+                f"{path}.controlPoints[3]",
+                f"edge {edge_id!r} does not end at its end node",
+            )
         if _curve_length(points) <= 1e-6:
-            _issue(issues, "scenario.edge.length", path, f"edge {edge_id!r} has zero length")
+            _issue(
+                issues,
+                "scenario.edge.length",
+                path,
+                f"edge {edge_id!r} has zero length",
+            )
 
     workstations_by_node: dict[str, Mapping[str, Any]] = {}
     for duplicate in _duplicates(str(item["id"]) for item in scene.workstations):
-        _issue(issues, "scenario.workstation.duplicate", "$.warehouseScene.workstations", f"duplicate workstation {duplicate!r}")
+        _issue(
+            issues,
+            "scenario.workstation.duplicate",
+            "$.warehouseScene.workstations",
+            f"duplicate workstation {duplicate!r}",
+        )
     for index, station in enumerate(scene.workstations):
         path = f"$.warehouseScene.workstations[{index}]"
         node_id = str(station["nodeId"])
         if node_id in workstations_by_node:
-            _issue(issues, "scenario.workstation.node_duplicate", f"{path}.nodeId", f"node {node_id!r} has multiple workstations")
+            _issue(
+                issues,
+                "scenario.workstation.node_duplicate",
+                f"{path}.nodeId",
+                f"node {node_id!r} has multiple workstations",
+            )
         workstations_by_node[node_id] = station
         node = nodes.get(node_id)
         if node is None or node.get("type") != "AP":
-            _issue(issues, "scenario.workstation.node", f"{path}.nodeId", f"workstation node {node_id!r} is not an AP")
+            _issue(
+                issues,
+                "scenario.workstation.node",
+                f"{path}.nodeId",
+                f"workstation node {node_id!r} is not an AP",
+            )
         elif not set(station["allowedRobotGroups"]) <= set(node["allowedRobotGroups"]):
-            _issue(issues, "scenario.workstation.groups", f"{path}.allowedRobotGroups", f"workstation {station['id']!r} has incompatible groups")
+            _issue(
+                issues,
+                "scenario.workstation.groups",
+                f"{path}.allowedRobotGroups",
+                f"workstation {station['id']!r} has incompatible groups",
+            )
     ap_ids = {node_id for node_id, node in nodes.items() if node["type"] == "AP"}
     if set(workstations_by_node) != ap_ids:
         missing = sorted(ap_ids - set(workstations_by_node))
         extra = sorted(set(workstations_by_node) - ap_ids)
-        _issue(issues, "scenario.workstation.coverage", "$.warehouseScene.workstations", f"workstations must cover every AP; missing={missing!r}, extra={extra!r}")
+        _issue(
+            issues,
+            "scenario.workstation.coverage",
+            "$.warehouseScene.workstations",
+            f"workstations must cover every AP; missing={missing!r}, extra={extra!r}",
+        )
 
     vehicle_groups: Counter[str] = Counter()
     vehicle_start_nodes: set[str] = set()
     for duplicate in _duplicates(str(item["vehicleId"]) for item in scene.vehicles):
-        _issue(issues, "scenario.vehicle.duplicate", "$.warehouseScene.vehicles", f"duplicate vehicle {duplicate!r}")
+        _issue(
+            issues,
+            "scenario.vehicle.duplicate",
+            "$.warehouseScene.vehicles",
+            f"duplicate vehicle {duplicate!r}",
+        )
     for index, vehicle in enumerate(scene.vehicles):
         path = f"$.warehouseScene.vehicles[{index}]"
         node_id = str(vehicle["initialNodeId"])
@@ -471,11 +577,26 @@ def validate_package(package: ScenarioPackage) -> PackageValidationReport:
         vehicle_groups[group] += 1
         node = nodes.get(node_id)
         if node is None or group not in node.get("allowedRobotGroups", []):
-            _issue(issues, "scenario.vehicle.start", f"{path}.initialNodeId", f"vehicle {vehicle['vehicleId']!r} has an incompatible start node")
+            _issue(
+                issues,
+                "scenario.vehicle.start",
+                f"{path}.initialNodeId",
+                f"vehicle {vehicle['vehicleId']!r} has an incompatible start node",
+            )
         elif not bool(node.get("waitAllowedByGroup", {}).get(group)):
-            _issue(issues, "scenario.vehicle.start_wait", f"{path}.initialNodeId", f"vehicle {vehicle['vehicleId']!r} must start at a waitable node")
+            _issue(
+                issues,
+                "scenario.vehicle.start_wait",
+                f"{path}.initialNodeId",
+                f"vehicle {vehicle['vehicleId']!r} must start at a waitable node",
+            )
         if node_id in vehicle_start_nodes:
-            _issue(issues, "scenario.vehicle.start_duplicate", f"{path}.initialNodeId", f"multiple vehicles start at {node_id!r}")
+            _issue(
+                issues,
+                "scenario.vehicle.start_duplicate",
+                f"{path}.initialNodeId",
+                f"multiple vehicles start at {node_id!r}",
+            )
         vehicle_start_nodes.add(node_id)
 
     graph_by_group = {group: nx.DiGraph() for group in groups}
@@ -484,8 +605,14 @@ def validate_package(package: ScenarioPackage) -> PackageValidationReport:
             graph_by_group[group].add_node(node_id)
     for edge in scene.edges:
         group = str(edge["robotGroup"])
-        if group in graph_by_group and edge["startNodeId"] in nodes and edge["endNodeId"] in nodes:
-            graph_by_group[group].add_edge(str(edge["startNodeId"]), str(edge["endNodeId"]))
+        if (
+            group in graph_by_group
+            and edge["startNodeId"] in nodes
+            and edge["endNodeId"] in nodes
+        ):
+            graph_by_group[group].add_edge(
+                str(edge["startNodeId"]), str(edge["endNodeId"])
+            )
 
     recovery_by_group: dict[str, set[str]] = defaultdict(set)
     recovery_ids: set[str] = set()
@@ -493,15 +620,32 @@ def validate_package(package: ScenarioPackage) -> PackageValidationReport:
         path = f"$.warehouseScene.recoveryNodes[{index}]"
         node_id = str(recovery["nodeId"])
         if node_id in recovery_ids:
-            _issue(issues, "scenario.recovery.duplicate", f"{path}.nodeId", f"duplicate recovery node {node_id!r}")
+            _issue(
+                issues,
+                "scenario.recovery.duplicate",
+                f"{path}.nodeId",
+                f"duplicate recovery node {node_id!r}",
+            )
         recovery_ids.add(node_id)
         node = nodes.get(node_id)
         if node is None:
-            _issue(issues, "scenario.recovery.node", f"{path}.nodeId", f"unknown recovery node {node_id!r}")
+            _issue(
+                issues,
+                "scenario.recovery.node",
+                f"{path}.nodeId",
+                f"unknown recovery node {node_id!r}",
+            )
             continue
         for group in recovery["allowedRobotGroups"]:
-            if group not in node["allowedRobotGroups"] or not node["waitAllowedByGroup"].get(group, False):
-                _issue(issues, "scenario.recovery.group", path, f"recovery node {node_id!r} is not waitable for {group!r}")
+            if group not in node["allowedRobotGroups"] or not node[
+                "waitAllowedByGroup"
+            ].get(group, False):
+                _issue(
+                    issues,
+                    "scenario.recovery.group",
+                    path,
+                    f"recovery node {node_id!r} is not waitable for {group!r}",
+                )
             else:
                 recovery_by_group[group].add(node_id)
 
@@ -510,16 +654,36 @@ def validate_package(package: ScenarioPackage) -> PackageValidationReport:
         path = f"$.warehouseScene.trafficZones[{index}]"
         members = set(zone["memberNodeIds"])
         if not members or not members <= set(nodes):
-            _issue(issues, "scenario.zone.nodes", f"{path}.memberNodeIds", f"zone {zone['id']!r} has missing or unknown member nodes")
+            _issue(
+                issues,
+                "scenario.zone.nodes",
+                f"{path}.memberNodeIds",
+                f"zone {zone['id']!r} has missing or unknown member nodes",
+            )
         overlap = members & claimed_zone_nodes
         if overlap:
-            _issue(issues, "scenario.zone.overlap", f"{path}.memberNodeIds", f"zone {zone['id']!r} overlaps nodes {sorted(overlap)!r}")
+            _issue(
+                issues,
+                "scenario.zone.overlap",
+                f"{path}.memberNodeIds",
+                f"zone {zone['id']!r} overlaps nodes {sorted(overlap)!r}",
+            )
         claimed_zone_nodes.update(members)
         if not set(zone["recoveryNodeIds"]) <= recovery_ids:
-            _issue(issues, "scenario.zone.recovery", f"{path}.recoveryNodeIds", f"zone {zone['id']!r} references undeclared recovery nodes")
+            _issue(
+                issues,
+                "scenario.zone.recovery",
+                f"{path}.recoveryNodeIds",
+                f"zone {zone['id']!r} references undeclared recovery nodes",
+            )
 
     for duplicate in _duplicates(str(item["taskId"]) for item in stream.tasks):
-        _issue(issues, "scenario.task.duplicate", "$.taskStream.tasks", f"duplicate task {duplicate!r}")
+        _issue(
+            issues,
+            "scenario.task.duplicate",
+            "$.taskStream.tasks",
+            f"duplicate task {duplicate!r}",
+        )
     for index, task in enumerate(stream.tasks):
         path = f"$.taskStream.tasks[{index}]"
         group = str(task["requiredRobotGroup"])
@@ -528,30 +692,85 @@ def validate_package(package: ScenarioPackage) -> PackageValidationReport:
         release = int(task["releaseTimeMs"])
         due = task.get("dueTimeMs")
         if release >= stream.end_time_ms:
-            _issue(issues, "scenario.task.release", f"{path}.releaseTimeMs", f"task {task['taskId']!r} releases outside the simulation window")
+            _issue(
+                issues,
+                "scenario.task.release",
+                f"{path}.releaseTimeMs",
+                f"task {task['taskId']!r} releases outside the simulation window",
+            )
         if due is not None and int(due) < release:
-            _issue(issues, "scenario.task.due_time", f"{path}.dueTimeMs", f"task {task['taskId']!r} is due before release")
+            _issue(
+                issues,
+                "scenario.task.due_time",
+                f"{path}.dueTimeMs",
+                f"task {task['taskId']!r} is due before release",
+            )
         if group not in vehicle_groups:
-            _issue(issues, "scenario.task.fleet", f"{path}.requiredRobotGroup", f"task {task['taskId']!r} has no compatible vehicle")
+            _issue(
+                issues,
+                "scenario.task.fleet",
+                f"{path}.requiredRobotGroup",
+                f"task {task['taskId']!r} has no compatible vehicle",
+            )
         for field, node_id in (("pickupNodeId", pickup), ("dropoffNodeId", dropoff)):
             node = nodes.get(node_id)
             station = workstations_by_node.get(node_id)
-            if node is None or node.get("type") != "AP" or station is None or group not in station.get("allowedRobotGroups", []):
-                _issue(issues, "scenario.task.workstation", f"{path}.{field}", f"task {task['taskId']!r} references an incompatible workstation")
+            if (
+                node is None
+                or node.get("type") != "AP"
+                or station is None
+                or group not in station.get("allowedRobotGroups", [])
+            ):
+                _issue(
+                    issues,
+                    "scenario.task.workstation",
+                    f"{path}.{field}",
+                    f"task {task['taskId']!r} references an incompatible workstation",
+                )
         graph = graph_by_group.get(group)
         if graph is not None and pickup in graph and dropoff in graph:
-            starts = [str(item["initialNodeId"]) for item in scene.vehicles if item["robotGroup"] == group]
-            if starts and not any(nx.has_path(graph, start, pickup) for start in starts if start in graph):
-                _issue(issues, "scenario.task.pickup_unreachable", f"{path}.pickupNodeId", f"no {group!r} vehicle can reach pickup {pickup!r}")
+            starts = [
+                str(item["initialNodeId"])
+                for item in scene.vehicles
+                if item["robotGroup"] == group
+            ]
+            if starts and not any(
+                nx.has_path(graph, start, pickup) for start in starts if start in graph
+            ):
+                _issue(
+                    issues,
+                    "scenario.task.pickup_unreachable",
+                    f"{path}.pickupNodeId",
+                    f"no {group!r} vehicle can reach pickup {pickup!r}",
+                )
             if not nx.has_path(graph, pickup, dropoff):
-                _issue(issues, "scenario.task.dropoff_unreachable", path, f"task {task['taskId']!r} has no directed pickup-to-dropoff route")
+                _issue(
+                    issues,
+                    "scenario.task.dropoff_unreachable",
+                    path,
+                    f"task {task['taskId']!r} has no directed pickup-to-dropoff route",
+                )
             recoveries = recovery_by_group.get(group, set())
-            if not recoveries or not any(nx.has_path(graph, dropoff, node_id) for node_id in recoveries if node_id in graph):
-                _issue(issues, "scenario.task.recovery_unreachable", f"{path}.dropoffNodeId", f"task {task['taskId']!r} has no reachable recovery node")
+            if not recoveries or not any(
+                nx.has_path(graph, dropoff, node_id)
+                for node_id in recoveries
+                if node_id in graph
+            ):
+                _issue(
+                    issues,
+                    "scenario.task.recovery_unreachable",
+                    f"{path}.dropoffNodeId",
+                    f"task {task['taskId']!r} has no reachable recovery node",
+                )
 
     for index, event in enumerate(stream.events):
         if int(event["atMs"]) > stream.end_time_ms:
-            _issue(issues, "scenario.event.time", f"$.taskStream.events[{index}].atMs", f"event {event['eventId']!r} occurs after the simulation window")
+            _issue(
+                issues,
+                "scenario.event.time",
+                f"$.taskStream.events[{index}].atMs",
+                f"event {event['eventId']!r} occurs after the simulation window",
+            )
 
     if float(scene.safety["footprintMarginM"]) == 0:
         _issue(
@@ -586,11 +805,18 @@ def _compiled_node(node: Mapping[str, Any], max_wait_ms: int) -> dict[str, Any]:
         "allowedRobotGroups": groups,
         "aliases": deepcopy(node.get("aliases", {})),
         "positions": {
-            group: list(node.get("positionsByGroup", {}).get(group, (node["x"], node["y"])))
+            group: list(
+                node.get("positionsByGroup", {}).get(group, (node["x"], node["y"]))
+            )
             for group in groups
         },
-        "headings": {group: float(node.get("headings", {}).get(group, 0.0)) for group in groups},
-        "propertiesByGroup": {group: deepcopy(node.get("propertiesByGroup", {}).get(group, {})) for group in groups},
+        "headings": {
+            group: float(node.get("headings", {}).get(group, 0.0)) for group in groups
+        },
+        "propertiesByGroup": {
+            group: deepcopy(node.get("propertiesByGroup", {}).get(group, {}))
+            for group in groups
+        },
         "allowWaitByGroup": {group: bool(wait_flags[group]) for group in groups},
         "waitPolicyByGroup": {
             group: {
@@ -605,7 +831,9 @@ def _compiled_node(node: Mapping[str, Any], max_wait_ms: int) -> dict[str, Any]:
     }
 
 
-def _compiled_edge(edge: Mapping[str, Any], nodes: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+def _compiled_edge(
+    edge: Mapping[str, Any], nodes: Mapping[str, Mapping[str, Any]]
+) -> dict[str, Any]:
     points = _edge_points(edge, nodes)
     return {
         "id": edge["id"],
@@ -649,7 +877,9 @@ def _swept_polygon(
     for index in range(samples):
         t = index / (samples - 1)
         x, y = _cubic_point(points, t)
-        rotated = affinity.rotate(footprint, _cubic_heading(points, t), origin=(0, 0), use_radians=False)
+        rotated = affinity.rotate(
+            footprint, _cubic_heading(points, t), origin=(0, 0), use_radians=False
+        )
         placements.append(affinity.translate(rotated, xoff=x, yoff=y))
     return unary_union(placements)
 
@@ -690,7 +920,9 @@ def _compile_conflicts(
             resource_id = f"edge-conflict:{len(pair_rows)}"
             resources_by_edge[left["id"]].append(resource_id)
             resources_by_edge[right["id"]].append(resource_id)
-            type_counts["-".join(sorted((left["robotGroup"], right["robotGroup"])))] += 1
+            type_counts[
+                "-".join(sorted((left["robotGroup"], right["robotGroup"])))
+            ] += 1
             pair_rows.append(
                 {
                     "resourceId": resource_id,
@@ -698,7 +930,9 @@ def _compile_conflicts(
                     "edgeB": right["id"],
                     "groupA": left["robotGroup"],
                     "groupB": right["robotGroup"],
-                    "sharedCanonicalEndpoint": bool({left["start"], left["end"]} & {right["start"], right["end"]}),
+                    "sharedCanonicalEndpoint": bool(
+                        {left["start"], left["end"]} & {right["start"], right["end"]}
+                    ),
                     "intersectionArea": round(float(intersection.area), 6),
                 }
             )
@@ -737,7 +971,9 @@ def _compile_conflicts(
     }
 
 
-def _compile_traffic_zones(scene: WarehouseSceneSpec, edges: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _compile_traffic_zones(
+    scene: WarehouseSceneSpec, edges: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
     zones = []
     for source in scene.traffic_zones:
         members = set(source["memberNodeIds"])
@@ -745,9 +981,21 @@ def _compile_traffic_zones(scene: WarehouseSceneSpec, edges: Sequence[Mapping[st
             {
                 "id": source["id"],
                 "memberNodeIds": sorted(members),
-                "memberEdgeIds": sorted(edge["id"] for edge in edges if edge["start"] in members and edge["end"] in members),
-                "entryEdgeIds": sorted(edge["id"] for edge in edges if edge["start"] not in members and edge["end"] in members),
-                "exitEdgeIds": sorted(edge["id"] for edge in edges if edge["start"] in members and edge["end"] not in members),
+                "memberEdgeIds": sorted(
+                    edge["id"]
+                    for edge in edges
+                    if edge["start"] in members and edge["end"] in members
+                ),
+                "entryEdgeIds": sorted(
+                    edge["id"]
+                    for edge in edges
+                    if edge["start"] not in members and edge["end"] in members
+                ),
+                "exitEdgeIds": sorted(
+                    edge["id"]
+                    for edge in edges
+                    if edge["start"] in members and edge["end"] not in members
+                ),
                 "capacity": 1,
                 "passingAllowed": False,
                 "directionalMode": "single_direction_at_a_time",
@@ -762,7 +1010,9 @@ def _compile_traffic_zones(scene: WarehouseSceneSpec, edges: Sequence[Mapping[st
 
 
 def _digest(document: Mapping[str, Any]) -> str:
-    encoded = json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    encoded = json.dumps(
+        document, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -779,7 +1029,9 @@ def compile_scenario_package(
     scheduler = deepcopy(scheduler_template)
     scheduler["mode"] = "simulation"
     scheduler["fleet"]["fixedDuringRun"] = True
-    scheduler["fleet"]["counts"] = dict(sorted(Counter(item["robotGroup"] for item in scene.vehicles).items()))
+    scheduler["fleet"]["counts"] = dict(
+        sorted(Counter(item["robotGroup"] for item in scene.vehicles).items())
+    )
     scheduler["fleet"]["initialVehiclesFile"] = "initial-vehicles.json"
     scheduler["safety"]["footprintMarginM"] = float(scene.safety["footprintMarginM"])
     max_wait_ms = int(scheduler["traffic"]["wait"]["maxPlannedWaitMs"])
@@ -795,9 +1047,15 @@ def compile_scenario_package(
         },
         "stats": {
             "canonicalNodeCount": len(nodes),
-            "sharedNodeCount": sum(1 for node in nodes if len(node["allowedRobotGroups"]) > 1),
-            "forkOnlyNodeCount": sum(node["allowedRobotGroups"] == ["fork"] for node in nodes),
-            "jackOnlyNodeCount": sum(node["allowedRobotGroups"] == ["jack"] for node in nodes),
+            "sharedNodeCount": sum(
+                1 for node in nodes if len(node["allowedRobotGroups"]) > 1
+            ),
+            "forkOnlyNodeCount": sum(
+                node["allowedRobotGroups"] == ["fork"] for node in nodes
+            ),
+            "jackOnlyNodeCount": sum(
+                node["allowedRobotGroups"] == ["jack"] for node in nodes
+            ),
             "edgeCount": len(edges),
             "forkEdgeCount": sum(edge["robotGroup"] == "fork" for edge in edges),
             "jackEdgeCount": sum(edge["robotGroup"] == "jack" for edge in edges),
@@ -844,8 +1102,12 @@ def compile_scenario_package(
                 "capacity": int(item.get("capacity", 1)),
                 "pickupServiceMs": int(item["pickupServiceMs"]),
                 "dropoffServiceMs": int(item["dropoffServiceMs"]),
-                "blocksTransitDuringService": bool(item.get("blocksTransitDuringService", True)),
-                "propertiesByGroup": deepcopy(source_nodes[item["nodeId"]].get("propertiesByGroup", {})),
+                "blocksTransitDuringService": bool(
+                    item.get("blocksTransitDuringService", True)
+                ),
+                "propertiesByGroup": deepcopy(
+                    source_nodes[item["nodeId"]].get("propertiesByGroup", {})
+                ),
             }
             for item in scene.workstations
         ],

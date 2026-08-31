@@ -127,6 +127,7 @@ plan_explanations = PlanExplanationService(
     audit=audit,
 )
 
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     agent_runs.start()
@@ -148,6 +149,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT"],
     allow_headers=["*"],
 )
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     status = engine.engine_status()
@@ -283,7 +286,10 @@ def list_scenarios() -> list[dict[str, Any]]:
 
 
 @app.post("/api/v1/scenario-drafts")
-def create_scenario_draft(document: dict[str, Any], requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+def create_scenario_draft(
+    document: dict[str, Any],
+    requested_by: str = Query(default="demo-operator", alias="requestedBy"),
+) -> dict[str, Any]:
     try:
         return scenario_drafts.create(document, requested_by)
     except ScenarioDraftConflict as error:
@@ -326,9 +332,16 @@ def get_scenario_draft(package_id: str) -> dict[str, Any]:
 
 
 @app.put("/api/v1/scenario-drafts/{package_id}")
-def update_scenario_draft(package_id: str, document: dict[str, Any], expected_revision: int = Query(alias="expectedRevision", ge=1), requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+def update_scenario_draft(
+    package_id: str,
+    document: dict[str, Any],
+    expected_revision: int = Query(alias="expectedRevision", ge=1),
+    requested_by: str = Query(default="demo-operator", alias="requestedBy"),
+) -> dict[str, Any]:
     try:
-        return scenario_drafts.update(package_id, document, expected_revision, requested_by)
+        return scenario_drafts.update(
+            package_id, document, expected_revision, requested_by
+        )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ScenarioDraftConflict as error:
@@ -338,7 +351,10 @@ def update_scenario_draft(package_id: str, document: dict[str, Any], expected_re
 
 
 @app.post("/api/v1/scenario-drafts/{package_id}/validate")
-def validate_scenario_draft(package_id: str, requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+def validate_scenario_draft(
+    package_id: str,
+    requested_by: str = Query(default="demo-operator", alias="requestedBy"),
+) -> dict[str, Any]:
     try:
         return scenario_drafts.validate(package_id, requested_by)
     except KeyError as error:
@@ -348,9 +364,16 @@ def validate_scenario_draft(package_id: str, requested_by: str = Query(default="
 
 
 @app.post("/api/v1/scenario-drafts/{package_id}/generate-tasks")
-def generate_scenario_draft_tasks(package_id: str, generation: dict[str, Any], expected_revision: int = Query(alias="expectedRevision", ge=1), requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+def generate_scenario_draft_tasks(
+    package_id: str,
+    generation: dict[str, Any],
+    expected_revision: int = Query(alias="expectedRevision", ge=1),
+    requested_by: str = Query(default="demo-operator", alias="requestedBy"),
+) -> dict[str, Any]:
     try:
-        return scenario_drafts.generate_tasks(package_id, generation, expected_revision, requested_by)
+        return scenario_drafts.generate_tasks(
+            package_id, generation, expected_revision, requested_by
+        )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ScenarioDraftConflict as error:
@@ -360,7 +383,10 @@ def generate_scenario_draft_tasks(package_id: str, generation: dict[str, Any], e
 
 
 @app.post("/api/v1/scenario-drafts/{package_id}/compile")
-def compile_scenario_draft(package_id: str, requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+def compile_scenario_draft(
+    package_id: str,
+    requested_by: str = Query(default="demo-operator", alias="requestedBy"),
+) -> dict[str, Any]:
     try:
         result = scenario_drafts.compile(package_id, requested_by)
         if not result["compiled"]:
@@ -373,7 +399,10 @@ def compile_scenario_draft(package_id: str, requested_by: str = Query(default="d
 
 
 @app.post("/api/v1/scenario-drafts/{package_id}/publish")
-def publish_scenario_draft(package_id: str, requested_by: str = Query(default="demo-operator", alias="requestedBy")) -> dict[str, Any]:
+def publish_scenario_draft(
+    package_id: str,
+    requested_by: str = Query(default="demo-operator", alias="requestedBy"),
+) -> dict[str, Any]:
     try:
         return scenario_drafts.publish(package_id, requested_by)
     except KeyError as error:
@@ -386,7 +415,7 @@ def publish_scenario_draft(package_id: str, requested_by: str = Query(default="d
 
 @app.get("/api/v1/world/snapshot")
 def world_snapshot(
-    scenario_id: str = Query(default="interactive-multi-fleet", alias="scenarioId")
+    scenario_id: str = Query(default="interactive-multi-fleet", alias="scenarioId"),
 ) -> dict[str, Any]:
     try:
         return engine.world_snapshot(scenario_id)
@@ -399,7 +428,9 @@ def map_model() -> dict[str, Any]:
     return engine.map_model()
 
 
-@app.post("/api/v1/agent/chat", response_model=ChatResponse, response_model_by_alias=True)
+@app.post(
+    "/api/v1/agent/chat", response_model=ChatResponse, response_model_by_alias=True
+)
 def chat(request: ChatRequest) -> ChatResponse:
     try:
         return orchestrator.chat(request)
@@ -480,9 +511,7 @@ async def stream_agent_run_events(
     response_model=AgentRunRecord,
     response_model_by_alias=True,
 )
-def resume_agent_run(
-    run_id: str, decision: AgentRunResumeRequest
-) -> AgentRunRecord:
+def resume_agent_run(run_id: str, decision: AgentRunResumeRequest) -> AgentRunRecord:
     try:
         return agent_runs.resume(run_id, decision)
     except KeyError as error:
@@ -522,7 +551,7 @@ def agent_memory(conversation_id: str) -> AgentConversationMemory:
 
 @app.get("/api/v1/agent/metrics")
 def agent_metrics(
-    recent_limit: int = Query(default=20, ge=1, le=100, alias="recentLimit")
+    recent_limit: int = Query(default=20, ge=1, le=100, alias="recentLimit"),
 ) -> dict[str, Any]:
     return orchestrator.observability.summary(recent_limit=recent_limit)
 
@@ -549,7 +578,11 @@ async def simulate(request: SimulationRequest) -> SimulationSummary:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
-@app.get("/api/v1/simulations", response_model=list[SimulationSummary], response_model_by_alias=True)
+@app.get(
+    "/api/v1/simulations",
+    response_model=list[SimulationSummary],
+    response_model_by_alias=True,
+)
 def list_simulations() -> list[SimulationSummary]:
     return engine.list_runs()
 
@@ -802,7 +835,9 @@ def incident_report(incident_id: str) -> dict[str, Any]:
     }
 
 
-@app.post("/api/v1/approvals", response_model=ApprovalRequest, response_model_by_alias=True)
+@app.post(
+    "/api/v1/approvals", response_model=ApprovalRequest, response_model_by_alias=True
+)
 def create_approval(
     intent: DispatchIntent,
     scenario_id: str = Query(default="interactive-multi-fleet", alias="scenarioId"),
@@ -820,7 +855,11 @@ def create_approval(
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
-@app.get("/api/v1/approvals", response_model=list[ApprovalRequest], response_model_by_alias=True)
+@app.get(
+    "/api/v1/approvals",
+    response_model=list[ApprovalRequest],
+    response_model_by_alias=True,
+)
 def list_approvals() -> list[ApprovalRequest]:
     return approvals.list()
 
@@ -869,9 +908,7 @@ def committed_intents() -> list[dict[str, Any]]:
 
 @app.get("/api/v1/audit")
 def latest_audit(limit: int = Query(default=50, ge=1, le=200)) -> list[dict[str, Any]]:
-    return [
-        row.model_dump(by_alias=True, mode="json") for row in audit.latest(limit)
-    ]
+    return [row.model_dump(by_alias=True, mode="json") for row in audit.latest(limit)]
 
 
 @app.get("/api/v1/reports/shift")
@@ -885,11 +922,11 @@ def shift_report() -> dict[str, Any]:
         "runCount": len(runs),
         "successfulRunCount": len(successful),
         "approvalCount": len(approvals_rows),
-        "pendingApprovalCount": sum(row.status.value == "PENDING" for row in approvals_rows),
+        "pendingApprovalCount": sum(
+            row.status.value == "PENDING" for row in approvals_rows
+        ),
         "latestRun": (
-            successful[0].model_dump(by_alias=True, mode="json")
-            if successful
-            else None
+            successful[0].model_dump(by_alias=True, mode="json") if successful else None
         ),
         "notice": "报告中的所有数值均来自MASP仿真结果，不代表真实生产收益。",
     }

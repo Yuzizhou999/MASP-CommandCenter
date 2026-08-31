@@ -48,7 +48,10 @@ def _baseline_manager_class(ref: str):
     )
     module = types.ModuleType("command_center._json_agent_run_manager_baseline")
     module.__package__ = "command_center"
-    exec(compile(completed.stdout, f"{ref}:agent_run_manager.py", "exec"), module.__dict__)
+    exec(
+        compile(completed.stdout, f"{ref}:agent_run_manager.py", "exec"),
+        module.__dict__,
+    )
     return module.AgentRunManager
 
 

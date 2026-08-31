@@ -66,9 +66,7 @@ def _graphs(scene: WarehouseSceneSpec) -> dict[str, nx.DiGraph]:
     for edge in scene.edges:
         group = str(edge["robotGroup"])
         if group in graphs:
-            graphs[group].add_edge(
-                str(edge["startNodeId"]), str(edge["endNodeId"])
-            )
+            graphs[group].add_edge(str(edge["startNodeId"]), str(edge["endNodeId"]))
     return graphs
 
 
@@ -224,7 +222,9 @@ def generate_task_stream(
     priorities = generation.get(
         "priorityDistribution", [{"priorityClass": 0, "weight": 1.0}]
     )
-    service_policy = generation.get("serviceTimePolicy", {"mode": "workstation_defaults"})
+    service_policy = generation.get(
+        "serviceTimePolicy", {"mode": "workstation_defaults"}
+    )
     due_policy = generation.get("dueTimePolicy", {"mode": "none"})
     stations = {str(item["nodeId"]): item for item in scene.workstations}
     stream_id = str(generation["streamId"])

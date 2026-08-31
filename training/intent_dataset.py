@@ -162,10 +162,7 @@ def validate_agent_trajectory(example: dict[str, Any]) -> dict[str, Any]:
     roles = [row.get("role") for row in messages]
     if roles[0] != "system" or roles[1] != "user" or roles[-1] != "assistant":
         raise ValueError("Agent 轨迹必须以 system/user 开始并以 assistant 结束")
-    if any(
-        roles[index] == roles[index - 1]
-        for index in range(2, len(roles))
-    ):
+    if any(roles[index] == roles[index - 1] for index in range(2, len(roles))):
         raise ValueError("Agent 轨迹中的 user/assistant 必须交替出现")
 
     actions: list[AgentAction | None] = []

@@ -185,7 +185,12 @@ def main() -> None:
         )
         writer.writeheader()
         for row in ranked:
-            writer.writerow({**row["weights"], **{key: row[key] for key in ("recallAt1", "recallAt3", "mrr")}})
+            writer.writerow(
+                {
+                    **row["weights"],
+                    **{key: row[key] for key in ("recallAt1", "recallAt3", "mrr")},
+                }
+            )
     if args.keep_history:
         history_csv = output_dir / f"knowledge-retrieval-grid-{stamp}.csv"
         history_csv.write_bytes(csv_path.read_bytes())

@@ -75,14 +75,14 @@ class KnowledgeBase:
         self.title_weight = title_weight
         self.score_threshold = score_threshold
         self.chunks = self._load()
-        self._tokens = [Counter(self._terms(self._document(chunk))) for chunk in self.chunks]
+        self._tokens = [
+            Counter(self._terms(self._document(chunk))) for chunk in self.chunks
+        ]
         self._lengths = [sum(row.values()) for row in self._tokens]
         self._average_length = (
             sum(self._lengths) / len(self._lengths) if self._lengths else 0.0
         )
-        self._document_frequency = Counter(
-            term for row in self._tokens for term in row
-        )
+        self._document_frequency = Counter(term for row in self._tokens for term in row)
         self._vectors = [self._vector(self._document(chunk)) for chunk in self.chunks]
 
     def _load(self) -> list[KnowledgeChunk]:
@@ -133,7 +133,9 @@ class KnowledgeBase:
             if len(sequence) == 1:
                 terms.append(sequence)
                 continue
-            terms.extend(sequence[index : index + 2] for index in range(len(sequence) - 1))
+            terms.extend(
+                sequence[index : index + 2] for index in range(len(sequence) - 1)
+            )
             if len(sequence) >= 3:
                 terms.extend(
                     sequence[index : index + 3] for index in range(len(sequence) - 2)
@@ -155,9 +157,7 @@ class KnowledgeBase:
             digest = hashlib.blake2b(feature.encode("utf-8"), digest_size=8).digest()
             counts[int.from_bytes(digest, "big") % dimensions] += 1
         norm = math.sqrt(sum(value * value for value in counts.values()))
-        return {
-            index: value / norm for index, value in counts.items()
-        } if norm else {}
+        return {index: value / norm for index, value in counts.items()} if norm else {}
 
     def _bm25(self, query_terms: list[str], index: int) -> float:
         if not query_terms or not self.chunks:
@@ -216,9 +216,7 @@ class KnowledgeBase:
             )
             if score >= self.score_threshold:
                 ranked.append((score, sparse, vector, chunk))
-        ranked.sort(
-            key=lambda item: (-item[0], -item[1], -item[2], item[3].source)
-        )
+        ranked.sort(key=lambda item: (-item[0], -item[1], -item[2], item[3].source))
         return [
             EvidenceItem(
                 source=chunk.source,

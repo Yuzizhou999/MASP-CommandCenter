@@ -49,7 +49,11 @@ class AgentAction(BaseModel):
             if self.tool is not None or self.arguments is not None:
                 raise ValueError("PROPOSE_INTENT must not include tool fields")
         else:
-            if self.tool is not None or self.arguments is not None or self.intent is not None:
+            if (
+                self.tool is not None
+                or self.arguments is not None
+                or self.intent is not None
+            ):
                 raise ValueError("REQUEST_CLARIFICATION has no model-authored payload")
         return self
 
@@ -123,10 +127,7 @@ def agent_action_response_schema() -> dict[str, Any]:
                 "required": ["action"],
                 "additionalProperties": False,
             },
-            *[
-                proposal_branch(name)
-                for name in SUPPORTED_AGENT_INTENT_TYPES
-            ],
+            *[proposal_branch(name) for name in SUPPORTED_AGENT_INTENT_TYPES],
         ],
     }
 

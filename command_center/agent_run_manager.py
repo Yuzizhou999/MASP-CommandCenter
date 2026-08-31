@@ -80,9 +80,7 @@ class AgentRunManager:
     ) -> None:
         self.legacy_path = path if path.suffix.lower() == ".json" else None
         self.path = (
-            path.with_suffix(".sqlite3")
-            if path.suffix.lower() == ".json"
-            else path
+            path.with_suffix(".sqlite3") if path.suffix.lower() == ".json" else path
         )
         self.orchestrator = orchestrator
         self.provider = provider
@@ -144,7 +142,9 @@ class AgentRunManager:
                 if existing is not None:
                     submitted = request.model_dump(by_alias=True, mode="json")
                     if existing.get("request") != submitted:
-                        raise ValueError("同一 Idempotency-Key 不能用于不同的 Agent 请求")
+                        raise ValueError(
+                            "同一 Idempotency-Key 不能用于不同的 Agent 请求"
+                        )
                     return AgentRunRecord.model_validate(existing)
 
             now = _utc_now()
@@ -204,9 +204,7 @@ class AgentRunManager:
             ).fetchall()
         return [self._event_document(row) for row in rows]
 
-    def resume(
-        self, run_id: str, decision: AgentRunResumeRequest
-    ) -> AgentRunRecord:
+    def resume(self, run_id: str, decision: AgentRunResumeRequest) -> AgentRunRecord:
         should_submit = False
 
         def update(row: dict[str, Any]) -> None:
@@ -302,6 +300,7 @@ class AgentRunManager:
                 )
                 continue
             if status in {"QUEUED", "RUNNING"}:
+
                 def mark_recovered(row: dict[str, Any]) -> None:
                     row["status"] = "QUEUED"
                     row["recovered"] = True
@@ -342,7 +341,10 @@ class AgentRunManager:
                 self._append_event(
                     row,
                     "run_started",
-                    {"attempt": row["attempt"], "recovered": row.get("recovered", False)},
+                    {
+                        "attempt": row["attempt"],
+                        "recovered": row.get("recovered", False),
+                    },
                 )
 
             record = self._update(run_id, start)
@@ -374,7 +376,11 @@ class AgentRunManager:
                     self._append_event(
                         row,
                         "workflow_checkpoint_reused",
-                        {"intentId": response.intent.intent_id if response.intent else None},
+                        {
+                            "intentId": response.intent.intent_id
+                            if response.intent
+                            else None
+                        },
                     )
 
                 self._update(run_id, reuse_checkpoint)
@@ -389,8 +395,10 @@ class AgentRunManager:
                         approval_gate=(
                             None
                             if goal_execution
-                            else lambda intent, validation: self._await_advisory_approval(
-                                run_id, intent, validation
+                            else lambda intent, validation: (
+                                self._await_advisory_approval(
+                                    run_id, intent, validation
+                                )
                             )
                         ),
                     )
@@ -431,9 +439,7 @@ class AgentRunManager:
                 row["status"] = "COMPLETED"
                 row["response"] = response.model_dump(by_alias=True, mode="json")
                 row["providerUsage"] = usage
-                row["evaluation"] = evaluation.model_dump(
-                    by_alias=True, mode="json"
-                )
+                row["evaluation"] = evaluation.model_dump(by_alias=True, mode="json")
                 row["completedAt"] = _iso()
                 self._append_event(
                     row,
@@ -460,9 +466,7 @@ class AgentRunManager:
             with self._lock:
                 self._conditions.pop(run_id, None)
 
-    def _execute_goal_workflow(
-        self, run_id: str, response: ChatResponse
-    ) -> None:
+    def _execute_goal_workflow(self, run_id: str, response: ChatResponse) -> None:
         if self.workflow is None:
             return
         intent = response.intent
@@ -472,7 +476,8 @@ class AgentRunManager:
             and intent is not None
             and validation is not None
             and validation.valid
-            and intent.intent_type in {IntentType.CREATE_TASK, IntentType.BLOCK_RESOURCE}
+            and intent.intent_type
+            in {IntentType.CREATE_TASK, IntentType.BLOCK_RESOURCE}
         )
         if not actionable or intent is None or validation is None:
             reason = (
@@ -491,9 +496,7 @@ class AgentRunManager:
                     "commitment": None,
                     "steps": [],
                 }
-                self._append_event(
-                    row, "workflow_skipped", {"reason": reason}
-                )
+                self._append_event(row, "workflow_skipped", {"reason": reason})
 
             self._update(run_id, skip)
             return
@@ -537,9 +540,7 @@ class AgentRunManager:
 
             def save_simulation(row: dict[str, Any]) -> None:
                 workflow = self._workflow_payload(row, intent.intent_id)
-                workflow["simulation"] = summary.model_dump(
-                    by_alias=True, mode="json"
-                )
+                workflow["simulation"] = summary.model_dump(by_alias=True, mode="json")
                 workflow["recommendation"] = recommendation.model_dump(
                     by_alias=True, mode="json"
                 )
@@ -751,9 +752,7 @@ class AgentRunManager:
         )
 
     @staticmethod
-    def _workflow_payload(
-        row: dict[str, Any], intent_id: str | None
-    ) -> dict[str, Any]:
+    def _workflow_payload(row: dict[str, Any], intent_id: str | None) -> dict[str, Any]:
         return dict(
             row.get("workflow")
             or {
@@ -814,12 +813,18 @@ class AgentRunManager:
                 "requestedAt": existing.get("requestedAt") or _iso(),
                 "decision": existing.get("decision"),
                 "stage": (
-                    "POST_SIMULATION" if approval_request is not None else "INTENT_DRAFT"
+                    "POST_SIMULATION"
+                    if approval_request is not None
+                    else "INTENT_DRAFT"
                 ),
                 "approvalId": (
-                    approval_request.approval_id if approval_request is not None else None
+                    approval_request.approval_id
+                    if approval_request is not None
+                    else None
                 ),
-                "simulationRunId": simulation.run_id if simulation is not None else None,
+                "simulationRunId": simulation.run_id
+                if simulation is not None
+                else None,
             }
             if row.get("workflow") is not None and approval_request is not None:
                 row["workflow"]["phase"] = "WAITING_APPROVAL"
@@ -901,7 +906,8 @@ class AgentRunManager:
         ]
         observed_after_tool = all(
             any(
-                later.state in {"OBSERVING", "PARAMETER_RESOLUTION", "SAFETY_VALIDATION"}
+                later.state
+                in {"OBSERVING", "PARAMETER_RESOLUTION", "SAFETY_VALIDATION"}
                 for later in steps[index + 1 :]
             )
             for index in tool_indices
@@ -996,9 +1002,7 @@ class AgentRunManager:
 
         self._update(run_id, update)
 
-    def _set_terminal(
-        self, row: dict[str, Any], status: str, message: str
-    ) -> None:
+    def _set_terminal(self, row: dict[str, Any], status: str, message: str) -> None:
         row["status"] = status
         row["error"] = message
         row["completedAt"] = _iso()
@@ -1068,9 +1072,7 @@ class AgentRunManager:
             return {
                 "schemaVersion": 2,
                 "runs": {
-                    str(row["run_id"]): self._row_for(
-                        connection, str(row["run_id"])
-                    )
+                    str(row["run_id"]): self._row_for(connection, str(row["run_id"]))
                     for row in rows
                 },
             }
@@ -1176,9 +1178,7 @@ class AgentRunManager:
         document = {key: value for key, value in row.items() if key != "events"}
         return json.dumps(document, ensure_ascii=False, separators=(",", ":"))
 
-    def _insert_row(
-        self, connection: sqlite3.Connection, row: dict[str, Any]
-    ) -> None:
+    def _insert_row(self, connection: sqlite3.Connection, row: dict[str, Any]) -> None:
         connection.execute(
             """
             INSERT INTO agent_runs(

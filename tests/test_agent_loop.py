@@ -82,8 +82,22 @@ class _MaliciousDriver(DeepSeekProvider):
     def status(self):
         return {"model": "malicious-test-driver"}
 
-    def decide_agent_action(self, text, tool_definitions, *, observations, authoritative_parameters, action_history=None):
-        del text, tool_definitions, observations, authoritative_parameters, action_history
+    def decide_agent_action(
+        self,
+        text,
+        tool_definitions,
+        *,
+        observations,
+        authoritative_parameters,
+        action_history=None,
+    ):
+        del (
+            text,
+            tool_definitions,
+            observations,
+            authoritative_parameters,
+            action_history,
+        )
         self.calls += 1
         if self.calls == 1:
             action = AgentAction(
@@ -129,8 +143,22 @@ def test_authority_mismatch_is_non_fixable_block(isolated_settings) -> None:
 
 
 class _UngroundedTaskDriver(_MaliciousDriver):
-    def decide_agent_action(self, text, tool_definitions, *, observations, authoritative_parameters, action_history=None):
-        del text, tool_definitions, observations, authoritative_parameters, action_history
+    def decide_agent_action(
+        self,
+        text,
+        tool_definitions,
+        *,
+        observations,
+        authoritative_parameters,
+        action_history=None,
+    ):
+        del (
+            text,
+            tool_definitions,
+            observations,
+            authoritative_parameters,
+            action_history,
+        )
         self.calls += 1
         if self.calls == 1:
             action = AgentAction(
@@ -192,7 +220,15 @@ class _InvalidToolDriver(DeepSeekProvider):
     def status(self):
         return {"model": "invalid-tool-test-driver"}
 
-    def decide_agent_action(self, text, tool_definitions, *, observations, authoritative_parameters, action_history=None):
+    def decide_agent_action(
+        self,
+        text,
+        tool_definitions,
+        *,
+        observations,
+        authoritative_parameters,
+        action_history=None,
+    ):
         del action_history
         self.observation_codes.append([row.code for row in observations])
         self.calls += 1
@@ -246,7 +282,15 @@ class _RepairingDriver(DeepSeekProvider):
     def status(self):
         return {"model": "repair-test-driver"}
 
-    def decide_agent_action(self, text, tool_definitions, *, observations, authoritative_parameters, action_history=None):
+    def decide_agent_action(
+        self,
+        text,
+        tool_definitions,
+        *,
+        observations,
+        authoritative_parameters,
+        action_history=None,
+    ):
         del text, tool_definitions, authoritative_parameters, action_history
         self.calls += 1
         if self.calls == 1:
@@ -266,7 +310,9 @@ class _RepairingDriver(DeepSeekProvider):
                 action=AgentActionType.PROPOSE_INTENT,
                 intent={
                     "intentType": "CREATE_TASK",
-                    "reason": "repaired after verifier feedback" if validation_rows else "initial draft",
+                    "reason": "repaired after verifier feedback"
+                    if validation_rows
+                    else "initial draft",
                 },
             )
         return AgentDecisionResult(
@@ -359,8 +405,22 @@ class _NeverValidDriver(DeepSeekProvider):
     def status(self):
         return {"model": "step-budget-test-driver"}
 
-    def decide_agent_action(self, text, tool_definitions, *, observations, authoritative_parameters, action_history=None):
-        del text, tool_definitions, observations, authoritative_parameters, action_history
+    def decide_agent_action(
+        self,
+        text,
+        tool_definitions,
+        *,
+        observations,
+        authoritative_parameters,
+        action_history=None,
+    ):
+        del (
+            text,
+            tool_definitions,
+            observations,
+            authoritative_parameters,
+            action_history,
+        )
         return AgentDecisionResult(
             action=None,
             model="step-budget-test-driver",
@@ -395,8 +455,22 @@ class _CostlyDriver(DeepSeekProvider):
     def status(self):
         return {"model": "cost-budget-test-driver"}
 
-    def decide_agent_action(self, text, tool_definitions, *, observations, authoritative_parameters, action_history=None):
-        del text, tool_definitions, observations, authoritative_parameters, action_history
+    def decide_agent_action(
+        self,
+        text,
+        tool_definitions,
+        *,
+        observations,
+        authoritative_parameters,
+        action_history=None,
+    ):
+        del (
+            text,
+            tool_definitions,
+            observations,
+            authoritative_parameters,
+            action_history,
+        )
         return AgentDecisionResult(
             action=AgentAction(
                 action=AgentActionType.CALL_TOOL,

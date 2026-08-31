@@ -263,7 +263,9 @@ def main() -> None:
     deduplicated: dict[str, IntentDatasetExample] = {}
     for example in examples:
         key = hashlib.sha256(
-            json.dumps(example.messages, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            json.dumps(example.messages, ensure_ascii=False, sort_keys=True).encode(
+                "utf-8"
+            )
         ).hexdigest()
         deduplicated[key] = example
     examples = sorted(

@@ -230,7 +230,11 @@ def _deadlock_diagnosis(incident, model, existing) -> DiagnosisReport:
     return DiagnosisReport(
         summary=(
             f"MASP 在 {incident.fault_at_ms}ms 检测到 {cycle_length} 车等待环；"
-            + ("存在受控倒退候选。" if recovery_available else "无合法倒退方案，已保持安全停车。")
+            + (
+                "存在受控倒退候选。"
+                if recovery_available
+                else "无合法倒退方案，已保持安全停车。"
+            )
         ),
         confirmedFacts=_confirmed_facts(incident),
         rootCauseCandidates=causes,

@@ -181,11 +181,18 @@ def _search_result(sequence: int, *, quarantined: bool = False) -> AgentObservat
         sequence=sequence,
         kind="SECURITY_BOUNDARY" if quarantined else "TOOL_RESULT",
         code="retrieval.ignore-instructions" if quarantined else "tool.ok",
-        summary="可疑检索内容已隔离" if quarantined else "安全 SOP 已作为不可信资料返回",
+        summary="可疑检索内容已隔离"
+        if quarantined
+        else "安全 SOP 已作为不可信资料返回",
         data={
             "value": [] if quarantined else [{"source": "sop/safety.md"}],
             "quarantined": (
-                [{"source": "wiki/poison.md", "violation": "retrieval.ignore-instructions"}]
+                [
+                    {
+                        "source": "wiki/poison.md",
+                        "violation": "retrieval.ignore-instructions",
+                    }
+                ]
                 if quarantined
                 else []
             ),
@@ -276,9 +283,9 @@ def _validation_repair_row(source: dict[str, Any], index: int) -> dict[str, Any]
         task["dueTimeMs"] = 1
     history = [
         _snapshot_action().model_dump(mode="json", exclude_none=True),
-        AgentAction(
-            action=AgentActionType.PROPOSE_INTENT, intent=draft
-        ).model_dump(mode="json", exclude_none=True),
+        AgentAction(action=AgentActionType.PROPOSE_INTENT, intent=draft).model_dump(
+            mode="json", exclude_none=True
+        ),
     ]
     observations = [
         _initial("任务实体已绑定，先读取权威快照"),
@@ -324,9 +331,9 @@ def _schema_repair_row(source: dict[str, Any], index: int) -> dict[str, Any]:
         invalid["intentType"] = "CHANGE_TASK_PRIORITY"
     history = [
         _snapshot_action().model_dump(mode="json", exclude_none=True),
-        AgentAction(
-            action=AgentActionType.PROPOSE_INTENT, intent=invalid
-        ).model_dump(mode="json", exclude_none=True),
+        AgentAction(action=AgentActionType.PROPOSE_INTENT, intent=invalid).model_dump(
+            mode="json", exclude_none=True
+        ),
     ]
     observations = [
         _initial("任务实体已绑定，先读取权威快照"),
@@ -375,7 +382,11 @@ def _protocol_recovery_rows() -> Iterable[dict[str, Any]]:
             history=history,
             final=AgentAction(
                 action=AgentActionType.PROPOSE_INTENT,
-                intent={"intentType": "QUERY_STATUS", "reason": request, "query": request},
+                intent={
+                    "intentType": "QUERY_STATUS",
+                    "reason": request,
+                    "query": request,
+                },
             ),
             example_id=f"agent-v23-protocol-recovery-{index:03d}",
             category="PROTOCOL_REJECTION_RECOVERY",
@@ -420,7 +431,11 @@ def _search_routing_rows() -> Iterable[dict[str, Any]]:
             history=history,
             final=AgentAction(
                 action=AgentActionType.PROPOSE_INTENT,
-                intent={"intentType": "QUERY_STATUS", "reason": request, "query": request},
+                intent={
+                    "intentType": "QUERY_STATUS",
+                    "reason": request,
+                    "query": request,
+                },
             ),
             example_id=f"agent-v23-search-routing-{index:03d}",
             category="SEARCH_SOP_ROUTING",
@@ -450,7 +465,9 @@ def _semantic_rows() -> Iterable[dict[str, Any]]:
         )
 
 
-def build_splits(source_dir: Path) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
+def build_splits(
+    source_dir: Path,
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
     manifest_path = source_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     knowledge = KnowledgeBase(ROOT / "knowledge")
@@ -530,9 +547,7 @@ def main() -> None:
             "sha256": file_sha256(path),
         }
     categories = Counter(
-        str(row["metadata"]["category"])
-        for rows in splits.values()
-        for row in rows
+        str(row["metadata"]["category"]) for rows in splits.values() for row in rows
     )
     invalid_context_rows = sum(
         bool(row["metadata"].get("allowInvalidUnsupervisedActions"))

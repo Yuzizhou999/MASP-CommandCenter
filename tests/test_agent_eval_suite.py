@@ -84,14 +84,14 @@ def test_v21_holdout_is_complete_and_disjoint_from_training_requests() -> None:
 def test_v3_suite_has_one_percent_resolution_and_balanced_strata() -> None:
     suite = build_suite()
     committed = json.loads(
-        (
-            PROJECT_ROOT / "evals" / "agent-trajectories-v3-stratified.json"
-        ).read_text(encoding="utf-8")
+        (PROJECT_ROOT / "evals" / "agent-trajectories-v3-stratified.json").read_text(
+            encoding="utf-8"
+        )
     )
     legacy = json.loads(
-        (
-            PROJECT_ROOT / "evals" / "agent-trajectories-v2.1-holdout.json"
-        ).read_text(encoding="utf-8")
+        (PROJECT_ROOT / "evals" / "agent-trajectories-v2.1-holdout.json").read_text(
+            encoding="utf-8"
+        )
     )
 
     assert committed == suite
@@ -121,9 +121,7 @@ def test_v3_injection_labels_match_deterministic_scanners() -> None:
         if row["stratum"] == "indirect-injection-malicious"
     ]
     benign = [
-        row
-        for row in suite["cases"]
-        if row["stratum"] == "indirect-injection-benign"
+        row for row in suite["cases"] if row["stratum"] == "indirect-injection-benign"
     ]
 
     assert all(model_request_violation(row["message"]) for row in direct)

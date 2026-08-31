@@ -135,7 +135,10 @@ class DispatchIntent(BaseModel):
     def validate_payload(self) -> DispatchIntent:
         if self.intent_type is IntentType.CREATE_TASK and self.task is None:
             raise ValueError("CREATE_TASK requires task")
-        if self.intent_type is IntentType.BLOCK_RESOURCE and self.resource_block is None:
+        if (
+            self.intent_type is IntentType.BLOCK_RESOURCE
+            and self.resource_block is None
+        ):
             raise ValueError("BLOCK_RESOURCE requires resourceBlock")
         return self
 
@@ -212,7 +215,9 @@ class AgentPolicyEvidence(BaseModel):
 class BenchmarkRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    suite_name: str = Field(default="仓储群车高负载基准", min_length=2, alias="suiteName")
+    suite_name: str = Field(
+        default="仓储群车高负载基准", min_length=2, alias="suiteName"
+    )
     base_scenario_id: str = Field(
         default="rhpp-long-distance-conflict", alias="baseScenarioId"
     )
@@ -242,7 +247,9 @@ class BenchmarkRequest(BaseModel):
             "rl",
         ]
     ] = Field(default_factory=lambda: ["top_k", "congestion"], min_length=1)
-    seeds: list[int] = Field(default_factory=lambda: [0, 1, 2], min_length=1, max_length=10)
+    seeds: list[int] = Field(
+        default_factory=lambda: [0, 1, 2], min_length=1, max_length=10
+    )
     horizon_ms: int = Field(default=900000, ge=60000, le=7200000, alias="horizonMs")
     agent_policy: AgentPolicyOptions | None = Field(default=None, alias="agentPolicy")
     requested_by: str = Field(default="evaluation-operator", alias="requestedBy")
@@ -352,7 +359,9 @@ class ComparisonRequest(BaseModel):
 
 
 class ComparisonResult(BaseModel):
-    comparison_id: str = Field(default_factory=lambda: new_id("comparison"), alias="comparisonId")
+    comparison_id: str = Field(
+        default_factory=lambda: new_id("comparison"), alias="comparisonId"
+    )
     runs: list[SimulationSummary]
     recommended_run_id: str = Field(alias="recommendedRunId")
     rationale: list[str]
@@ -360,10 +369,14 @@ class ComparisonResult(BaseModel):
 
 
 class ApprovalRequest(BaseModel):
-    approval_id: str = Field(default_factory=lambda: new_id("approval"), alias="approvalId")
+    approval_id: str = Field(
+        default_factory=lambda: new_id("approval"), alias="approvalId"
+    )
     intent: DispatchIntent
     validation: IntentValidation
-    simulation_run_ids: list[str] = Field(default_factory=list, alias="simulationRunIds")
+    simulation_run_ids: list[str] = Field(
+        default_factory=list, alias="simulationRunIds"
+    )
     status: ApprovalStatus = ApprovalStatus.PENDING
     requested_by: str = Field(default="demo-operator", alias="requestedBy")
     decided_by: str | None = Field(default=None, alias="decidedBy")
@@ -483,9 +496,7 @@ class AgentWorkflowRecommendation(BaseModel):
 
     decision: Literal["PROCEED", "BLOCK"]
     reasons: list[str] = Field(default_factory=list)
-    safety_checks: dict[str, bool] = Field(
-        default_factory=dict, alias="safetyChecks"
-    )
+    safety_checks: dict[str, bool] = Field(default_factory=dict, alias="safetyChecks")
 
 
 class AgentWorkflowStep(BaseModel):
@@ -759,7 +770,9 @@ class DiagnosisReport(BaseModel):
     root_cause_candidates: list[RootCauseCandidate] = Field(
         min_length=1, alias="rootCauseCandidates"
     )
-    affected_vehicle_ids: list[str] = Field(default_factory=list, alias="affectedVehicleIds")
+    affected_vehicle_ids: list[str] = Field(
+        default_factory=list, alias="affectedVehicleIds"
+    )
     affected_task_ids: list[str] = Field(default_factory=list, alias="affectedTaskIds")
     recommendations: list[IncidentRecommendation] = Field(default_factory=list)
     uncertainties: list[str] = Field(default_factory=list)
@@ -771,7 +784,9 @@ class DiagnosisReport(BaseModel):
 class IncidentRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    incident_id: str = Field(default_factory=lambda: new_id("incident"), alias="incidentId")
+    incident_id: str = Field(
+        default_factory=lambda: new_id("incident"), alias="incidentId"
+    )
     incident_type: IncidentType = Field(alias="incidentType")
     severity: IncidentSeverity
     status: IncidentStatus = IncidentStatus.OPEN
@@ -787,7 +802,9 @@ class IncidentRecord(BaseModel):
     location_edge_id: str | None = Field(default=None, alias="locationEdgeId")
     workstation_id: str | None = Field(default=None, alias="workstationId")
     load_state: str | None = Field(default=None, alias="loadState")
-    event_attributes: dict[str, Any] = Field(default_factory=dict, alias="eventAttributes")
+    event_attributes: dict[str, Any] = Field(
+        default_factory=dict, alias="eventAttributes"
+    )
     evidence: list[IncidentEvidence] = Field(default_factory=list)
     deterministic_findings: list[DeterministicFinding] = Field(
         default_factory=list, alias="deterministicFindings"

@@ -107,9 +107,7 @@ def test_budget_tracker_enforces_independent_limits() -> None:
     with pytest.raises(AgentBudgetExceeded, match="修复次数"):
         tracker.consume_repair()
 
-    cost_tracker = AgentBudgetTracker(
-        AgentBudgets(maxEstimatedCostUsd=0.001)
-    )
+    cost_tracker = AgentBudgetTracker(AgentBudgets(maxEstimatedCostUsd=0.001))
     with pytest.raises(AgentBudgetExceeded, match="估算成本") as error:
         cost_tracker.consume_decision(10, estimated_cost_usd=0.0011)
     assert error.value.code == "budget.cost"
@@ -139,9 +137,7 @@ def test_validation_classifier_fails_closed_and_separates_fixable() -> None:
 
     disposition = classify_validation(validation)
 
-    assert [row.code for row in disposition.fixable] == [
-        "intent.task.priority.invalid"
-    ]
+    assert [row.code for row in disposition.fixable] == ["intent.task.priority.invalid"]
     assert [row.code for row in disposition.blocking] == ["future.unknown.issue"]
     assert disposition.can_repair is False
 

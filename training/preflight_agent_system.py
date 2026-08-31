@@ -55,7 +55,9 @@ def suite_quality(suite: dict[str, Any]) -> dict[str, Any]:
             "actual": min((counts.get(name, 0) for name in required_strata), default=0),
             "minimum": minimum_per_stratum,
             "passed": not configured
-            or all(counts.get(name, 0) >= minimum_per_stratum for name in required_strata),
+            or all(
+                counts.get(name, 0) >= minimum_per_stratum for name in required_strata
+            ),
         },
         "requiredStrata": {
             "actual": sorted(counts),
@@ -90,8 +92,7 @@ def expected_authority(case: dict[str, Any]) -> dict[str, Any] | None:
         return {
             "intentType": IntentType.CREATE_TASK.value,
             "task": {
-                field: parameters["task"].get(field)
-                for field in TASK_AUTHORITY_FIELDS
+                field: parameters["task"].get(field) for field in TASK_AUTHORITY_FIELDS
             },
         }
     if isinstance(parameters.get("resourceBlock"), dict):
@@ -198,22 +199,16 @@ def evaluate_reachability(
     }
 
 
-def preflight_suite(
-    suite: dict[str, Any], settings: Settings
-) -> dict[str, Any]:
+def preflight_suite(suite: dict[str, Any], settings: Settings) -> dict[str, Any]:
     target = float(
-        suite["qualification"]["trajectoryThresholds"]["goalSuccessRate"][
-            "value"
-        ]
+        suite["qualification"]["trajectoryThresholds"]["goalSuccessRate"]["value"]
     )
     engine = MaspAdapter(settings)
     with tempfile.TemporaryDirectory(prefix="masp-agent-system-preflight-") as root:
         resolver = ClarificationResolver(
             ClarificationStore(Path(root) / "clarifications.json"), engine
         )
-        result = evaluate_reachability(
-            list(suite["cases"]), resolver, target=target
-        )
+        result = evaluate_reachability(list(suite["cases"]), resolver, target=target)
         result["suiteQuality"] = suite_quality(suite)
         return result
 

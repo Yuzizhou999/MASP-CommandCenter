@@ -134,7 +134,9 @@ class DatasetExporter:
 
     @staticmethod
     def _split(source_id: str) -> str:
-        bucket = int(hashlib.sha256(source_id.encode("utf-8")).hexdigest()[:8], 16) % 100
+        bucket = (
+            int(hashlib.sha256(source_id.encode("utf-8")).hexdigest()[:8], 16) % 100
+        )
         if bucket < 70:
             return "train"
         if bucket < 85:
@@ -190,7 +192,9 @@ class DatasetExporter:
         missing_required = [
             index
             for index, row in enumerate(records)
-            if not all(row.get(key) for key in ("recordId", "recordType", "sourceId", "split"))
+            if not all(
+                row.get(key) for key in ("recordId", "recordType", "sourceId", "split")
+            )
         ]
         sensitive = [
             {"recordId": row["recordId"], "paths": paths}
@@ -223,11 +227,15 @@ class DatasetExporter:
             document = run.model_dump(by_alias=True, mode="json")
             yield "simulation", run.run_id, document
             if run.intent_id:
-                yield "intent-link", f"{run.run_id}:{run.intent_id}", {
-                    "runId": run.run_id,
-                    "intentId": run.intent_id,
-                    "scenarioId": run.scenario_id,
-                }
+                yield (
+                    "intent-link",
+                    f"{run.run_id}:{run.intent_id}",
+                    {
+                        "runId": run.run_id,
+                        "intentId": run.intent_id,
+                        "scenarioId": run.scenario_id,
+                    },
+                )
         for approval in self.approvals.list():
             yield (
                 "approval",
@@ -306,7 +314,9 @@ class DatasetExporter:
         }
         self._write_json(output_dir / "manifest.json", manifest)
         bundle_path = output_dir / "dataset-bundle.zip"
-        with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+        with zipfile.ZipFile(
+            bundle_path, "w", compression=zipfile.ZIP_DEFLATED
+        ) as bundle:
             for name in ("manifest.json", "quality-report.json", "dataset.jsonl"):
                 bundle.write(output_dir / name, arcname=name)
         self.audit.append(

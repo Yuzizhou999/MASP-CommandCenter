@@ -97,9 +97,7 @@ def expected_fields(case: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {"intentType": expected["intentType"]}
     authoritative = case.get("authoritativeParameters") or {}
     if authoritative.get("task") is not None:
-        result["task"] = {
-            key: authoritative["task"][key] for key in TASK_FIELDS
-        }
+        result["task"] = {key: authoritative["task"][key] for key in TASK_FIELDS}
     if authoritative.get("resourceBlock") is not None:
         result["resourceBlock"] = {
             key: authoritative["resourceBlock"][key] for key in BLOCK_FIELDS
@@ -261,11 +259,7 @@ def classification_metrics(
         )
         precision = true_positive / max(1, true_positive + false_positive)
         recall = true_positive / max(1, true_positive + false_negative)
-        f1 = (
-            2 * precision * recall / (precision + recall)
-            if precision + recall
-            else 0
-        )
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0
         f1_values.append(f1)
         per_label[label] = {
             "support": sum(value == label for value in expected),
@@ -378,9 +372,7 @@ def evaluate(
     )
     prompt_sha256 = hashlib.sha256(static_prompt.encode("utf-8")).hexdigest()
     response_schema_sha256 = hashlib.sha256(
-        json.dumps(
-            response_schema, ensure_ascii=False, sort_keys=True
-        ).encode("utf-8")
+        json.dumps(response_schema, ensure_ascii=False, sort_keys=True).encode("utf-8")
     ).hexdigest()
     for case in suite["cases"]:
         authoritative = case.get("authoritativeParameters") or {}
@@ -541,14 +533,11 @@ def evaluate(
 
     expected_labels = [row["category"] for row in cases]
     observed_labels = [
-        row["observed"]["intentType"] if row["observed"] else None
-        for row in cases
+        row["observed"]["intentType"] if row["observed"] else None for row in cases
     ]
     classification = classification_metrics(expected_labels, observed_labels)
     slot_cases = [
-        row
-        for row in cases
-        if row["category"] in {"CREATE_TASK", "BLOCK_RESOURCE"}
+        row for row in cases if row["category"] in {"CREATE_TASK", "BLOCK_RESOURCE"}
     ]
     total = len(cases)
     metrics = {
@@ -567,16 +556,14 @@ def evaluate(
             sum(row["exactMatch"] for row in cases) / max(1, total), 4
         ),
         "rawSlotExactMatchRate": round(
-            sum(row["exactMatch"] for row in slot_cases)
-            / max(1, len(slot_cases)),
+            sum(row["exactMatch"] for row in slot_cases) / max(1, len(slot_cases)),
             4,
         ),
         "rawMaspValidRate": round(
             sum(row["maspValid"] for row in cases) / max(1, total), 4
         ),
         "rawSafetyPassRate": round(
-            sum(row["rawSafe"] for row in safety_cases)
-            / max(1, len(safety_cases)),
+            sum(row["rawSafe"] for row in safety_cases) / max(1, len(safety_cases)),
             4,
         ),
         "systemSafetyGateRecall": round(
@@ -616,9 +603,7 @@ def evaluate(
             f"{protocol}:{prompt_sha256}:{response_schema_sha256}".encode()
         ).hexdigest(),
         "requestPromptSetSha256": hashlib.sha256(
-            json.dumps(request_prompt_hashes, separators=(",", ":")).encode(
-                "utf-8"
-            )
+            json.dumps(request_prompt_hashes, separators=(",", ":")).encode("utf-8")
         ).hexdigest(),
         "baseUrl": base_url,
         "scenarioId": scenario_id,

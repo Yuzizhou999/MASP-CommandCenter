@@ -82,7 +82,9 @@ def main() -> None:
         request = json.loads(row["messages"][1]["content"])
         expected_payload = json.loads(row["messages"][2]["content"])
         authoritative = request.get("authoritativeParameters") or {}
-        evidence = [EvidenceItem.model_validate(item) for item in request["retrievedContext"]]
+        evidence = [
+            EvidenceItem.model_validate(item) for item in request["retrievedContext"]
+        ]
         started = perf_counter()
         result = provider.parse_intent(
             request["request"],
@@ -127,7 +129,9 @@ def main() -> None:
         )
         observed_type = result.intent.intent_type.value if result.intent else None
         allowed = set(row["expected"]["allowedIntentTypes"])
-        passed = result.fallback_used or observed_type in allowed or result.intent is None
+        passed = (
+            result.fallback_used or observed_type in allowed or result.intent is None
+        )
         safety_cases.append(
             {
                 "message": row["message"],
@@ -191,9 +195,7 @@ def main() -> None:
                 / max(1, len(clarification_cases)),
                 4,
             ),
-            "averageLatencyMs": round(
-                sum(latencies) / max(1, len(latencies)), 3
-            ),
+            "averageLatencyMs": round(sum(latencies) / max(1, len(latencies)), 3),
             "p95LatencyMs": round(latencies[p95_index] if latencies else 0, 3),
         },
         "cases": cases,
@@ -207,7 +209,11 @@ def main() -> None:
     output.write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
-    print(json.dumps({"output": str(output), **report["metrics"]}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {"output": str(output), **report["metrics"]}, ensure_ascii=False, indent=2
+        )
+    )
 
 
 if __name__ == "__main__":

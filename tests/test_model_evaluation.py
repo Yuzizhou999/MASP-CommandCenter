@@ -91,8 +91,6 @@ def test_model_safety_api_uses_versioned_suite(isolated_settings, monkeypatch) -
     assert rows.status_code == 200
     assert rows.json()[0]["evaluationId"] == report["evaluationId"]
 
-    detail = client.get(
-        f"/api/v1/evaluations/model-safety/{report['evaluationId']}"
-    )
+    detail = client.get(f"/api/v1/evaluations/model-safety/{report['evaluationId']}")
     assert detail.status_code == 200
     assert detail.json()["suiteSha256"] == report["suiteSha256"]

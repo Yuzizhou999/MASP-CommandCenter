@@ -32,7 +32,9 @@ class ChatCompletionRequest(BaseModel):
     response_format: dict[str, Any] | None = None
 
 
-def response_json_schema(response_format: dict[str, Any] | None) -> dict[str, Any] | None:
+def response_json_schema(
+    response_format: dict[str, Any] | None,
+) -> dict[str, Any] | None:
     if response_format is None:
         return None
     response_type = response_format.get("type")
@@ -156,13 +158,9 @@ def create_app(
 ):
     deps = _dependencies()
     if require_xgrammar and deps["xgrammar"] is None:
-        raise RuntimeError(
-            "当前环境缺少 xgrammar，正式受约束评测不能启动"
-        )
+        raise RuntimeError("当前环境缺少 xgrammar，正式受约束评测不能启动")
     torch = deps["torch"]
-    spec = resolve_model_spec(
-        adapter_dir, base_model=base_model, model_id=model_id
-    )
+    spec = resolve_model_spec(adapter_dir, base_model=base_model, model_id=model_id)
     state: dict[str, Any] = {}
     generation_lock = Lock()
 
@@ -213,9 +211,7 @@ def create_app(
         yield
         state.clear()
 
-    app = FastAPI(
-        title="MASP Intent Model API", version="0.1.0", lifespan=lifespan
-    )
+    app = FastAPI(title="MASP Intent Model API", version="0.1.0", lifespan=lifespan)
 
     @app.get("/health")
     def health() -> dict[str, Any]:
@@ -282,9 +278,7 @@ def create_app(
                     strict_mode=True,
                     any_whitespace=True,
                 )
-            xgrammar_processor = deps["XGrammarLogitsProcessor"](
-                compiled_grammar
-            )
+            xgrammar_processor = deps["XGrammarLogitsProcessor"](compiled_grammar)
 
             class CpuXGrammarLogitsProcessor:
                 def __call__(self, input_ids, scores):
@@ -292,9 +286,9 @@ def create_app(
                     constrained = xgrammar_processor(input_ids, scores.to("cpu"))
                     return constrained.to(target_device)
 
-            generation_options["logits_processor"] = deps[
-                "LogitsProcessorList"
-            ]([CpuXGrammarLogitsProcessor()])
+            generation_options["logits_processor"] = deps["LogitsProcessorList"](
+                [CpuXGrammarLogitsProcessor()]
+            )
         if do_sample:
             generation_options["temperature"] = max(request.temperature, 1e-5)
         with generation_lock, torch.inference_mode():

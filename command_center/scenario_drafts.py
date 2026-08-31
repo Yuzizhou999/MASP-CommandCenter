@@ -42,12 +42,19 @@ class ScenarioDraftStore:
         )
 
     def _path(self, package_id: str) -> Path:
-        if not package_id or "/" in package_id or "\\" in package_id or package_id in {".", ".."}:
+        if (
+            not package_id
+            or "/" in package_id
+            or "\\" in package_id
+            or package_id in {".", ".."}
+        ):
             raise ValueError("packageId contains an invalid path")
         return self.drafts_dir / f"{package_id}.json"
 
     @staticmethod
-    def _envelope(document: dict[str, Any], *, revision: int, status: str) -> dict[str, Any]:
+    def _envelope(
+        document: dict[str, Any], *, revision: int, status: str
+    ) -> dict[str, Any]:
         value = deepcopy(document)
         value["status"] = status
         value.setdefault("metadata", {})
@@ -117,7 +124,11 @@ class ScenarioDraftStore:
         return self._read(path)
 
     def update(
-        self, package_id: str, document: dict[str, Any], expected_revision: int, actor: str
+        self,
+        package_id: str,
+        document: dict[str, Any],
+        expected_revision: int,
+        actor: str,
     ) -> dict[str, Any]:
         with self._lock:
             current = self.get(package_id)
@@ -132,7 +143,9 @@ class ScenarioDraftStore:
             value["packageId"] = package_id
             value["status"] = "draft"
             value.setdefault("metadata", {})
-            value["metadata"]["createdBy"] = current.get("metadata", {}).get("createdBy", actor)
+            value["metadata"]["createdBy"] = current.get("metadata", {}).get(
+                "createdBy", actor
+            )
             value["metadata"]["updatedAt"] = datetime.now(UTC).isoformat()
             value["metadata"]["revision"] = actual + 1
             self.engine.validate_scenario_package(value)
@@ -143,11 +156,19 @@ class ScenarioDraftStore:
     def validate(self, package_id: str, actor: str) -> dict[str, Any]:
         value = self.get(package_id)
         report = self.engine.validate_scenario_package(value)
-        self._audit("SCENARIO_DRAFT_VALIDATED", actor, {"packageId": package_id, "report": report})
+        self._audit(
+            "SCENARIO_DRAFT_VALIDATED",
+            actor,
+            {"packageId": package_id, "report": report},
+        )
         return report
 
     def generate_tasks(
-        self, package_id: str, generation: dict[str, Any], expected_revision: int, actor: str
+        self,
+        package_id: str,
+        generation: dict[str, Any],
+        expected_revision: int,
+        actor: str,
     ) -> dict[str, Any]:
         with self._lock:
             current = self.get(package_id)
@@ -163,7 +184,15 @@ class ScenarioDraftStore:
             value["metadata"]["updatedAt"] = datetime.now(UTC).isoformat()
             self.engine.validate_scenario_package(value)
             self._write(self._path(package_id), value)
-        self._audit("SCENARIO_TASK_STREAM_GENERATED", actor, {"packageId": package_id, "generation": generation, "taskCount": len(stream["tasks"])})
+        self._audit(
+            "SCENARIO_TASK_STREAM_GENERATED",
+            actor,
+            {
+                "packageId": package_id,
+                "generation": generation,
+                "taskCount": len(stream["tasks"]),
+            },
+        )
         return self._record(value)
 
     def compile(self, package_id: str, actor: str) -> dict[str, Any]:
@@ -172,11 +201,23 @@ class ScenarioDraftStore:
         if not report["valid"]:
             return {"packageId": package_id, "compiled": False, "validation": report}
         revision = int(value.get("metadata", {}).get("revision", 0))
-        output = self.builds_dir / package_id / str(value["version"]) / f"draft-revision-{revision}"
+        output = (
+            self.builds_dir
+            / package_id
+            / str(value["version"])
+            / f"draft-revision-{revision}"
+        )
         result = self.engine.compile_scenario_package(value, output)
-        value["metadata"]["build"] = {"directory": str(output), "manifest": result["manifest"]}
+        value["metadata"]["build"] = {
+            "directory": str(output),
+            "manifest": result["manifest"],
+        }
         self._write(self._path(package_id), value)
-        self._audit("SCENARIO_DRAFT_COMPILED", actor, {"packageId": package_id, "manifest": result["manifest"]})
+        self._audit(
+            "SCENARIO_DRAFT_COMPILED",
+            actor,
+            {"packageId": package_id, "manifest": result["manifest"]},
+        )
         return {"packageId": package_id, "compiled": True, **result}
 
     def publish(self, package_id: str, actor: str) -> dict[str, Any]:
@@ -197,8 +238,21 @@ class ScenarioDraftStore:
             "manifest": result["manifest"],
         }
         self._write(self._path(package_id), value)
-        self._audit("SCENARIO_DRAFT_PUBLISHED", actor, {"packageId": package_id, "version": value["version"], "buildDirectory": str(output)})
+        self._audit(
+            "SCENARIO_DRAFT_PUBLISHED",
+            actor,
+            {
+                "packageId": package_id,
+                "version": value["version"],
+                "buildDirectory": str(output),
+            },
+        )
         return self._record(value)
 
     def _audit(self, event_type: str, actor: str, payload: dict[str, Any]) -> None:
-        self.audit.append(trace_id=new_id("trace"), event_type=event_type, actor=actor, payload=payload)
+        self.audit.append(
+            trace_id=new_id("trace"),
+            event_type=event_type,
+            actor=actor,
+            payload=payload,
+        )
