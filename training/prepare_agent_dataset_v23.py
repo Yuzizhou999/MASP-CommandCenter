@@ -4,9 +4,10 @@ import argparse
 import copy
 import json
 from collections import Counter
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from command_center.agent_protocol import (
     AgentAction,
@@ -15,10 +16,15 @@ from command_center.agent_protocol import (
     action_messages,
 )
 from command_center.knowledge import KnowledgeBase
-from training.intent_dataset import file_sha256, read_jsonl, validate_example, write_jsonl
+from training.intent_dataset import (
+    file_sha256,
+    read_jsonl,
+    validate_example,
+    write_jsonl,
+)
 from training.prepare_agent_dataset import (
-    ROOT,
     INJECTION_QUARANTINE,
+    ROOT,
     SOFT_CLARIFICATION,
     _assistant,
     _base_context,
@@ -31,10 +37,13 @@ from training.prepare_agent_dataset import (
 )
 from training.prepare_agent_dataset_v21 import (
     _clarification_rows as _v21_clarification_rows,
+)
+from training.prepare_agent_dataset_v21 import (
     _explanation_rows as _v21_explanation_rows,
+)
+from training.prepare_agent_dataset_v21 import (
     _status_rows as _v21_status_rows,
 )
-
 
 DEFAULT_SOURCE = Path("data/finetuning/intent-sft-v1")
 DEFAULT_OUTPUT = Path("data/finetuning/agent-sft-v2.3")
@@ -533,7 +542,7 @@ def main() -> None:
     manifest = {
         "schemaVersion": 1,
         "datasetId": "masp-agent-sft-v2.3",
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "createdAt": datetime.now(UTC).isoformat(),
         "engineCommit": source_manifest["engineCommit"],
         "sourceDataset": {
             "datasetId": source_manifest["datasetId"],

@@ -10,7 +10,6 @@ from command_center.audit import AuditStore
 from command_center.engine_adapter import MaspAdapter
 from command_center.scenario_drafts import ScenarioDraftConflict, ScenarioDraftStore
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ENGINE_ROOT = PROJECT_ROOT.parent / "MASP"
 

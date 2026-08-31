@@ -9,7 +9,6 @@ from pathlib import Path
 
 from .contracts import EvidenceItem
 
-
 DOMAIN_TERMS = (
     "故障",
     "封路",
@@ -82,7 +81,7 @@ class KnowledgeBase:
             sum(self._lengths) / len(self._lengths) if self._lengths else 0.0
         )
         self._document_frequency = Counter(
-            term for row in self._tokens for term in row.keys()
+            term for row in self._tokens for term in row
         )
         self._vectors = [self._vector(self._document(chunk)) for chunk in self.chunks]
 
@@ -112,7 +111,7 @@ class KnowledgeBase:
 
     @staticmethod
     def _chunk(source: str, title: str, text: str) -> KnowledgeChunk:
-        digest = hashlib.sha256(f"{source}\0{title}".encode("utf-8")).hexdigest()[:16]
+        digest = hashlib.sha256(f"{source}\0{title}".encode()).hexdigest()[:16]
         return KnowledgeChunk(
             chunk_id=f"kb-{digest}", source=source, title=title, text=text
         )

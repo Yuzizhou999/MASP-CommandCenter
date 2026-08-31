@@ -4,10 +4,11 @@ import hashlib
 import json
 import math
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 import networkx as nx
 from jsonschema import Draft202012Validator
@@ -17,7 +18,6 @@ from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
 from .domain import DomainError
-
 
 ROBOT_GROUPS = frozenset({"fork", "jack"})
 NODE_TYPES = frozenset({"LM", "AP", "PP", "CP"})
@@ -259,7 +259,7 @@ def package_from_assets(
         seed=int(scenario_document["seed"]),
         end_time_ms=int(scenario_document["endTimeMs"]),
         tasks=tuple(deepcopy(scenario_document["tasks"])),
-        events=tuple(),
+        events=(),
     )
     return ScenarioPackage(
         package_id=package_id,
@@ -375,7 +375,6 @@ def validate_package(package: ScenarioPackage) -> PackageValidationReport:
     stream = package.task_stream
     issues: list[PackageValidationIssue] = []
     nodes = {str(item["id"]): item for item in scene.nodes}
-    edges = {str(item["id"]): item for item in scene.edges}
     groups = set(scene.robot_profiles)
 
     if package.status == "published" and not package.metadata.get("createdBy"):

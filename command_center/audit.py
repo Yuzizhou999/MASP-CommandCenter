@@ -34,9 +34,8 @@ class AuditStore:
             sort_keys=True,
             separators=(",", ":"),
         )
-        with self._lock:
-            with self.path.open("a", encoding="utf-8") as stream:
-                stream.write(encoded + "\n")
+        with self._lock, self.path.open("a", encoding="utf-8") as stream:
+            stream.write(encoded + "\n")
         return event
 
     def latest(self, limit: int = 100) -> list[AuditEvent]:

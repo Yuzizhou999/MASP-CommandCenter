@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -75,7 +75,7 @@ class ScenarioDraftStore:
         value["status"] = "draft"
         value.setdefault("metadata", {})
         value["metadata"]["createdBy"] = actor
-        value["metadata"]["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        value["metadata"]["updatedAt"] = datetime.now(UTC).isoformat()
         value["metadata"]["revision"] = 1
         self.engine.validate_scenario_package(value)
         path = self._path(str(value["packageId"]))
@@ -133,7 +133,7 @@ class ScenarioDraftStore:
             value["status"] = "draft"
             value.setdefault("metadata", {})
             value["metadata"]["createdBy"] = current.get("metadata", {}).get("createdBy", actor)
-            value["metadata"]["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            value["metadata"]["updatedAt"] = datetime.now(UTC).isoformat()
             value["metadata"]["revision"] = actual + 1
             self.engine.validate_scenario_package(value)
             self._write(self._path(package_id), value)
@@ -160,7 +160,7 @@ class ScenarioDraftStore:
             value = deepcopy(current)
             value["taskStream"] = stream
             value["metadata"]["revision"] = actual + 1
-            value["metadata"]["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            value["metadata"]["updatedAt"] = datetime.now(UTC).isoformat()
             self.engine.validate_scenario_package(value)
             self._write(self._path(package_id), value)
         self._audit("SCENARIO_TASK_STREAM_GENERATED", actor, {"packageId": package_id, "generation": generation, "taskCount": len(stream["tasks"])})
@@ -189,7 +189,7 @@ class ScenarioDraftStore:
         output = self.builds_dir / package_id / str(value["version"]) / "published"
         value["status"] = "published"
         value["metadata"]["publishedBy"] = actor
-        value["metadata"]["publishedAt"] = datetime.now(timezone.utc).isoformat()
+        value["metadata"]["publishedAt"] = datetime.now(UTC).isoformat()
         result = self.engine.compile_scenario_package(value, output)
         value["metadata"]["build"] = {
             "directory": str(output),

@@ -11,7 +11,6 @@ from command_center.knowledge import KnowledgeBase
 from command_center.model_evaluation import ModelSafetyEvaluator
 from command_center.provider import DeepSeekProvider
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 

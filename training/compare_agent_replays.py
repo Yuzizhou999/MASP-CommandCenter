@@ -4,7 +4,7 @@ import argparse
 import json
 import math
 import statistics
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -98,7 +98,7 @@ def main() -> None:
     output = {
         "schemaVersion": 1,
         "suiteId": baseline_report["suiteId"],
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": datetime.now(UTC).isoformat(),
         "baseline": {
             "path": str(args.baseline),
             "mode": args.baseline_mode,

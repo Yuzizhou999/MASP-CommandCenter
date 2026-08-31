@@ -7,7 +7,7 @@ import subprocess
 import types
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter, sleep
@@ -21,7 +21,6 @@ from command_center.knowledge import KnowledgeBase
 from command_center.orchestrator import DispatchOrchestrator
 from command_center.provider import DeepSeekProvider
 from command_center.settings import Settings
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -165,7 +164,7 @@ def main() -> None:
         )
     result = {
         "schemaVersion": 1,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": datetime.now(UTC).isoformat(),
         "baselineRef": args.baseline_ref,
         "configuration": {"runs": args.runs, "workers": args.workers},
         "baseline": baseline,

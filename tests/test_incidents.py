@@ -10,8 +10,8 @@ import command_center.api as api_module
 from command_center.approvals import ApprovalStore
 from command_center.audit import AuditStore
 from command_center.contracts import (
-    DiagnosisReport,
     DeadlockInjectionRequest,
+    DiagnosisReport,
     FaultInjectionRequest,
     IncidentRecommendation,
     RiskLevel,
@@ -24,7 +24,6 @@ from command_center.engine_adapter import MaspAdapter
 from command_center.incidents import IncidentService, IncidentStore
 from command_center.knowledge import KnowledgeBase
 from command_center.provider import DeepSeekProvider
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 

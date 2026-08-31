@@ -10,7 +10,6 @@ from typing import Any
 from .contracts import ClarificationRequest, IntentType, utc_now
 from .engine_adapter import MaspAdapter
 
-
 TASK_TERMS = (
     "创建",
     "新建",

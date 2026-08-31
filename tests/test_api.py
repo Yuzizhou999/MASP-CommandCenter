@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 
 from command_center.api import app
 
-
 client = TestClient(app)
 
 

@@ -5,9 +5,10 @@ import json
 import re
 import zipfile
 from collections import Counter
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from .approvals import ApprovalStore
 from .audit import AuditStore
@@ -15,7 +16,6 @@ from .contracts import DatasetExportRequest, new_id
 from .engine_adapter import MaspAdapter
 from .incidents import IncidentStore
 from .intent_store import IntentStore
-
 
 ACTOR_KEYS = {
     "actor",
@@ -50,7 +50,7 @@ PHONE_PATTERN = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class DatasetExporter:
@@ -90,7 +90,7 @@ class DatasetExporter:
 
     @staticmethod
     def _pseudonym(export_id: str, value: str) -> str:
-        digest = hashlib.sha256(f"{export_id}:{value}".encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(f"{export_id}:{value}".encode()).hexdigest()
         return f"user-{digest[:12]}"
 
     def _sanitize(

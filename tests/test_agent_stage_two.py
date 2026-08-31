@@ -9,7 +9,6 @@ from command_center.knowledge import KnowledgeBase
 from command_center.orchestrator import DispatchOrchestrator
 from command_center.provider import DeepSeekProvider
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 

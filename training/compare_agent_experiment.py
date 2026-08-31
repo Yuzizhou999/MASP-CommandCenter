@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -211,7 +211,7 @@ def compare_experiment(
     return {
         "schemaVersion": 1,
         "experimentId": spec["experimentId"],
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": datetime.now(UTC).isoformat(),
         "suiteId": next(iter(suite_ids)),
         "expectedSuiteFileStem": expected_suite_id,
         "reproduction": {

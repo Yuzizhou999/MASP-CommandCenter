@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import json
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter
@@ -13,12 +13,12 @@ from typing import Any
 import httpx
 
 from command_center.agent_protocol import (
+    AGENT_LOOP_SYSTEM_PROMPT,
     AgentAction,
     AgentActionType,
     AgentObservation,
     action_messages,
     agent_action_response_schema,
-    AGENT_LOOP_SYSTEM_PROMPT,
 )
 from command_center.agent_tools import CurrentWorldSnapshotInput, SearchSopInput
 from command_center.clarifications import ClarificationResolver, ClarificationStore
@@ -27,7 +27,6 @@ from command_center.engine_adapter import MaspAdapter
 from command_center.model_safety import model_request_violation
 from command_center.provider import SYSTEM_PROMPT, intent_training_messages
 from command_center.settings import Settings
-
 
 MODEL_INTENT_LABELS = tuple(
     row.value
@@ -606,15 +605,15 @@ def evaluate(
     )
     return {
         "schemaVersion": 1,
-        "evaluationId": f"intent-challenge-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "evaluationId": f"intent-challenge-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}",
+        "createdAt": datetime.now(UTC).isoformat(),
         "suiteId": suite["suiteId"],
         "model": model,
         "protocol": protocol,
         "promptSha256": prompt_sha256,
         "responseSchemaSha256": response_schema_sha256,
         "evaluationContractSha256": hashlib.sha256(
-            f"{protocol}:{prompt_sha256}:{response_schema_sha256}".encode("utf-8")
+            f"{protocol}:{prompt_sha256}:{response_schema_sha256}".encode()
         ).hexdigest(),
         "requestPromptSetSha256": hashlib.sha256(
             json.dumps(request_prompt_hashes, separators=(",", ":")).encode(

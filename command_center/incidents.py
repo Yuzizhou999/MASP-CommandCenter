@@ -7,8 +7,8 @@ from typing import Any
 
 from .audit import AuditStore
 from .contracts import (
-    DeterministicFinding,
     DeadlockInjectionRequest,
+    DeterministicFinding,
     DiagnosisReport,
     FaultInjectionRequest,
     IncidentEvidence,

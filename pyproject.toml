@@ -15,8 +15,52 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9"]
+dev = ["pytest>=8,<9", "ruff>=0.8,<1", "mypy>=1.14,<2"]
 agent = ["gymnasium>=1.0,<2", "numpy>=2.0,<3", "torch>=2.6,<3"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = ["frontend", ".venv", "runs", "data", "tmp"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "DTZ", "ISC", "PIE", "RUF"]
+ignore = [
+  # 行宽由 formatter 负责，长字符串和中文表格不强制断行。
+  "E501",
+  # 中文报错信息里的隐式拼接可读性更好。
+  "ISC003",
+  # 项目大量使用中文文档与报错，全角标点不是笔误。
+  "RUF001",
+  "RUF002",
+  "RUF003",
+  # IntentType 等 (str, Enum) 是对外契约的一部分，不改成 StrEnum。
+  "UP042",
+  # zip 的等长语义需要逐个确认，不做批量改写。
+  "B905",
+  # 校验函数统一写成 guard-clause 链，末尾 return True 比合并条件更好读。
+  "SIM103",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI 的 Query/Depends 依赖注入本来就写在默认参数里。
+"command_center/api.py" = ["B008"]
+# 训练脚本按顺序执行，允许模块级导入之后的路径准备。
+"training/*.py" = ["E402"]
+# 测试里构造非法输入时故意不遵守类型约定。
+"tests/*.py" = ["B017"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["command_center"]
+ignore_missing_imports = true
+follow_imports = "silent"
+# 首轮只拦真实错误，不要求全量注解；后续可逐步收紧。
+disallow_untyped_defs = false
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

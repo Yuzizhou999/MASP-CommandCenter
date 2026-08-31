@@ -7,7 +7,6 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_OUTPUT = Path("evals/agent-trajectories-v3-stratified.json")
 ZONE_ID = "zone:zone-jack-pp363-pp365"
 SNAPSHOT = ["get_world_snapshot"]

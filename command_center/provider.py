@@ -3,14 +3,22 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from threading import RLock
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 
+from .agent_protocol import (
+    AgentAction,
+    AgentActionType,
+    AgentObservation,
+    action_messages,
+    agent_action_response_schema,
+)
 from .contracts import (
     ClarificationRequest,
     DiagnosisReport,
@@ -30,15 +38,7 @@ from .model_safety import (
     model_request_violation,
     untrusted_retrieval_record,
 )
-from .agent_protocol import (
-    AgentAction,
-    AgentActionType,
-    AgentObservation,
-    action_messages,
-    agent_action_response_schema,
-)
 from .settings import Settings
-
 
 SYSTEM_PROMPT = """你是保利智仓·灵枢的调度意图解析器。
 你只能把用户请求转换为结构化调度意图，不得生成车辆轨迹、资源预约或解除安全停车。

@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from training.preflight_agent_system import suite_quality, suite_sha256
-
 
 INTENT_RETENTION_METRICS = (
     "requestSuccessRate",
@@ -210,7 +209,7 @@ def qualify(
     )
     return {
         "schemaVersion": 1,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": datetime.now(UTC).isoformat(),
         "suiteId": suite["suiteId"],
         "decision": "PROMOTE" if passed else "KEEP_V1",
         "passed": passed,

@@ -4,7 +4,7 @@ import argparse
 import csv
 import itertools
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -139,7 +139,7 @@ def main() -> None:
         }
         for name, minimum in thresholds.items()
     }
-    generated = datetime.now(timezone.utc)
+    generated = datetime.now(UTC)
     output = {
         "schemaVersion": 1,
         "suiteId": suite["suiteId"],

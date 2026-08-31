@@ -14,29 +14,43 @@ from training.intent_dataset import (
     validate_example,
     write_jsonl,
 )
-from training.prepare_agent_dataset_v23 import (
-    PROTOCOL_ID,
-    _extra_clarification_rows as _v23_clarification_rows,
-    _intent_rows as _v23_intent_rows,
-    _protocol_recovery_rows as _v23_protocol_recovery_rows,
-    _schema_repair_row as _v23_schema_repair_row,
-    _search_routing_rows as _v23_search_routing_rows,
-    _semantic_rows as _v23_semantic_rows,
-    _validation_repair_row as _v23_validation_repair_row,
-)
-from training.train_lora import (
-    _checkpoint_training_arguments,
-    tokenize_conversation,
-)
-from training.tokenization_preflight import (
-    inspect_dataset_tokenization,
-    require_transformers_4,
-)
 from training.prepare_agent_dataset_v21 import (
     _clarification_rows,
     _explanation_rows,
     _repair_rows,
     _status_rows,
+)
+from training.prepare_agent_dataset_v23 import (
+    PROTOCOL_ID,
+)
+from training.prepare_agent_dataset_v23 import (
+    _extra_clarification_rows as _v23_clarification_rows,
+)
+from training.prepare_agent_dataset_v23 import (
+    _intent_rows as _v23_intent_rows,
+)
+from training.prepare_agent_dataset_v23 import (
+    _protocol_recovery_rows as _v23_protocol_recovery_rows,
+)
+from training.prepare_agent_dataset_v23 import (
+    _schema_repair_row as _v23_schema_repair_row,
+)
+from training.prepare_agent_dataset_v23 import (
+    _search_routing_rows as _v23_search_routing_rows,
+)
+from training.prepare_agent_dataset_v23 import (
+    _semantic_rows as _v23_semantic_rows,
+)
+from training.prepare_agent_dataset_v23 import (
+    _validation_repair_row as _v23_validation_repair_row,
+)
+from training.tokenization_preflight import (
+    inspect_dataset_tokenization,
+    require_transformers_4,
+)
+from training.train_lora import (
+    _checkpoint_training_arguments,
+    tokenize_conversation,
 )
 
 
@@ -130,7 +144,7 @@ def test_tokenizer_mapping_output_is_rejected() -> None:
 
 def test_transformers_major_version_is_pinned() -> None:
     require_transformers_4("4.57.6")
-    with pytest.raises(RuntimeError, match="只允许项目锁定的 4.x"):
+    with pytest.raises(RuntimeError, match=r"只允许项目锁定的 4\.x"):
         require_transformers_4("5.12.1")
 
 

@@ -14,7 +14,6 @@ from command_center.contracts import DispatchIntent, IntentType
 from command_center.engine_adapter import MaspAdapter
 from command_center.settings import Settings
 
-
 TASK_AUTHORITY_FIELDS = (
     "pickupNodeId",
     "dropoffNodeId",

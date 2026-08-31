@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from .contracts import (
     DiagnosisReport,
-    IncidentRecord,
     IncidentRecommendation,
+    IncidentRecord,
     IncidentType,
     RiskLevel,
     RootCauseCandidate,
 )
-
 
 INCIDENT_ACTIONS: dict[IncidentType, set[str]] = {
     IncidentType.VEHICLE_FAULT: {

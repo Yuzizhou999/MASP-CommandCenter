@@ -1,23 +1,23 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from time import perf_counter
-from typing import Callable
 
+from .agent_loop import AgentLoopExecutor
 from .agent_memory import AgentMemoryStore
 from .agent_observability import AgentObservabilityStore
-from .agent_loop import AgentLoopExecutor
 from .agent_protocol import AgentBudgets
 from .agent_runtime import AgentState, BoundedAgentRun
 from .agent_tools import DispatchAgentTools
 from .audit import AuditStore
 from .clarifications import ClarificationResolver, ClarificationStore
 from .contracts import (
+    AgentTraceStep,
     ChatRequest,
     ChatResponse,
     DispatchIntent,
-    IntentValidation,
     IntentType,
-    AgentTraceStep,
+    IntentValidation,
     new_id,
 )
 from .engine_adapter import MaspAdapter

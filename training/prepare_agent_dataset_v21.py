@@ -12,9 +12,10 @@ import argparse
 import copy
 import json
 from collections import Counter
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from command_center.agent_protocol import (
     AgentAction,
@@ -29,7 +30,6 @@ from training.intent_dataset import (
     write_jsonl,
 )
 from training.prepare_agent_dataset import _tool_definitions
-
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = Path("data/finetuning/agent-sft-v2")
@@ -451,7 +451,7 @@ def main() -> None:
     manifest = {
         "schemaVersion": 1,
         "datasetId": "masp-agent-sft-v2.1",
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "createdAt": datetime.now(UTC).isoformat(),
         "engineCommit": source_manifest["engineCommit"],
         "sourceDataset": {
             "datasetId": source_manifest["datasetId"],

@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from training import serve_intent_model
 from command_center.agent_protocol import AgentAction
 from command_center.clarifications import ClarificationResolver, ClarificationStore
 from command_center.contracts import IntentType
 from command_center.engine_adapter import MaspAdapter
 from command_center.model_safety import model_request_violation
+from training import serve_intent_model
 from training.evaluate_intent_challenge import (
     agent_intent_challenge_messages,
     classification_metrics,
@@ -23,7 +23,6 @@ from training.serve_intent_model import (
     response_json_schema,
     validate_generated_json,
 )
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -140,7 +139,7 @@ def test_classification_metrics_include_every_supported_intent() -> None:
         "BLOCK_RESOURCE",
         "GENERATE_REPORT",
     ]
-    observed = labels[:-1] + ["QUERY_STATUS"]
+    observed = [*labels[:-1], "QUERY_STATUS"]
 
     result = classification_metrics(labels, observed)
 

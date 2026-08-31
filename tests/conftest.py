@@ -9,7 +9,6 @@ import pytest
 
 from command_center.settings import Settings
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ENGINE_ROOT = Path(os.getenv("MASP_TEST_ENGINE_ROOT", PROJECT_ROOT.parent / "MASP"))
 

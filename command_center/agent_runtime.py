@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import Enum
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any
 
 from .agent_tools import AgentToolResult, DispatchAgentTools
 from .contracts import AgentExecutionTrace, AgentTraceStep

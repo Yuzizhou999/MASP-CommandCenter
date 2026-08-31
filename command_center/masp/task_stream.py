@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-import math
 import random
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 import networkx as nx
 from jsonschema import Draft202012Validator
@@ -127,7 +127,7 @@ def _poisson_arrivals(
     current = float(start_ms)
     while len(arrivals) < limit:
         current += rng.expovariate(1.0 / mean_interval_ms)
-        rounded = int(round(current))
+        rounded = round(current)
         if rounded >= end_ms:
             break
         arrivals.append(max(start_ms, rounded))

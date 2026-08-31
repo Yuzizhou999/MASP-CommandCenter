@@ -35,7 +35,7 @@ class LLMModelCard(BaseModel):
     metrics: dict[str, float] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_adapter_identity(self) -> "LLMModelCard":
+    def validate_adapter_identity(self) -> LLMModelCard:
         if bool(self.adapter_file) != bool(self.adapter_sha256):
             raise ValueError("adapterFile 和 adapterSha256 必须同时提供")
         if self.adapter_sha256 is not None and len(self.adapter_sha256) != 64:

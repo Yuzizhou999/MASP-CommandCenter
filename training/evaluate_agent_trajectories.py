@@ -9,13 +9,13 @@ import shutil
 import statistics
 import tempfile
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from command_center.agent_memory import AgentMemoryStore
-from command_center.agent_protocol import AGENT_LOOP_SYSTEM_PROMPT
 from command_center.agent_observability import AgentObservabilityStore
+from command_center.agent_protocol import AGENT_LOOP_SYSTEM_PROMPT
 from command_center.audit import AuditStore
 from command_center.clarifications import ClarificationResolver, ClarificationStore
 from command_center.contracts import ChatRequest, IntentValidation, ValidationIssue
@@ -23,7 +23,7 @@ from command_center.engine_adapter import MaspAdapter
 from command_center.knowledge import KnowledgeBase
 from command_center.llm_provider import OpenAICompatibleLocalProvider
 from command_center.orchestrator import DispatchOrchestrator
-from command_center.provider import DeepSeekProvider, SYSTEM_PROMPT
+from command_center.provider import SYSTEM_PROMPT, DeepSeekProvider
 from command_center.settings import Settings
 from training.preflight_agent_system import (
     authority_matches,
@@ -33,7 +33,6 @@ from training.preflight_agent_system import (
     suite_quality,
     suite_sha256,
 )
-
 
 MODE_LABELS = {
     "deterministic": "Deterministic fallback",
@@ -496,7 +495,7 @@ def main() -> None:
         summaries.append(summary)
         case_rows[mode] = rows
 
-    generated_at = datetime.now(timezone.utc)
+    generated_at = datetime.now(UTC)
     result = {
         "schemaVersion": 2,
         "suiteId": suite["suiteId"],

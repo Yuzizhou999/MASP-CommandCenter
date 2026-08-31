@@ -10,7 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .contracts import DispatchIntent, IntentValidation, ValidationIssue
 
-
 SUPPORTED_AGENT_INTENT_TYPES = (
     "QUERY_STATUS",
     "EXPLAIN_DECISION",
@@ -37,7 +36,7 @@ class AgentAction(BaseModel):
     intent: dict[str, Any] | None = None
 
     @model_validator(mode="after")
-    def validate_action_payload(self) -> "AgentAction":
+    def validate_action_payload(self) -> AgentAction:
         if self.action is AgentActionType.CALL_TOOL:
             if not self.tool:
                 raise ValueError("CALL_TOOL requires tool")
@@ -55,7 +54,7 @@ class AgentAction(BaseModel):
         return self
 
     @classmethod
-    def from_content(cls, content: str) -> "AgentAction":
+    def from_content(cls, content: str) -> AgentAction:
         stripped = content.strip()
         if stripped.startswith("```"):
             lines = stripped.splitlines()

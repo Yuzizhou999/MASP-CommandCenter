@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Condition, RLock
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any
 
 from .contracts import (
     AgentRunCreateRequest,
@@ -32,7 +32,6 @@ from .contracts import (
 from .dispatch_workflow import DispatchWorkflowService
 from .orchestrator import DispatchOrchestrator
 from .provider import DeepSeekProvider
-
 
 TERMINAL_AGENT_RUN_STATUSES = {
     "COMPLETED",
@@ -60,7 +59,7 @@ class AgentRunStopping(RuntimeError):
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _iso(value: datetime | None = None) -> str:
@@ -855,7 +854,9 @@ class AgentRunManager:
             if not parsed_decision.approved:
                 return parsed_decision
 
-            def continue_run(row: dict[str, Any]) -> None:
+            def continue_run(
+                row: dict[str, Any], decision: dict[str, Any] = decision
+            ) -> None:
                 row["status"] = "RUNNING"
                 self._append_event(
                     row,
@@ -969,9 +970,9 @@ class AgentRunManager:
         usage = self.provider.telemetry(run_id)
 
         def update(row: dict[str, Any]) -> None:
+            # 终态幂等：已经落终态的 run 不允许被后续异常改写状态或追加终态事件。
             if row["status"] in TERMINAL_AGENT_RUN_STATUSES:
-                if row["status"] == "CANCELLED":
-                    return
+                return
             workflow = row.get("workflow")
             if workflow is not None and workflow.get("phase") not in {
                 "COMPLETED",
@@ -1077,14 +1078,13 @@ class AgentRunManager:
     def _write(self, payload: dict[str, Any]) -> None:
         """Compatibility bulk import used by migration and legacy tests only."""
 
-        with self._lock:
-            with self._connect() as connection:
-                connection.execute("BEGIN IMMEDIATE")
-                connection.execute("DELETE FROM agent_run_events")
-                connection.execute("DELETE FROM agent_runs")
-                for row in payload.get("runs", {}).values():
-                    self._insert_row(connection, dict(row))
-                connection.commit()
+        with self._lock, self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("DELETE FROM agent_run_events")
+            connection.execute("DELETE FROM agent_runs")
+            for row in payload.get("runs", {}).values():
+                self._insert_row(connection, dict(row))
+            connection.commit()
 
     def _initialize_store(self) -> None:
         legacy_payload: dict[str, Any] | None = None

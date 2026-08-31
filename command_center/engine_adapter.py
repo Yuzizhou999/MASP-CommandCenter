@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 import time
+from contextlib import suppress
 from copy import deepcopy
 from pathlib import Path
 from threading import Lock
@@ -151,8 +152,8 @@ class MaspAdapter:
         dirty = bool(dirty_rows)
         allowed = matches and (
             not dirty
-            or not self.settings.is_production
-            and self.settings.allow_dirty_development
+            or (not self.settings.is_production
+            and self.settings.allow_dirty_development)
         )
         return {
             "root": str(self.root),
@@ -271,13 +272,11 @@ class MaspAdapter:
                 import torch
 
                 torch.set_num_threads(self.settings.agent_torch_threads)
-                try:
+                # PyTorch only permits setting inter-op threads before work starts.
+                with suppress(RuntimeError):
                     torch.set_num_interop_threads(
                         self.settings.agent_torch_threads
                     )
-                except RuntimeError:
-                    # PyTorch only permits setting inter-op threads before work starts.
-                    pass
                 from masp.rl_priority import load_checkpoint
 
                 payload = load_checkpoint(
@@ -457,6 +456,8 @@ class MaspAdapter:
             sys.path.insert(0, root_text)
         from masp.domain import TransportTask, Vehicle
         from masp.online import OnlineDispatchRuntime
+        from masp.topology import MapTopology
+
         from .masp.scenario_package import (
             ScenarioPackage,
             compile_scenario_package,
@@ -467,7 +468,6 @@ class MaspAdapter:
             generate_task_stream,
             validate_task_stream_generation_document,
         )
-        from masp.topology import MapTopology
 
         self._modules = {
             "TransportTask": TransportTask,

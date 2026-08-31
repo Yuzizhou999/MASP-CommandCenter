@@ -7,7 +7,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
 
@@ -72,7 +71,7 @@ class Settings:
         return self.data_root or (self.root / "data")
 
     @classmethod
-    def load(cls) -> "Settings":
+    def load(cls) -> Settings:
         lock = json.loads((ROOT / "engine.lock.json").read_text(encoding="utf-8"))
         default_engine = ROOT.parent / "MASP"
         engine_root = Path(os.getenv("MASP_ENGINE_ROOT", str(default_engine))).resolve()

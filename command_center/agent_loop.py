@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -36,7 +37,6 @@ from .knowledge import KnowledgeBase
 from .model_safety import (
     ModelBoundaryError,
     enforce_intent_authority,
-    model_request_violation,
     untrusted_retrieval_record,
 )
 from .provider import DeepSeekProvider
@@ -773,9 +773,11 @@ class AgentLoopExecutor:
         if intent.intent_type is IntentType.CREATE_TASK and intent.task:
             task = intent.task
             return (
-                f"已形成紧急运输任务草案：{task.pickup_node_id} 到 "
-                f"{task.dropoff_node_id}，由 {task.required_robot_group} 车型执行，"
-                f"优先级 {task.priority_class}。",
+                (
+                    f"已形成紧急运输任务草案：{task.pickup_node_id} 到 "
+                    f"{task.dropoff_node_id}，由 {task.required_robot_group} 车型执行，"
+                    f"优先级 {task.priority_class}。"
+                ),
                 ["运行数字孪生", "查看任务参数"],
             )
         if intent.intent_type is IntentType.BLOCK_RESOURCE and intent.resource_block:
@@ -788,8 +790,10 @@ class AgentLoopExecutor:
             return "可以根据仿真和审计记录生成班次运营报告。", ["生成运营报告"]
         counts = (snapshot or {}).get("counts") or {}
         return (
-            f"当前场景共有 {counts.get('vehicles', 0)} 辆车、"
-            f"{counts.get('tasks', 0)} 个任务。系统处于仿真模式。",
+            (
+                f"当前场景共有 {counts.get('vehicles', 0)} 辆车、"
+                f"{counts.get('tasks', 0)} 个任务。系统处于仿真模式。"
+            ),
             ["注入紧急任务", "推演通道封闭"],
         )
 

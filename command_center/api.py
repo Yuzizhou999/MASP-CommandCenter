@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Query
@@ -11,27 +10,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .agent_run_manager import AgentRunManager, TERMINAL_AGENT_RUN_STATUSES
 from .agent_protocol import AgentBudgets
+from .agent_run_manager import TERMINAL_AGENT_RUN_STATUSES, AgentRunManager
 from .approvals import ApprovalStore
 from .audit import AuditStore
 from .benchmark import BenchmarkRunner
 from .clarifications import ClarificationResolver, ClarificationStore
 from .contracts import (
-    ApprovalDecision,
-    ApprovalRequest,
     AgentConversationMemory,
     AgentRunCreateRequest,
     AgentRunRecord,
     AgentRunResumeRequest,
+    ApprovalDecision,
+    ApprovalRequest,
     BenchmarkRequest,
     ChatRequest,
     ChatResponse,
     ComparisonRequest,
     ComparisonResult,
+    DatasetExportRequest,
     DeadlockInjectionRequest,
     DispatchIntent,
-    DatasetExportRequest,
     FaultInjectionRequest,
     IncidentApprovalRequest,
     IncidentRecord,
@@ -45,21 +44,19 @@ from .contracts import (
     SimulationRequest,
     SimulationSummary,
     WorkstationInjectionRequest,
-    new_id,
 )
 from .dataset_exports import DatasetExporter
 from .dispatch_workflow import DispatchWorkflowService
 from .engine_adapter import EngineVersionError, MaspAdapter
 from .explanations import PlanExplanationService
-from .intent_store import IntentStore
 from .incidents import IncidentService, IncidentStore
+from .intent_store import IntentStore
 from .knowledge import KnowledgeBase
 from .llm_provider import create_llm_provider
 from .model_evaluation import ModelSafetyEvaluator
 from .orchestrator import DispatchOrchestrator
-from .settings import Settings
 from .scenario_drafts import ScenarioDraftConflict, ScenarioDraftStore
-
+from .settings import Settings
 
 settings = Settings.load()
 engine = MaspAdapter(settings)
@@ -336,7 +333,7 @@ def update_scenario_draft(package_id: str, document: dict[str, Any], expected_re
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ScenarioDraftConflict as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    except (ValueError, KeyError) as error:
+    except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
@@ -358,7 +355,7 @@ def generate_scenario_draft_tasks(package_id: str, generation: dict[str, Any], e
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ScenarioDraftConflict as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    except (ValueError, KeyError) as error:
+    except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 

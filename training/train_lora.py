@@ -5,7 +5,7 @@ import hashlib
 import json
 import platform
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -317,7 +317,7 @@ def main() -> None:
                 else None
             ),
         },
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "createdAt": datetime.now(UTC).isoformat(),
         "tokenization": {
             "maxLength": preflight["maxLength"],
             "maxObservedTokens": preflight["maxObservedTokens"],

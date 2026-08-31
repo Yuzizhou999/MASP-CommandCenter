@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from time import monotonic, sleep
 
 from command_center.agent_run_manager import AgentRunManager
 from command_center.approvals import ApprovalStore
 from command_center.audit import AuditStore
 from command_center.contracts import (
-    AgentWorkflowRecommendation,
     AgentRunCreateRequest,
     AgentRunRecord,
     AgentRunResumeRequest,
+    AgentWorkflowRecommendation,
 )
 from command_center.dispatch_workflow import DispatchWorkflowService
 from command_center.engine_adapter import MaspAdapter
@@ -20,7 +20,6 @@ from command_center.intent_store import IntentStore
 from command_center.knowledge import KnowledgeBase
 from command_center.orchestrator import DispatchOrchestrator
 from command_center.provider import DeepSeekProvider
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -181,7 +180,7 @@ def test_waiting_agent_run_can_be_cancelled(isolated_settings) -> None:
 
 def test_service_start_recovers_persisted_queued_run(isolated_settings) -> None:
     manager = _manager(isolated_settings)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     run_id = "agent-run-recovery"
     seeded = AgentRunRecord(
         runId=run_id,
@@ -351,7 +350,7 @@ def test_waiting_approval_survives_restart_after_original_deadline(
     manager.shutdown()
     worker.result(timeout=2)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     data = manager._read()
     row = data["runs"][created.run_id]
     row["approval"]["requestedAt"] = (now - timedelta(minutes=5)).isoformat()

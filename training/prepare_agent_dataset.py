@@ -5,7 +5,7 @@ import hashlib
 import json
 import random
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,14 +17,16 @@ from command_center.agent_protocol import (
 )
 from command_center.agent_tools import CurrentWorldSnapshotInput, SearchSopInput
 from command_center.knowledge import KnowledgeBase
-from command_center.model_safety import screen_retrieved_evidence, untrusted_retrieval_record
+from command_center.model_safety import (
+    screen_retrieved_evidence,
+    untrusted_retrieval_record,
+)
 from training.intent_dataset import (
     file_sha256,
     read_jsonl,
     validate_example,
     write_jsonl,
 )
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -546,7 +548,7 @@ def main() -> None:
     manifest = {
         "schemaVersion": 1,
         "datasetId": "masp-agent-sft-v2",
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "createdAt": datetime.now(UTC).isoformat(),
         "seed": args.seed,
         "engineCommit": source_manifest["engineCommit"],
         "sourceDataset": {

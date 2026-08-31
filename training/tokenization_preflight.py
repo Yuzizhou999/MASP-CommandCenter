@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import json
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -103,7 +103,7 @@ def inspect_dataset_tokenization(
 
     return {
         "schemaVersion": 1,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": datetime.now(UTC).isoformat(),
         "datasetId": manifest["datasetId"],
         "datasetManifestSha256": _sha256(manifest_path),
         "tokenizerSource": tokenizer_source,

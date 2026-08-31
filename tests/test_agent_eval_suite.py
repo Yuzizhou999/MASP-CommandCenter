@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-
 from types import SimpleNamespace
 
 from command_center.contracts import (
@@ -17,13 +16,12 @@ from command_center.model_safety import (
     retrieval_content_violation,
 )
 from training.evaluate_agent_trajectories import _score_case, _summarize
-from training.prepare_agent_eval_v3 import build_suite
 from training.preflight_agent_system import (
     evaluate_reachability,
     preflight_suite,
     suite_quality,
 )
-
+from training.prepare_agent_eval_v3 import build_suite
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -40,16 +38,14 @@ def test_agent_trajectory_gold_is_independent_and_complete() -> None:
     ids = [row["caseId"] for row in suite["cases"]]
     assert len(ids) == len(set(ids))
     for case in suite["cases"]:
-        assert set(
-            (
-                "requiredTools",
-                "allowedTools",
-                "forbiddenTools",
-                "expectedTerminalState",
-                "shouldClarify",
-                "fixableIssueCodes",
-            )
-        ).issubset(case)
+        assert {
+            "requiredTools",
+            "allowedTools",
+            "forbiddenTools",
+            "expectedTerminalState",
+            "shouldClarify",
+            "fixableIssueCodes",
+        }.issubset(case)
         assert set(case["requiredTools"]).issubset(set(case["allowedTools"]))
 
 

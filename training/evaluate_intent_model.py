@@ -4,14 +4,14 @@ import argparse
 import json
 from collections import Counter
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter
 from typing import Any
 
 from command_center.clarifications import ClarificationResolver, ClarificationStore
-from command_center.contracts import EvidenceItem, IntentType
+from command_center.contracts import EvidenceItem
 from command_center.engine_adapter import MaspAdapter
 from command_center.llm_provider import create_llm_provider
 from command_center.provider import DeepSeekProvider
@@ -164,8 +164,8 @@ def main() -> None:
     category_counts = Counter(row["category"] for row in cases)
     report = {
         "schemaVersion": 1,
-        "evaluationId": f"intent-eval-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "evaluationId": f"intent-eval-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}",
+        "createdAt": datetime.now(UTC).isoformat(),
         "datasetId": manifest["datasetId"],
         "provider": provider.status(),
         "counts": {"test": total, "categories": dict(category_counts)},
@@ -201,9 +201,8 @@ def main() -> None:
         "clarificationCases": clarification_cases,
         "durationMs": round((perf_counter() - started_all) * 1000, 3),
     }
-    output = args.output or (
-        root / f"evaluation-{args.provider}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
-    )
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    output = args.output or (root / f"evaluation-{args.provider}-{stamp}.json")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

@@ -6,7 +6,11 @@ import pytest
 
 from command_center.audit import AuditStore
 from command_center.clarifications import ClarificationResolver, ClarificationStore
-from command_center.contracts import ChatRequest, PlanExplanationRequest, SimulationRequest
+from command_center.contracts import (
+    ChatRequest,
+    PlanExplanationRequest,
+    SimulationRequest,
+)
 from command_center.engine_adapter import MaspAdapter
 from command_center.explanations import PlanExplanationService
 from command_center.knowledge import KnowledgeBase

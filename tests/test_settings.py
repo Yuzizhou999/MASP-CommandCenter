@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import command_center.settings as settings_module
 import pytest
+
+import command_center.settings as settings_module
 from command_center.settings import Settings
 
 

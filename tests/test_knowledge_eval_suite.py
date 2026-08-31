@@ -5,7 +5,6 @@ from pathlib import Path
 
 from training.evaluate_knowledge_retrieval import _evaluate
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 

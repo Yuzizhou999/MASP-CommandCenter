@@ -5,7 +5,7 @@ import hashlib
 import json
 import random
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,6 @@ from training.intent_dataset import (
     validate_example,
     write_jsonl,
 )
-
 
 TASK_TEMPLATES = {
     "fork": [
@@ -317,7 +316,7 @@ def main() -> None:
     manifest = {
         "schemaVersion": 1,
         "datasetId": "masp-intent-sft-v1",
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "createdAt": datetime.now(UTC).isoformat(),
         "seed": args.seed,
         "engineCommit": settings.engine_commit,
         "scenarioIds": scenario_ids,

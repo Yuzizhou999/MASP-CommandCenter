@@ -7,7 +7,7 @@ import random
 import re
 import statistics
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from itertools import product
 from pathlib import Path
 from typing import Any
@@ -15,7 +15,6 @@ from typing import Any
 from .audit import AuditStore
 from .contracts import BenchmarkRequest, new_id
 from .engine_adapter import MaspAdapter
-
 
 ARRIVAL_TASKS_PER_VEHICLE = {
     "low": 0.75,
@@ -41,7 +40,7 @@ METRIC_PATHS = {
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _canonical_digest(document: dict[str, Any]) -> str:
@@ -390,7 +389,7 @@ class BenchmarkRunner:
         for row in report["aggregates"]:
             metric = row["metrics"]
 
-            def mean(name: str) -> str:
+            def mean(name: str, metric: dict[str, Any] = metric) -> str:
                 value = metric[name]["mean"]
                 return "-" if value is None else f"{value:.3f}"
 

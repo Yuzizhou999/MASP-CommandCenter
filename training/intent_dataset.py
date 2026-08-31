@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
-from command_center.contracts import DispatchIntent, EvidenceItem, IntentType
 from command_center.agent_protocol import AgentAction, AgentActionType
+from command_center.contracts import DispatchIntent, EvidenceItem, IntentType
 from command_center.engine_adapter import MaspAdapter
 from command_center.model_safety import enforce_intent_authority
 from command_center.provider import intent_training_messages
@@ -196,7 +197,7 @@ def validate_agent_trajectory(example: dict[str, Any]) -> dict[str, Any]:
             ):
                 raise ValueError(
                     "非法历史动作后必须紧跟 protocol.invalid_action observation"
-                )
+                ) from None
             actions.append(None)
     if not actions:
         raise ValueError("Agent 轨迹没有 assistant 动作")

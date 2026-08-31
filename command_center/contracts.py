@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, Literal
 from uuid import uuid4
@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def new_id(prefix: str) -> str:
@@ -94,7 +94,7 @@ class TaskDraft(BaseModel):
     due_time_ms: int | None = Field(default=300000, ge=0, alias="dueTimeMs")
 
     @model_validator(mode="after")
-    def validate_due_time(self) -> "TaskDraft":
+    def validate_due_time(self) -> TaskDraft:
         if self.due_time_ms is not None and self.due_time_ms < self.release_time_ms:
             raise ValueError("dueTimeMs must not be earlier than releaseTimeMs")
         return self
@@ -109,7 +109,7 @@ class ResourceBlockDraft(BaseModel):
     reason: str = Field(default="现场检修临时封闭", min_length=2)
 
     @model_validator(mode="after")
-    def validate_window(self) -> "ResourceBlockDraft":
+    def validate_window(self) -> ResourceBlockDraft:
         if self.end_ms <= self.start_ms:
             raise ValueError("endMs must be later than startMs")
         return self
@@ -132,7 +132,7 @@ class DispatchIntent(BaseModel):
     query: str | None = None
 
     @model_validator(mode="after")
-    def validate_payload(self) -> "DispatchIntent":
+    def validate_payload(self) -> DispatchIntent:
         if self.intent_type is IntentType.CREATE_TASK and self.task is None:
             raise ValueError("CREATE_TASK requires task")
         if self.intent_type is IntentType.BLOCK_RESOURCE and self.resource_block is None:
@@ -248,7 +248,7 @@ class BenchmarkRequest(BaseModel):
     requested_by: str = Field(default="evaluation-operator", alias="requestedBy")
 
     @model_validator(mode="after")
-    def validate_matrix(self) -> "BenchmarkRequest":
+    def validate_matrix(self) -> BenchmarkRequest:
         if any(value < 1 or value > 100 for value in self.vehicle_counts):
             raise ValueError("vehicleCounts must be between 1 and 100")
         for name in (
@@ -323,7 +323,7 @@ class SimulationRequest(BaseModel):
     agent_policy: AgentPolicyOptions | None = Field(default=None, alias="agentPolicy")
 
     @model_validator(mode="after")
-    def validate_agent_policy(self) -> "SimulationRequest":
+    def validate_agent_policy(self) -> SimulationRequest:
         if self.policy != "rl" and self.agent_policy is not None:
             raise ValueError("agentPolicy is only valid when policy is rl")
         return self
@@ -542,7 +542,7 @@ class AgentRunRecord(BaseModel):
     recovered: bool = False
     cancel_requested: bool = Field(default=False, alias="cancelRequested")
     trace_steps: list[AgentTraceStep] = Field(default_factory=list, alias="traceSteps")
-    response: "ChatResponse | None" = None
+    response: ChatResponse | None = None
     approval: dict[str, Any] | None = None
     evaluation: AgentRunEvaluation | None = None
     workflow: AgentGoalWorkflow | None = None

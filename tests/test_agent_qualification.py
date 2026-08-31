@@ -9,7 +9,7 @@ def _intent(value: float, passed: bool = True) -> dict:
         "protocol": "agent_action",
         "evaluationContractSha256": "intent-contract",
         "requestPromptSetSha256": "request-set",
-        "metrics": {name: value for name in INTENT_RETENTION_METRICS},
+        "metrics": dict.fromkeys(INTENT_RETENTION_METRICS, value),
         "qualification": {"passed": passed},
     }
 

@@ -4,8 +4,6 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
-import pytest
-
 from command_center.masp.scenario_package import (
     ScenarioPackage,
     compile_scenario_package,
