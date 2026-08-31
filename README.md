@@ -93,6 +93,18 @@ Copy-Item .env.example .env
 .\scripts\start.ps1 -SkipBuild -Offline
 ```
 
+### 没有 GPU、WSL 或 adapter 时
+
+adapter 权重体积较大，不随 Git 仓库分发（`models/` 已 gitignore），XGrammar 模型服务还需要 WSL。只想看系统本身时用确定性模式：
+
+```powershell
+.\scripts\start.ps1 -Deterministic
+```
+
+这条路径只需要 Python、Node 和并列的 MASP 仓库。MASP 仿真、路径规划、资源预约、安全校验、风险分级、审批闭环、异常注入诊断和评测矩阵全部照常运行；意图理解与解释走确定性解析器，`/api/health` 的 `model.observedMode` 会在首次请求后报告 `deterministic-fallback`，界面同步标注降级状态。
+
+也就是说，**除了微调模型本身的决策质量，其余能力都可以在没有 GPU 的机器上完整验证**。
+
 完整检查：
 
 ```powershell

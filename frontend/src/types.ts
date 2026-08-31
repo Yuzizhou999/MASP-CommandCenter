@@ -30,7 +30,10 @@ export interface Health {
     provider: string;
     model: string;
     configured: boolean;
+    /** 配置意图：是否配置了本地或远端模型端点。 */
     mode: string;
+    /** 实测状态：模型端点是否真的响应过。unverified 表示还没发过请求。 */
+    observedMode?: "unverified" | "local-api" | "deterministic-fallback";
     capability?: string;
     agentCapability?: string;
     registration?: {

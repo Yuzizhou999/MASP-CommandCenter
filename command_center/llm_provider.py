@@ -102,6 +102,11 @@ class OpenAICompatibleLocalProvider(DeepSeekProvider):
             {
                 "provider": "local-openai-compatible",
                 "mode": "local-api" if self.configured else "deterministic-fallback",
+                # configured 只说明 base_url 和 key 有值，而本地 provider 的 key
+                # 默认是字面量 "local"，所以它恒为 True，说明不了模型服务是否真的
+                # 在监听。observedMode 用实际请求结果回答这个问题，避免 health
+                # 在模型不可达时仍然报告 local-api。
+                "observedMode": self._observed_mode(),
                 "capability": "dispatch-intent-and-agent-actions",
                 "agentCapability": "single-action-protocol",
                 "registration": model_registration(
@@ -110,6 +115,14 @@ class OpenAICompatibleLocalProvider(DeepSeekProvider):
             }
         )
         return status
+
+    def _observed_mode(self) -> str:
+        telemetry = self.telemetry()
+        if not telemetry.get("requestCount"):
+            return "unverified"
+        if telemetry.get("successCount"):
+            return "local-api"
+        return "deterministic-fallback"
 
 
 def create_llm_provider(settings: Settings) -> DeepSeekProvider:

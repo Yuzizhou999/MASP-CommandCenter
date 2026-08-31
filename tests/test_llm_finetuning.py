@@ -73,6 +73,30 @@ def test_provider_factory_selects_deepseek_local_and_auto(
     assert isinstance(automatic, OpenAICompatibleLocalProvider)
 
 
+def test_local_provider_observed_mode_reflects_reality(isolated_settings) -> None:
+    """configured 只看配置，observedMode 要反映模型端点是否真的响应过。
+
+    本地 provider 的 api_key 默认是字面量 "local"，所以 configured 恒为 True，
+    health 不能只靠它判断模型是否可用。
+    """
+    provider = OpenAICompatibleLocalProvider(
+        replace(isolated_settings, local_llm_base_url="http://127.0.0.1:9/v1")
+    )
+
+    # 还没发过请求：不能声称可用，也不能声称已降级。
+    assert provider.configured is True
+    assert provider.status()["observedMode"] == "unverified"
+
+    # 端点不可达，请求失败后应当如实报告降级。
+    provider._increment("requestCount")
+    provider._increment("failureCount")
+    assert provider.status()["observedMode"] == "deterministic-fallback"
+
+    # 一旦有成功请求，报告为真实使用本地服务。
+    provider._increment("successCount")
+    assert provider.status()["observedMode"] == "local-api"
+
+
 def test_local_provider_reports_registration_and_keeps_tools_deterministic(
     isolated_settings, tmp_path: Path
 ) -> None:

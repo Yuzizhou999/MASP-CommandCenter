@@ -1,6 +1,10 @@
 param(
     [switch]$SkipBuild,
     [switch]$Offline,
+    # 不启动本地模型服务，只跑确定性链路。适用于没有 GPU、没有 WSL 或没有
+    # v2.3 adapter 的机器：MASP 仿真、安全校验、风险分级、审批和评测全部照常，
+    # 只是意图理解与解释走确定性解析器，界面会标注降级状态。
+    [switch]$Deterministic,
     [string]$WslDistribution = "Ubuntu",
     [string]$ModelPython = "/home/dministrator/.venvs/masp-lora/bin/python"
 )
@@ -67,25 +71,39 @@ if ($Offline) {
     $env:DEEPSEEK_API_KEY = ""
 }
 
-$Adapter = Join-Path $ProjectRoot "models\masp-agent-lora-v2.3"
-if (-not (Test-Path -LiteralPath (Join-Path $Adapter "model-card.json"))) {
-    throw "The v2.3 adapter is incomplete: $Adapter"
-}
+if (-not $Deterministic) {
+    $Adapter = Join-Path $ProjectRoot "models\masp-agent-lora-v2.3"
+    if (-not (Test-Path -LiteralPath (Join-Path $Adapter "model-card.json"))) {
+        throw @"
+未找到 v2.3 adapter：$Adapter
+adapter 权重体积较大，不随 Git 仓库分发。
+没有 adapter 时可以只跑确定性链路：
+    .\scripts\start.ps1 -Deterministic
+"@
+    }
 
-$Wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
-if ($null -eq $Wsl) {
-    throw "WSL is required for the XGrammar model service."
-}
-$PortableProjectRoot = $ProjectRoot.Replace("\", "/")
-$WslPathOutput = & wsl.exe -d $WslDistribution -- wslpath -a $PortableProjectRoot
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($WslPathOutput)) {
-    throw "Could not resolve the project path in WSL distribution $WslDistribution."
-}
-$WslProjectRoot = $WslPathOutput.Trim()
-$null = & wsl.exe -d $WslDistribution -- test -x $ModelPython
-$ModelPythonReady = $LASTEXITCODE -eq 0
-if (-not $ModelPythonReady) {
-    throw "Model Python was not found in WSL: $ModelPython"
+    $Wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
+    if ($null -eq $Wsl) {
+        throw @"
+XGrammar 模型服务需要 WSL。
+没有 WSL 时可以只跑确定性链路：
+    .\scripts\start.ps1 -Deterministic
+"@
+    }
+    $PortableProjectRoot = $ProjectRoot.Replace("\", "/")
+    $WslPathOutput = & wsl.exe -d $WslDistribution -- wslpath -a $PortableProjectRoot
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($WslPathOutput)) {
+        throw "无法在 WSL 发行版 $WslDistribution 中解析项目路径。"
+    }
+    $WslProjectRoot = $WslPathOutput.Trim()
+    $null = & wsl.exe -d $WslDistribution -- test -x $ModelPython
+    if ($LASTEXITCODE -ne 0) {
+        throw @"
+WSL 中未找到模型 Python：$ModelPython
+可以改用 -ModelPython 指定，或只跑确定性链路：
+    .\scripts\start.ps1 -Deterministic
+"@
+    }
 }
 
 Push-Location $ProjectRoot
@@ -119,50 +137,65 @@ if (-not $SkipBuild -or -not (Test-Path -LiteralPath (Join-Path $FrontendRoot "d
 New-Item -ItemType Directory -Path $LogRoot -Force | Out-Null
 
 try {
-    if (-not (Test-ListeningPort $ModelPort)) {
-        $StartedModel = Start-HiddenProcess "wsl.exe" @(
-            "-d", $WslDistribution,
-            "--cd", $WslProjectRoot,
-            "--", $ModelPython,
-            "-m", "training.serve_intent_model",
-            "--adapter-dir", "models/masp-agent-lora-v2.3",
-            "--host", "0.0.0.0",
-            "--port", "$ModelPort",
-            "--require-xgrammar"
-        ) "model-v23"
-    }
+    if (-not $Deterministic) {
+        if (-not (Test-ListeningPort $ModelPort)) {
+            $StartedModel = Start-HiddenProcess "wsl.exe" @(
+                "-d", $WslDistribution,
+                "--cd", $WslProjectRoot,
+                "--", $ModelPython,
+                "-m", "training.serve_intent_model",
+                "--adapter-dir", "models/masp-agent-lora-v2.3",
+                "--host", "0.0.0.0",
+                "--port", "$ModelPort",
+                "--require-xgrammar"
+            ) "model-v23"
+        }
 
-    $ModelHealth = Wait-Endpoint "http://127.0.0.1:$ModelPort/health" "v2.3 model"
-    if (
-        $ModelHealth.model -ne $ModelId -or
-        $ModelHealth.structuredOutput -ne "xgrammar"
-    ) {
-        throw "Port $ModelPort is not the $ModelId XGrammar service."
+        $ModelHealth = Wait-Endpoint "http://127.0.0.1:$ModelPort/health" "v2.3 model"
+        if (
+            $ModelHealth.model -ne $ModelId -or
+            $ModelHealth.structuredOutput -ne "xgrammar"
+        ) {
+            throw "端口 $ModelPort 上不是 $ModelId 的 XGrammar 服务。"
+        }
     }
 
     if (Test-ListeningPort $AppPort) {
         $AppHealth = Wait-Endpoint "http://127.0.0.1:$AppPort/api/health" "Command Center" 10
-        if (
-            $AppHealth.model.model -ne $ModelId -or
-            $AppHealth.agentRuntime.mode -ne "loop"
-        ) {
-            throw "Port $AppPort is occupied by a different Command Center configuration."
+        if ($AppHealth.agentRuntime.mode -ne "loop") {
+            throw "端口 $AppPort 被另一份 Command Center 配置占用。"
         }
-        Write-Host "Command Center is already running: http://127.0.0.1:$AppPort"
+        Write-Host "Command Center 已在运行：http://127.0.0.1:$AppPort"
         return
     }
 
     $env:APP_PORT = "$AppPort"
-    $env:LLM_PROVIDER = "local"
-    $env:LOCAL_LLM_ENABLED = "true"
-    $env:LOCAL_LLM_BASE_URL = "http://127.0.0.1:$ModelPort/v1"
-    $env:LOCAL_LLM_MODEL = $ModelId
-    $env:LOCAL_LLM_MODEL_CARD = "models/masp-agent-lora-v2.3/model-card.json"
     $env:AGENT_RUNTIME_MODE = "loop"
 
-    Write-Host "Model: $ModelId / XGrammar / loop"
-    Write-Host "Open:  http://127.0.0.1:$AppPort"
-    Write-Host "Logs:  $LogRoot"
+    if ($Deterministic) {
+        # 指向一个确定不会有服务监听的地址，让 provider 走既有降级路径，
+        # 而不是引入一条新的分支逻辑。
+        $env:LLM_PROVIDER = "local"
+        $env:LOCAL_LLM_ENABLED = "false"
+        $env:LOCAL_LLM_BASE_URL = "http://127.0.0.1:9/v1"
+        $env:LOCAL_LLM_TIMEOUT_SECONDS = "2"
+        $env:LOCAL_LLM_MODEL_CARD = ""
+        $env:DEEPSEEK_API_KEY = ""
+        Write-Host "模式:  确定性链路（无模型服务）"
+        Write-Host "说明:  MASP 仿真、安全校验、风险分级、审批和评测照常运行；"
+        Write-Host "       意图理解与解释走确定性解析器，界面标注降级状态。"
+    }
+    else {
+        $env:LLM_PROVIDER = "local"
+        $env:LOCAL_LLM_ENABLED = "true"
+        $env:LOCAL_LLM_BASE_URL = "http://127.0.0.1:$ModelPort/v1"
+        $env:LOCAL_LLM_MODEL = $ModelId
+        $env:LOCAL_LLM_MODEL_CARD = "models/masp-agent-lora-v2.3/model-card.json"
+        Write-Host "模式:  $ModelId / XGrammar / loop"
+    }
+
+    Write-Host "打开:  http://127.0.0.1:$AppPort"
+    Write-Host "日志:  $LogRoot"
 
     Push-Location $ProjectRoot
     try {
