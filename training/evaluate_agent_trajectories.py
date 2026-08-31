@@ -104,7 +104,9 @@ def _arguments() -> argparse.Namespace:
     )
     parser.add_argument("--local-base-url", default=None)
     parser.add_argument("--local-v1-model", default="masp-intent-lora")
-    parser.add_argument("--local-candidate-model", default="masp-agent-lora-v2")
+    parser.add_argument(
+        "--local-candidate-model", default="masp-agent-lora-v2.3"
+    )
     parser.add_argument("--include-deepseek", action="store_true")
     parser.add_argument(
         "--keep-history",

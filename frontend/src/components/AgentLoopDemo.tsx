@@ -76,7 +76,7 @@ export function AgentLoopDemo({
     || (agentRun && terminalStatuses.has(agentRun.status)
       ? agentRun.error || agentRun.status
       : null);
-  const isCandidate = registration?.status === "candidate";
+  const registrationValid = Boolean(registration?.valid);
   const isLoop = health.agentRuntime.mode === "loop";
   const validation = response?.validation;
   const displayStatus = response?.state === "BLOCKED"
@@ -93,8 +93,8 @@ export function AgentLoopDemo({
           <div>
             <div className="agent-demo-title-line">
               <h2>{registration?.modelId || health.model.model}</h2>
-              <Badge appearance="filled" color={isCandidate ? "warning" : "success"}>
-                {isCandidate ? "Candidate" : registration?.status === "active" ? "Stable" : "未登记"}
+              <Badge appearance="filled" color={registrationValid ? "success" : "warning"}>
+                {registrationValid ? "单模型" : "未登记"}
               </Badge>
               <Badge appearance="outline" color={isLoop ? "success" : "informative"}>
                 {health.agentRuntime.mode}
@@ -126,11 +126,6 @@ export function AgentLoopDemo({
           <div><span>步骤</span><strong className="mono">{trace.length}/{health.agentRuntime.budgets.maxSteps}</strong></div>
           <div><span>时限</span><strong className="mono">{Math.round(health.agentRuntime.budgets.maxLatencyMs / 1000)}s</strong></div>
         </div>
-        {isCandidate && (
-          <p className="agent-candidate-notice">
-            v2 已训练并完成真实轨迹评测，但尚未达到替换 v1 的晋级门槛。本页用于展示候选模型的工具决策与受控闭环。
-          </p>
-        )}
       </section>
 
       <div className="agent-demo-grid">

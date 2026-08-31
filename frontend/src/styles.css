@@ -413,16 +413,6 @@ p {
   white-space: nowrap;
 }
 
-.agent-candidate-notice {
-  grid-column: 1 / -1;
-  padding: 8px 10px;
-  color: #6d4600;
-  background: #fff8e8;
-  border-left: 3px solid #c88a00;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
 .agent-demo-grid {
   display: grid;
   grid-template-columns: minmax(320px, 0.8fr) minmax(520px, 1.35fr);

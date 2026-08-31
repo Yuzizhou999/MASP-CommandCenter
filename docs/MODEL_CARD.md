@@ -4,7 +4,7 @@
 
 ## 模型用途
 
-业务大模型支持三种可替换 driver：DeepSeek `deepseek-chat`、本地 Qwen2.5-1.5B QLoRA 和无模型的确定性 fallback。冻结 v1 adapter 只把请求解析为 `DispatchIntent`；v2 候选 adapter 每轮只从 `CALL_TOOL`、`REQUEST_CLARIFICATION`、`PROPOSE_INTENT` 中选择一个动作。模型也可基于已提供证据解释异常，但不承担路径规划、资源预约、冲突检测、事件注入或设备控制。
+当前本地部署只保留 Qwen2.5-1.5B QLoRA `masp-agent-lora-v2.3`。它每轮只从 `CALL_TOOL`、`REQUEST_CLARIFICATION`、`PROPOSE_INTENT` 中选择一个动作；DeepSeek driver 和确定性 fallback 仍是代码层兼容路径，但不参与单模型演示。模型也可基于已提供证据解释异常，但不承担路径规划、资源预约、冲突检测、事件注入或设备控制。
 
 模型输出还要经过确定性边界复核。任务站点、车型和封锁资源必须来自参数解析器，模型不得自行补齐或改写；恢复、取消、故障上报等高风险意图不在大模型可生成范围内。模型不可用、JSON 不合规、实体越界、证据虚构或动作越权时，系统使用确定性结果并保留降级标记。
 
@@ -30,7 +30,7 @@
 
 ## 调用方式
 
-后端通过 OpenAI 兼容的 `/chat/completions` 接口调用外部或本地模型，请求使用 `temperature=0`。DeepSeek 使用原生 tool calling；本地 v2 使用单动作 JSON 协议。两者共用同一个有界 observe-decide-act 引擎、工具白名单、预算、审计和 MASP verifier。API 密钥只保存在服务端环境变量中。
+后端通过本机 OpenAI 兼容的 `/chat/completions` 接口调用 v2.3，请求使用 `temperature=0` 和 XGrammar 结构约束。模型使用单动作 JSON 协议，并由有界 observe-decide-act 引擎、工具白名单、预算、审计和 MASP verifier 约束。API 密钥只保存在服务端环境变量中。
 
 ## 降级策略
 

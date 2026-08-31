@@ -26,6 +26,11 @@ class LLMModelCard(BaseModel):
     sample_limits: dict[str, int | None] = Field(
         default_factory=dict, alias="sampleLimits"
     )
+    checkpointing: dict[str, int | str | None] = Field(default_factory=dict)
+    tokenization: dict[str, int | float | bool] = Field(default_factory=dict)
+    training_environment: dict[str, str | None] = Field(
+        default_factory=dict, alias="trainingEnvironment"
+    )
     created_at: str = Field(alias="createdAt")
     metrics: dict[str, float] = Field(default_factory=dict)
 

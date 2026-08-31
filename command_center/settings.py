@@ -35,11 +35,11 @@ class Settings:
     deepseek_circuit_reset_seconds: float = 30
     deepseek_input_cost_per_million: float = 0.27
     deepseek_output_cost_per_million: float = 1.10
-    llm_provider: str = "deepseek"
-    local_llm_enabled: bool = False
+    llm_provider: str = "local"
+    local_llm_enabled: bool = True
     local_llm_api_key: str = "local"
     local_llm_base_url: str = "http://127.0.0.1:8000/v1"
-    local_llm_model: str = "masp-intent-lora"
+    local_llm_model: str = "masp-agent-lora-v2.3"
     local_llm_timeout_seconds: float = 30
     local_llm_model_card: Path | None = None
     agent_model_id: str = "masp-ppo-priority"
@@ -47,7 +47,7 @@ class Settings:
     agent_checkpoint: Path | None = None
     agent_device: str = "cpu"
     agent_torch_threads: int = 1
-    agent_runtime_mode: str = "linear"
+    agent_runtime_mode: str = "loop"
     agent_max_decisions: int = 8
     agent_max_tool_calls: int = 6
     agent_max_repair_attempts: int = 2
@@ -107,13 +107,15 @@ class Settings:
                 model_card = ROOT / model_card
             model_card = model_card.resolve()
         else:
-            default_model_card = ROOT / "models" / "masp-intent-lora" / "model-card.json"
+            default_model_card = (
+                ROOT / "models" / "masp-agent-lora-v2.3" / "model-card.json"
+            )
             if default_model_card.is_file():
                 model_card = default_model_card.resolve()
-        llm_provider = os.getenv("LLM_PROVIDER", "deepseek").strip().lower()
+        llm_provider = os.getenv("LLM_PROVIDER", "local").strip().lower()
         if llm_provider not in {"deepseek", "local", "auto"}:
             raise ValueError("LLM_PROVIDER 必须是 deepseek、local 或 auto")
-        runtime_mode = os.getenv("AGENT_RUNTIME_MODE", "linear").strip().lower()
+        runtime_mode = os.getenv("AGENT_RUNTIME_MODE", "loop").strip().lower()
         if runtime_mode not in {"linear", "loop"}:
             raise ValueError("AGENT_RUNTIME_MODE 必须是 linear 或 loop")
         return cls(
@@ -151,13 +153,15 @@ class Settings:
                 0, float(os.getenv("DEEPSEEK_OUTPUT_COST_PER_MILLION", "1.10"))
             ),
             llm_provider=llm_provider,
-            local_llm_enabled=_as_bool(os.getenv("LOCAL_LLM_ENABLED")),
+            local_llm_enabled=_as_bool(
+                os.getenv("LOCAL_LLM_ENABLED"), default=True
+            ),
             local_llm_api_key=os.getenv("LOCAL_LLM_API_KEY", "local"),
             local_llm_base_url=os.getenv(
                 "LOCAL_LLM_BASE_URL", "http://127.0.0.1:8000/v1"
             ).rstrip("/"),
             local_llm_model=os.getenv(
-                "LOCAL_LLM_MODEL", "masp-intent-lora"
+                "LOCAL_LLM_MODEL", "masp-agent-lora-v2.3"
             ).strip(),
             local_llm_timeout_seconds=max(
                 1, float(os.getenv("LOCAL_LLM_TIMEOUT_SECONDS", "30"))

@@ -100,7 +100,7 @@ def _dependencies() -> dict[str, Any]:
 def _arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="启动 MASP 意图模型兼容 API")
     parser.add_argument(
-        "--adapter-dir", type=Path, default=Path("models/masp-intent-lora")
+        "--adapter-dir", type=Path, default=Path("models/masp-agent-lora-v2.3")
     )
     parser.add_argument(
         "--base-model",

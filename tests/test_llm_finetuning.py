@@ -47,10 +47,15 @@ def _write_model_card(root: Path, adapter_bytes: bytes = b"adapter") -> Path:
 def test_provider_factory_selects_deepseek_local_and_auto(
     isolated_settings,
 ) -> None:
-    assert isinstance(create_llm_provider(isolated_settings), DeepSeekProvider)
-    assert not isinstance(
+    assert isinstance(
         create_llm_provider(isolated_settings), OpenAICompatibleLocalProvider
     )
+
+    deepseek = create_llm_provider(
+        replace(isolated_settings, llm_provider="deepseek")
+    )
+    assert isinstance(deepseek, DeepSeekProvider)
+    assert not isinstance(deepseek, OpenAICompatibleLocalProvider)
 
     local = create_llm_provider(
         replace(
@@ -106,6 +111,41 @@ def test_model_registration_rejects_changed_adapter(tmp_path: Path) -> None:
     assert registration is not None
     assert registration["valid"] is False
     assert registration["adapterSha256Matches"] is False
+
+
+def test_model_registration_accepts_training_metadata(tmp_path: Path) -> None:
+    card = _write_model_card(tmp_path / "model")
+    payload = json.loads(card.read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "checkpointing": {"intervalSteps": 20, "resumedFrom": None},
+            "tokenization": {
+                "maxLength": 2048,
+                "maxObservedTokens": 1403,
+                "p50": 948.0,
+                "p99": 1391.0,
+                "truncatedExamples": 0,
+                "preflightPassed": True,
+            },
+            "trainingEnvironment": {
+                "python": "3.12.3",
+                "torch": "2.8.0+cu128",
+                "cuda": "12.8",
+                "transformers": "4.57.6",
+                "peft": "0.20.0",
+                "bitsandbytes": "0.50.1",
+                "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+            },
+        }
+    )
+    card.write_text(json.dumps(payload), encoding="utf-8")
+
+    registration = model_registration(card)
+
+    assert registration is not None
+    assert registration["valid"] is True
+    assert registration["tokenization"]["truncatedExamples"] == 0
+    assert registration["trainingEnvironment"]["cuda"] == "12.8"
 
 
 def test_dataset_split_is_stable_at_entity_level() -> None:

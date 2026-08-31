@@ -162,9 +162,10 @@ python -m training.preflight_agent_system `
 
 ```powershell
 python -m training.serve_intent_model `
-  --adapter-dir models\masp-intent-lora `
+  --adapter-dir models\masp-agent-lora-v2.3 `
   --host 127.0.0.1 `
-  --port 8000
+  --port 8000 `
+  --require-xgrammar
 ```
 
 正式运行受约束 Agent 评测时增加 `--require-xgrammar`。该参数会在 XGrammar 不可用时直接拒绝启动，防止把只有生成后 Schema 终检的兼容模式误当成 token 级约束评测。
@@ -188,22 +189,14 @@ LLM_PROVIDER=local
 LOCAL_LLM_ENABLED=true
 LOCAL_LLM_API_KEY=local
 LOCAL_LLM_BASE_URL=http://127.0.0.1:8000/v1
-LOCAL_LLM_MODEL=masp-intent-lora
-LOCAL_LLM_MODEL_CARD=models/masp-intent-lora/model-card.json
-AGENT_RUNTIME_MODE=linear
+LOCAL_LLM_MODEL=masp-agent-lora-v2.3
+LOCAL_LLM_MODEL_CARD=models/masp-agent-lora-v2.3/model-card.json
+AGENT_RUNTIME_MODE=loop
 ```
 
 再启动主服务。`GET /api/health` 中的 `model.provider` 应为 `local-openai-compatible`，`registration.valid` 应为 `true`。
 
-v1 模型使用 `AGENT_RUNTIME_MODE=linear`，只处理 `parse_intent`。通过晋级门槛的 v2 使用以下组合：
-
-```dotenv
-LOCAL_LLM_MODEL=masp-agent-lora-v2
-LOCAL_LLM_MODEL_CARD=models/masp-agent-lora-v2/model-card.json
-AGENT_RUNTIME_MODE=loop
-```
-
-两种模式共用同一工具白名单、权威边界、verifier、预算、审计和目标执行路径。不要把 v1 adapter 配成默认 loop driver；它在 loop 中的兼容包装仅用于过渡诊断，不是部署模式。
+当前演示不再并排运行 v1 与 v2，也不再维护两个后端端口。`scripts/start.ps1` 固定启动一个 v2.3/XGrammar 模型服务和一个 loop 后端。代码中的 linear driver 只用于历史报告复算和回归测试，不是当前演示部署路径。
 
 ## 7. 评测微调模型
 
@@ -213,7 +206,7 @@ AGENT_RUNTIME_MODE=loop
 python -m training.evaluate_intent_model data\finetuning\intent-sft-v1 `
   --provider local `
   --base-url http://127.0.0.1:8000/v1 `
-  --model masp-intent-lora
+  --model masp-agent-lora-v2.3
 ```
 
 重点查看：
@@ -225,28 +218,13 @@ python -m training.evaluate_intent_model data\finetuning\intent-sft-v1 `
 - `safetyPassRate`、`clarificationPassRate`：安全边界和缺参澄清是否保持；
 - `averageLatencyMs`、`p95LatencyMs`：本机推理延迟。
 
-模型达到候选标准后，再把模型卡 `status` 从 `candidate` 改为 `active`。不要只用训练 loss 判断模型是否可用。
+不要因为它成为唯一演示模型就把模型卡门禁结果改写为通过；训练 loss 和单模型打包方式都不能替代轨迹评测。
 
 ### 冻结轨迹评测与晋级
 
 轨迹 gold 独立标注了必需/允许/禁止工具、终态、是否应澄清、意图类型、可修复 verifier issue 和直接/间接注入。评测器会在指定 case 的第一次 MASP 校验中注入 gold issue，确保 `repairSuccessRate` 测到真实回路，而不是空指标。
 
-```powershell
-python -m training.evaluate_agent_trajectories `
-  --mode linear_v1 --local-base-url http://127.0.0.1:8000/v1 `
-  --output-dir results\agent-eval-v1
-
-python -m training.evaluate_agent_trajectories `
-  --mode loop_local --local-base-url http://127.0.0.1:8001/v1 `
-  --output-dir results\agent-eval-v2
-
-python -m training.compare_agent_replays `
-  results\agent-eval-v1\agent-trajectory-eval-latest.json `
-  results\agent-eval-v2\agent-trajectory-eval-latest.json `
-  --output results\agent-eval-v2\paired-replay.json
-```
-
-最后运行 `training.qualify_agent_candidate`，同时输入 v1/v2 的 `intent-challenge-v1` 报告和轨迹报告。脚本只输出两种结论：`PROMOTE` 或 `KEEP_V1`。门槛包括 v1 各率指标退化不超过 1 个百分点、目标完成、工具 precision/recall、无效调用、修复成功、澄清，以及系统级注入攻击成功率必须为 0。
+当前服务只直接回放 v2.3。历史 v1/v2-repro 对照报告仍可交给 `training.compare_agent_replays` 和 `training.qualify_agent_candidate` 离线复算，但不需要同时启动第二个模型服务。
 
 当前正式轨迹回归使用 100 条分层 suite。先执行确定性可达性预检，再分别用同一个 XGrammar 服务契约回放 control 与 candidate：
 
@@ -260,19 +238,12 @@ python -m training.preflight_agent_system `
 python -m training.evaluate_agent_trajectories `
   --suite evals\agent-trajectories-v3-stratified.json `
   --mode loop_local `
-  --local-base-url http://127.0.0.1:8002/v1 `
-  --local-candidate-model masp-agent-lora-v2-repro `
-  --output-dir results\agent-eval-v3-stratified-control
-
-python -m training.evaluate_agent_trajectories `
-  --suite evals\agent-trajectories-v3-stratified.json `
-  --mode loop_local `
-  --local-base-url http://127.0.0.1:8002/v1 `
+  --local-base-url http://127.0.0.1:8000/v1 `
   --local-candidate-model masp-agent-lora-v2.3 `
   --output-dir results\agent-eval-v3-stratified-candidate
 ```
 
-每次模型回放前必须确认 `/health` 返回的 model 与命令中的 `--local-candidate-model` 一致。两份报告必须具有相同的 `suiteSha256`、`promptSha256ByMode.loop_local`，并与同一组 intent 报告的 `evaluationContractSha256` 和 `requestPromptSetSha256` 对齐。100 条 suite 将单条波动降为 1%，但它是训练后编写的分层回归，同层样本也不是完全独立；它适合做回归门禁，不应包装成盲测统计证明。
+回放前必须确认 `/health` 返回 `masp-agent-lora-v2.3` 和 `structuredOutput=xgrammar`。与历史对照报告比较时，仍必须核对 `suiteSha256`、`promptSha256ByMode.loop_local`、`evaluationContractSha256` 和 `requestPromptSetSha256`。100 条 suite 将单条波动降为 1%，但它是训练后编写的分层回归，同层样本也不是完全独立；它适合做回归门禁，不应包装成盲测统计证明。
 
 ## 8. 独立挑战集与基座对照
 
@@ -281,7 +252,7 @@ python -m training.evaluate_agent_trajectories `
 ```powershell
 python -m training.evaluate_intent_challenge evals\intent-challenge-v1.json `
   --base-url http://127.0.0.1:8000/v1 `
-  --model masp-intent-lora `
+  --model masp-agent-lora-v2.3 `
   --output data\finetuning\challenge-lora.json
 ```
 
@@ -331,7 +302,7 @@ QLoRA 通过模型和系统两组资格门；基座模型只通过系统组。QL
 - 本机延迟：平均约 `4855ms`，P95 约 `8582ms`；
 - adapter：`73.9MB`，模型卡状态为 `active`，SHA-256 已由应用健康接口复核。
 
-这组结果只代表当前仿真数据和单机环境，不等价于真实生产收益。训练产物位于被 Git 忽略的 `models/masp-intent-lora/`，重新部署时应通过模型制品仓库或文件包分发，并重新执行模型卡摘要校验。
+这组结果只代表当时的仿真数据和单机环境，不等价于真实生产收益。v1 本地 adapter 已从当前演示工件中删除，历史评测报告仍保留；当前重新部署只分发 `models/masp-agent-lora-v2.3/`，并重新执行模型卡摘要校验。
 
 ## 10. 代码入口
 

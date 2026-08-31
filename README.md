@@ -9,7 +9,7 @@
 ## 核心能力
 
 - 自然语言紧急插单、通道封锁、状态查询和报告生成；
-- `linear` v1 与有界 observe-decide-act `loop` 双运行模式，工具结果会进入下一轮模型决策；
+- 单一 v2.3 本地模型服务驱动有界 observe-decide-act `loop`，工具结果会进入下一轮模型决策；
 - DeepSeek 原生 Tool Calling、本地 Qwen 单动作 JSON 协议和确定性 fallback 共用同一执行引擎；
 - MASP verifier 可修复问题最多回送模型两次，越权、审批、过期版本和未知问题直接阻断；
 - 服务端工具白名单，模型只能选择只读上下文工具，安全校验不可跳过；
@@ -79,20 +79,13 @@ Copy-Item .env.example .env
 .\scripts\start.ps1
 ```
 
-浏览器访问 [http://127.0.0.1:8877](http://127.0.0.1:8877)。首次启动会安装前端依赖并构建生产资源。之后可使用：
+`start.ps1` 会启动唯一的 `masp-agent-lora-v2.3` XGrammar 模型服务和 loop 后端。浏览器访问 [http://127.0.0.1:8877](http://127.0.0.1:8877)。首次启动会安装前端依赖并构建生产资源。之后可使用：
 
 ```powershell
 .\scripts\start.ps1 -SkipBuild
 ```
 
-面试演示时可同时启动冻结 v1 与候选 v2。默认配置和 v1 工件不会被修改，v2 使用独立的数据与仿真输出目录：
-
-```powershell
-.\scripts\start-dual-demo.ps1
-```
-
-- [http://127.0.0.1:8877](http://127.0.0.1:8877)：v1 `linear` 稳定意图识别演示；
-- [http://127.0.0.1:8878](http://127.0.0.1:8878)：v2 `loop` 候选模型闭环与工具调用演示。
+演示只使用一个模型端口 `8000` 和一个应用端口 `8877`，不再启动 v1/v2 并排服务。旧模型的对照数据只保留在 `results/`，用于解释模型选择过程，不进入运行路径。
 
 现场网络不稳定或不准备调用 DeepSeek 时，可显式使用离线降级：
 
@@ -123,12 +116,12 @@ DEEPSEEK_TIMEOUT_SECONDS=30
 
 项目提供从锁定 MASP 场景生成数据、QLoRA 训练、模型卡登记、OpenAI-compatible 本地服务和 holdout 评测的完整链路。默认基座为 `Qwen/Qwen2.5-1.5B-Instruct`，适配 8GB 显存单卡。
 
-冻结的 v1 adapter 只负责 `DispatchIntent` 解析，当前仍是默认的 `linear` 模型。v2 候选 adapter 学习 `CALL_TOOL`、`REQUEST_CLARIFICATION`、`PROPOSE_INTENT` 单动作协议；它已完成正式训练和真实评测，但没有通过晋级门槛，因此只作为候选工件保留。路径、预约、校验、仿真、审批和车辆控制始终不交给模型。完整命令和晋级指标见 [大模型微调指南](docs/LLM_FINETUNING.md)。
+当前只保留 `masp-agent-lora-v2.3` adapter。它学习 `CALL_TOOL`、`REQUEST_CLARIFICATION`、`PROPOSE_INTENT` 单动作协议，并通过唯一的本地 OpenAI-compatible 服务接入 loop runtime。历史门禁仍记录为 `KEEP_V1`，因此单模型演示不等价于生产晋级结论；路径、预约、校验、仿真、审批和车辆控制始终不交给模型。完整训练过程和评测限制见 [大模型微调指南](docs/LLM_FINETUNING.md)。
 
 运行模式与预算可通过 `.env` 配置：
 
 ```dotenv
-AGENT_RUNTIME_MODE=linear
+AGENT_RUNTIME_MODE=loop
 AGENT_MAX_DECISIONS=8
 AGENT_MAX_TOOL_CALLS=6
 AGENT_MAX_REPAIR_ATTEMPTS=2

@@ -48,7 +48,7 @@ def test_explicit_agent_checkpoint_overrides_bundled_model(
 
 def test_settings_discovers_local_llm_model_card(tmp_path: Path, monkeypatch) -> None:
     _prepare_root(tmp_path)
-    model_dir = tmp_path / "models" / "masp-intent-lora"
+    model_dir = tmp_path / "models" / "masp-agent-lora-v2.3"
     model_dir.mkdir()
     card = model_dir / "model-card.json"
     card.write_text("{}", encoding="utf-8")
@@ -69,16 +69,22 @@ def test_settings_rejects_unknown_llm_provider(tmp_path: Path, monkeypatch) -> N
         Settings.load()
 
 
-def test_settings_default_to_frozen_linear_runtime(
+def test_settings_defaults_to_single_local_loop_runtime(
     tmp_path: Path, monkeypatch
 ) -> None:
     _prepare_root(tmp_path)
     monkeypatch.setattr(settings_module, "ROOT", tmp_path)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("LOCAL_LLM_ENABLED", raising=False)
+    monkeypatch.delenv("LOCAL_LLM_MODEL", raising=False)
     monkeypatch.delenv("AGENT_RUNTIME_MODE", raising=False)
 
     settings = Settings.load()
 
-    assert settings.agent_runtime_mode == "linear"
+    assert settings.llm_provider == "local"
+    assert settings.local_llm_enabled is True
+    assert settings.local_llm_model == "masp-agent-lora-v2.3"
+    assert settings.agent_runtime_mode == "loop"
 
 
 def test_settings_supports_isolated_runtime_directories(

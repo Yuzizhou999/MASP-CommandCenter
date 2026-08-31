@@ -73,7 +73,7 @@
 
 Agent 模型使用人工独立标注的 `evals/agent-trajectories-v1.json`。每个 case 标注必需、允许和禁止工具、目标终态、意图类型、澄清要求、可修复校验项及注入属性。报告同时给出目标完成率、工具 precision/recall、澄清准确率、校验与修复成功率、无效调用、步数、模型驱动率和系统级攻击成功率；所有比例指标包含样本标准差与 95% 置信区间。`goalSuccess` 单独衡量终态、意图、权威槽位、澄清和安全结果，必需工具是否完整由独立的 `toolRecall` 硬门槛衡量，便于识别“结果碰巧正确但轨迹不完整”；两项必须同时过门。规则 fallback 不计作模型驱动结果。
 
-2026-08-25 的真实本地模型对照使用同一冻结意图挑战集和轨迹集。v1 与 v2 的原始意图准确率均为 94%；v2 的工具 precision/recall 均为 97.1%，系统边界拦截召回率 100%，系统级攻击成功率 0，但目标完成率只有 64.7%、修复成功率 50%、校验成功率 72.7%，且原始 Schema 合法率从 v1 的 100% 降至 96%。资格脚本据此输出 `KEEP_V1`。当前默认保持 `masp-intent-lora + linear`，`masp-agent-lora-v2` 仅登记为 candidate，不把训练 loss 或未通过门槛的结果包装成上线能力。
+2026-08-25 的真实本地模型对照使用同一冻结意图挑战集和轨迹集。v1 与 v2 的原始意图准确率均为 94%；v2 的工具 precision/recall 均为 97.1%，系统边界拦截召回率 100%，系统级攻击成功率 0，但目标完成率只有 64.7%、修复成功率 50%、校验成功率 72.7%，且原始 Schema 合法率从 v1 的 100% 降至 96%。资格脚本据此输出 `KEEP_V1`。这是历史模型选择结论，不把训练 loss 或未通过门槛的结果包装成生产能力。
 
 2026-08-26 又完成了 v2.2 失败驱动数据的受控实验。控制组 `v2-repro` 使用 v2 数据和原 v2 全部超参数，先在 2048 token、零截断条件下复现：原始 Schema 合法率 96%，18 条 v2.1 holdout 的目标成功率 66.7%，满足预先冻结的复现容差。候选 `v2.2` 只把训练数据替换为增加 34 条失败驱动样本的 v2.1 数据，其他训练参数不变。候选目标成功率升至 72.2%，目标案例 `AH-INJ-003` 改善，6 个目标案例和 12 个非目标案例均无回归；系统级攻击成功率仍为 0。与此同时，意图宏 F1 从 0.9577 降至 0.9460、精确匹配率从 94% 降至 92%，工具 recall 从 91.7% 降至 86.1%，边界拦截召回率仍为 50%，修复成功率仍为 25%。受控方向性门和正式资格门均未通过，结论仍是 `KEEP_V1`。18 条 holdout 只支持方向性观察，不构成统计显著性证据。
 
@@ -97,6 +97,8 @@ v2.3 的结构化推理实现不是训练前完全冻结的单一变量。冻结
 | 系统级攻击执行率 | 0.000 | 0.000 |
 
 paired replay 记录 9 条改善、4 条回归，目标成功率差为 `+0.05`，95% 区间为 `[-0.0203, 0.1203]`，包含 0。v2.3 的主要短板是软歧义 `2/10`、良性间接注入语境 `3/10`、恶意间接注入语境 `7/10`，且工具 recall 退化。正式门禁继续输出 `KEEP_V1`。这套 suite 是在 v2.3 训练和既有缺陷分析后编写的 post-training stratified regression，不是训练前盲测；同层改写也存在相关性，因此不能把 100 条表述为 100 个独立重复实验。
+
+当前演示打包后来收敛为单一 `masp-agent-lora-v2.3 + loop` 服务，删除了 v1/v2 并排启动方式和其他本地 adapter 工件。这个工程打包决定不修改上述 `KEEP_V1` 评测事实，也不将 v2.3 重新标记为已通过生产晋级；历史 control 报告只用于复核。
 
 稳定报告保存在 `results/intent-eval-v1/`、`results/intent-eval-v2/`、`results/agent-eval-v1/` 和 `results/agent-eval-v2/`。v2.2 受控实验另保存在 `results/intent-eval-v2-repro/`、`results/intent-eval-v22/`、`results/agent-eval-v2-repro/` 和 `results/agent-eval-v22/`。v2.3 历史证据位于 `results/intent-eval-v23-control/`、`results/intent-eval-v23-seed-20260827/`、`results/agent-eval-v23-control/` 和 `results/agent-eval-v23-seed-20260827/`；系统修复后的正式重评使用 `results/*-system-fix-*` 独立目录，不覆盖历史失败实验。`qualification.json` 是唯一晋级结论，`experiment-summary.json`、`controlled-experiment.json` 和 `paired-replay.json` 用于定位逐 case 的改进与退化。
 
