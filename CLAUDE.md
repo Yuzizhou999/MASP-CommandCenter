@@ -48,14 +48,24 @@ Copy-Item .env.example .env
 
 # 启动（需要 WSL 起 XGrammar 模型服务 :8000，应用 :8877）
 .\scripts\start.ps1 [-SkipBuild] [-Offline]
+# 无 GPU / 无 WSL / 无 adapter 时只跑确定性链路
+.\scripts\start.ps1 -Deterministic
+
+# 静态检查
+python -m ruff check .
+python -m ruff format .
+python -m mypy
 
 # 测试
-python -m pytest -m unit                   # 单元测试，CI 跑这个
-.\scripts\check.ps1                        # 完整门禁：锁定引擎副本 + pytest + 前端构建
+python -m pytest -m unit                   # 单元测试
+.\scripts\check.ps1                        # 完整门禁，与 CI 等价
 
 # 前端
-cd frontend; npm ci; npm run build         # tsc -b && vite build
+cd frontend; npm ci; npm test; npm run build
 ```
+
+`check.ps1` 是唯一的完整门禁，内容与 CI 一致：ruff check、ruff format --check、
+mypy、锁定引擎副本下的全量 pytest、前端 vitest 和构建。提交前跑它。
 
 直接 `python -m pytest` 会跳过全部 integration 用例：`tests/conftest.py` 要求相邻
 MASP 检出的 HEAD 恰好等于 `engine.lock.json` 的 commit 且工作区干净。
@@ -65,11 +75,18 @@ MASP 检出的 HEAD 恰好等于 `engine.lock.json` 的 commit 且工作区干�
 ## 环境与风格
 
 - Windows + PowerShell，脚本和文档用 PowerShell 语法。
-- 仓库没有配置 linter / formatter，跟随现有文件风格：`from __future__ import
-  annotations`、内建泛型类型注解（`str | None`、`dict[str, Any]`）、极少 docstring。
+- ruff（line-length 88）+ mypy 已接入，配置和豁免原因写在 `pyproject.toml`。
+  mypy 的存量豁免名单只允许缩短，不允许新增模块。
+- 跟随现有文件风格：`from __future__ import annotations`、内建泛型类型注解
+  （`str | None`、`dict[str, Any]`）、极少 docstring。
 - 错误信息中英混用，跟随所在模块既有语言，不要统一改写。
+- 可变状态用 `command_center/storage.py` 的原子写入，不要直接 `path.write_text`
+  重写共享状态文件。
+- 日志用 `command_center/logging_setup.get_logger`，只记标识、状态和计数，
+  不写提示词原文、模型回复和密钥。审计与日志分工不同，不要混用。
 - `models/`、`data/`、`runs/`、`tmp/` 不入库。`masp-agent-lora-v2.3` adapter 被
-  gitignore，新克隆的仓库需要本地提供才能跑 `start.ps1`。
+  gitignore，新克隆的仓库需要本地提供才能跑默认 `start.ps1`；
+  没有 adapter 时用 `-Deterministic`。
 
 ## 评测纪律（来自 findings.md，容易踩）
 
