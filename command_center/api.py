@@ -5,15 +5,21 @@ import json
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .agent_protocol import AgentBudgets
 from .agent_run_manager import TERMINAL_AGENT_RUN_STATUSES, AgentRunManager
 from .approvals import ApprovalStore
 from .audit import AuditStore
+from .auth import (
+    OperatorIdentity,
+    is_protected,
+    operator_dependency,
+    token_matches,
+)
 from .benchmark import BenchmarkRunner
 from .clarifications import ClarificationResolver, ClarificationStore
 from .contracts import (
@@ -145,10 +151,31 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+    allow_origins=settings.cors_allow_origins,
     allow_methods=["GET", "POST", "PUT"],
     allow_headers=["*"],
 )
+
+
+current_operator = Depends(operator_dependency(settings))
+
+
+@app.middleware("http")
+async def enforce_api_token(request: Request, call_next):
+    """配置 token 后，拦下所有未携带有效 token 的变更类请求。
+
+    身份覆盖由 current_operator 依赖负责，这里只负责准入。两者分开是因为
+    路由目前直接挂在 app 上而不是 APIRouter，无法用 router 级 dependencies。
+    """
+    if is_protected(request.method, request.url.path) and not token_matches(
+        settings, request.headers.get("authorization")
+    ):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "缺少或无效的 Authorization: Bearer <token>。"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return await call_next(request)
 
 
 @app.get("/api/health")
@@ -185,6 +212,10 @@ def health() -> dict[str, Any]:
             "mode": "simulation-only",
             "fieldExecutionEnabled": False,
             "approvalBoundaryEnabled": True,
+            # 如实暴露鉴权状态：未配置 token 时任何能访问端口的人都能提交
+            # 变更并自称任意审批人身份，这一点不应被隐藏。
+            "apiTokenEnabled": settings.api_token is not None,
+            "approverIdentityTrusted": settings.api_token is not None,
         },
     }
 
@@ -511,9 +542,17 @@ async def stream_agent_run_events(
     response_model=AgentRunRecord,
     response_model_by_alias=True,
 )
-def resume_agent_run(run_id: str, decision: AgentRunResumeRequest) -> AgentRunRecord:
+def resume_agent_run(
+    run_id: str,
+    decision: AgentRunResumeRequest,
+    operator: OperatorIdentity = current_operator,
+) -> AgentRunRecord:
+    # 与审批决策同理：暂停中的 R3 run 由谁批准必须由服务端裁定。
+    decided = decision.model_copy(
+        update={"decided_by": operator.resolve(decision.decided_by)}
+    )
     try:
-        return agent_runs.resume(run_id, decision)
+        return agent_runs.resume(run_id, decided)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
@@ -869,9 +908,20 @@ def list_approvals() -> list[ApprovalRequest]:
     response_model=ApprovalRequest,
     response_model_by_alias=True,
 )
-def decide_approval(approval_id: str, decision: ApprovalDecision) -> ApprovalRequest:
+def decide_approval(
+    approval_id: str,
+    decision: ApprovalDecision,
+    operator: OperatorIdentity = current_operator,
+) -> ApprovalRequest:
+    # 审批人身份由服务端裁定：已认证时忽略客户端提交的 decidedBy，
+    # 否则任何能访问端口的人都能以任意身份批准 R3 操作。
+    decided = decision.model_copy(
+        update={"decided_by": operator.resolve(decision.decided_by)}
+    )
     try:
-        return dispatch_workflow.decide_approval(approval_id, decision)
+        return dispatch_workflow.decide_approval(
+            approval_id, decided, authenticated=operator.authenticated
+        )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:

@@ -14,6 +14,7 @@ ENGINE_ROOT = Path(os.getenv("MASP_TEST_ENGINE_ROOT", PROJECT_ROOT.parent / "MAS
 
 INTEGRATION_MODULES = {
     "test_agent_loop.py",
+    "test_auth_endpoints.py",
     "test_agent_policy.py",
     "test_agent_run_manager.py",
     "test_agent_runtime.py",

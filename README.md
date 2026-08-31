@@ -245,3 +245,24 @@ Agent 会话记忆写入 `data/agent-memories.json`，不保存模型自由文�
 - R3 操作没有已批准且意图匹配的审批单时无法提交；
 - 世界状态版本变化后，旧意图必须重新仿真；
 - 所有仿真指标必须能追溯到 MASP 原始运行文件。
+
+## 身份鉴权的当前状态
+
+这是一条需要如实说明的边界。默认配置下**没有身份鉴权**：服务只绑
+`127.0.0.1`，任何能访问该端口的进程都能提交变更，并在审批决策里自称任意
+`decidedBy`。也就是说默认演示模式下"人工审批"是流程演示，不是身份保证。
+
+配置 `COMMAND_CENTER_API_TOKEN` 后：
+
+- 所有变更类 `/api` 请求（POST/PUT/PATCH/DELETE）必须带
+  `Authorization: Bearer <token>`，否则返回 401；
+- 审批人身份由服务端用 `COMMAND_CENTER_API_TOKEN_OPERATOR` 覆盖，客户端提交的
+  `decidedBy` 被忽略，无法伪造；
+- `GET` 接口、`/api/health` 和前端静态资源保持开放，便于探活与排查。
+
+`APPROVAL_DECIDED` 审计事件带 `authenticated` 字段，事后可以分辨哪些决策经过
+鉴权。`/api/health` 的 `safety.apiTokenEnabled` 和 `safety.approverIdentityTrusted`
+如实反映当前状态。
+
+尚未具备的能力：多用户账号、角色权限、审批人与操作人分离、单点登录、
+token 轮换和吊销。不要把当前实现表述为企业级身份权限系统。

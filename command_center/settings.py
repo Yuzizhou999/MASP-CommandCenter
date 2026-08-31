@@ -29,6 +29,15 @@ class Settings:
     deepseek_base_url: str
     deepseek_model: str
     deepseek_timeout_seconds: float
+    # 可选的 Bearer token。留空表示本机演示模式，接口保持开放但审批身份会被
+    # 标记为未认证；配置后服务端用 api_token_operator 覆盖客户端提交的审批人。
+    api_token: str | None = None
+    api_token_operator: str = "authenticated-supervisor"
+    # Vite dev server 的来源。生产部署由后端直接托管构建产物，不需要跨域。
+    cors_allow_origins: tuple[str, ...] = (
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+    )
     deepseek_max_retries: int = 2
     deepseek_circuit_failure_threshold: int = 3
     deepseek_circuit_reset_seconds: float = 30
@@ -133,6 +142,19 @@ class Settings:
             ).rstrip("/"),
             deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
             deepseek_timeout_seconds=float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "30")),
+            api_token=os.getenv("COMMAND_CENTER_API_TOKEN", "").strip() or None,
+            api_token_operator=os.getenv(
+                "COMMAND_CENTER_API_TOKEN_OPERATOR", "authenticated-supervisor"
+            ).strip()
+            or "authenticated-supervisor",
+            cors_allow_origins=tuple(
+                origin.strip()
+                for origin in os.getenv(
+                    "COMMAND_CENTER_CORS_ORIGINS",
+                    "http://127.0.0.1:5173,http://localhost:5173",
+                ).split(",")
+                if origin.strip()
+            ),
             deepseek_max_retries=max(
                 0, min(5, int(os.getenv("DEEPSEEK_MAX_RETRIES", "2")))
             ),

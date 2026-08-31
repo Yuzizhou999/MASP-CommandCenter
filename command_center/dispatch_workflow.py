@@ -105,7 +105,11 @@ class DispatchWorkflowService:
         return request
 
     def decide_approval(
-        self, approval_id: str, decision: ApprovalDecision
+        self,
+        approval_id: str,
+        decision: ApprovalDecision,
+        *,
+        authenticated: bool = False,
     ) -> ApprovalRequest:
         current = self.approvals.get(approval_id)
         if current.status.value != "PENDING":
@@ -117,7 +121,12 @@ class DispatchWorkflowService:
             trace_id=new_id("trace"),
             event_type="APPROVAL_DECIDED",
             actor=decision.decided_by,
-            payload=result.model_dump(by_alias=True, mode="json"),
+            payload={
+                **result.model_dump(by_alias=True, mode="json"),
+                # 记录该决策是否经过 token 鉴权，否则演示模式和鉴权模式的审计
+                # 事件无法区分，事后无法判断审批人身份是否可信。
+                "authenticated": authenticated,
+            },
         )
         return result
 

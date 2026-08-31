@@ -16,6 +16,8 @@ def test_health_exposes_model_and_safety_boundary() -> None:
         "mode": "simulation-only",
         "fieldExecutionEnabled": False,
         "approvalBoundaryEnabled": True,
+        "apiTokenEnabled": False,
+        "approverIdentityTrusted": False,
     }
     assert payload["agentPolicy"]["modelId"] == "masp-ppo-priority"
     assert payload["agentPolicy"]["safetyController"].startswith("MASP Top-K")

@@ -49,6 +49,32 @@ DEEPSEEK_MODEL=deepseek-chat
 
 `DEEPSEEK_API_KEY` 留空时，系统使用确定性本地解析器。密钥只由后端读取，不应写入前端配置或提交到 Git。
 
+## 启用 API token
+
+默认不启用鉴权：服务只绑 `127.0.0.1`，任何能访问该端口的进程都能提交变更，并在审批决策里自称任意 `decidedBy`。只要不止本机可信，就应当配置 token：
+
+```dotenv
+COMMAND_CENTER_API_TOKEN=用一段足够长的随机串
+COMMAND_CENTER_API_TOKEN_OPERATOR=supervisor-zhang
+```
+
+启用后：
+
+- 变更类 `/api` 请求（POST/PUT/PATCH/DELETE）必须带 `Authorization: Bearer <token>`；
+- 审批人身份由 `COMMAND_CENTER_API_TOKEN_OPERATOR` 覆盖，客户端提交的 `decidedBy` 被忽略；
+- `GET`、`/api/health` 和前端静态资源保持开放，SSE 轨迹订阅（GET）不受影响；
+- `APPROVAL_DECIDED` 审计事件带 `authenticated` 字段。
+
+自带前端从 `sessionStorage` 读取 token。启用后在浏览器控制台执行一次：
+
+```javascript
+sessionStorage.setItem("masp.apiToken", "你的token");
+```
+
+刷新页面即可。关闭标签页后失效，token 不会写进 URL 或浏览器历史。
+
+当前实现只有单一共享 token，没有多用户账号、角色权限、审批人与操作人分离、SSO 或 token 轮换吊销。不要按企业级身份权限系统对外描述。
+
 ## 启动
 
 ```powershell

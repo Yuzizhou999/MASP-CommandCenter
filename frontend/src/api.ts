@@ -32,16 +32,41 @@ import type {
   ScenarioValidationReport,
 } from "./types";
 
+const TOKEN_STORAGE_KEY = "masp.apiToken";
+
+// 后端配置 COMMAND_CENTER_API_TOKEN 后，变更类请求需要 Bearer token。
+// 默认演示模式不配置 token，这里读到 null 时行为与此前完全一致。
+// 只用 sessionStorage：关闭标签页即失效，且不会写进 URL 或浏览器历史。
+export function setApiToken(token: string | null): void {
+  if (token) {
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } else {
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  }
+}
+
+export function hasApiToken(): boolean {
+  return Boolean(sessionStorage.getItem(TOKEN_STORAGE_KEY));
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
   const response = await fetch(path, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers || {}),
     },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: response.statusText }));
+    if (response.status === 401) {
+      throw new Error(
+        "后端已启用 API token，当前会话未提供或 token 无效。" +
+          "在浏览器控制台执行 sessionStorage.setItem('masp.apiToken', '你的token') 后刷新。",
+      );
+    }
     throw new Error(body.detail || response.statusText);
   }
   return response.json() as Promise<T>;
