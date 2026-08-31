@@ -21,7 +21,7 @@ agent = ["gymnasium>=1.0,<2", "numpy>=2.0,<3", "torch>=2.6,<3"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-extend-exclude = ["frontend", ".venv", "runs", "data", "tmp"]
+extend-exclude = ["frontend", ".venv", "runs", "data", "tmp", ".masp-engine"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "DTZ", "ISC", "PIE", "RUF"]
