@@ -59,6 +59,7 @@ from .incidents import IncidentService, IncidentStore
 from .intent_store import IntentStore
 from .knowledge import KnowledgeBase
 from .llm_provider import create_llm_provider
+from .logging_setup import configure_logging, get_logger
 from .model_evaluation import ModelSafetyEvaluator
 from .orchestrator import DispatchOrchestrator
 from .scenario_drafts import ScenarioDraftConflict, ScenarioDraftStore
@@ -136,11 +137,23 @@ plan_explanations = PlanExplanationService(
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    configure_logging()
+    logger = get_logger("api")
+    logger.info(
+        "command center starting",
+        extra={
+            "environment": settings.app_env,
+            "runtimeMode": settings.agent_runtime_mode,
+            "llmProvider": settings.llm_provider,
+            "apiTokenEnabled": settings.api_token is not None,
+        },
+    )
     agent_runs.start()
     try:
         yield
     finally:
         agent_runs.shutdown()
+        logger.info("command center stopped")
 
 
 app = FastAPI(

@@ -30,8 +30,11 @@ from .contracts import (
     new_id,
 )
 from .dispatch_workflow import DispatchWorkflowService
+from .logging_setup import get_logger
 from .orchestrator import DispatchOrchestrator
 from .provider import DeepSeekProvider
+
+logger = get_logger("agent_run_manager")
 
 TERMINAL_AGENT_RUN_STATUSES = {
     "COMPLETED",
@@ -1006,6 +1009,15 @@ class AgentRunManager:
         row["status"] = status
         row["error"] = message
         row["completedAt"] = _iso()
+        logger.warning(
+            "agent run terminal",
+            extra={
+                "runId": row.get("runId"),
+                "status": status,
+                "reason": message,
+                "workflowPhase": (row.get("workflow") or {}).get("phase"),
+            },
+        )
         self._append_event(
             row,
             "run_terminal",

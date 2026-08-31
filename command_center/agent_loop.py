@@ -34,12 +34,15 @@ from .contracts import (
 )
 from .engine_adapter import MaspAdapter
 from .knowledge import KnowledgeBase
+from .logging_setup import get_logger
 from .model_safety import (
     ModelBoundaryError,
     enforce_intent_authority,
     untrusted_retrieval_record,
 )
 from .provider import DeepSeekProvider
+
+logger = get_logger("agent_loop")
 
 
 def _json_value(value: Any) -> Any:
@@ -218,6 +221,27 @@ class AgentLoopExecutor:
                 model = decision.model
                 fallback_used = fallback_used or decision.fallback_used
                 attempt = tracker.decisions
+                # 每轮一条运维日志：只记标识、动作、耗时和预算，不记提示词与模型
+                # 回复。排查「run 卡在哪一轮」「为什么降级」靠这条。
+                logger.info(
+                    "agent decision",
+                    extra={
+                        "traceId": trace_id,
+                        "conversationId": request.conversation_id,
+                        "attempt": attempt,
+                        "model": model,
+                        "action": (
+                            decision.action.action.value
+                            if decision.action is not None
+                            else "INVALID"
+                        ),
+                        "errorCode": decision.error_code,
+                        "fallbackUsed": decision.fallback_used,
+                        "tokens": decision_tokens,
+                        "toolCalls": tracker.tool_calls,
+                        "durationMs": round((perf_counter() - started) * 1000, 1),
+                    },
+                )
 
                 if decision.action is None:
                     code = decision.error_code or "protocol.invalid_action"
