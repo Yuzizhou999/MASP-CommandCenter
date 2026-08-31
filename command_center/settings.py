@@ -33,6 +33,9 @@ class Settings:
     # 标记为未认证；配置后服务端用 api_token_operator 覆盖客户端提交的审批人。
     api_token: str | None = None
     api_token_operator: str = "authenticated-supervisor"
+    # 并发执行 Agent run 的 worker 数。每个 run 会独占一次 MASP 仿真，
+    # 调高会同时放大引擎侧的内存和 CPU 占用。
+    agent_run_workers: int = 4
     # Vite dev server 的来源。生产部署由后端直接托管构建产物，不需要跨域。
     cors_allow_origins: tuple[str, ...] = (
         "http://127.0.0.1:5173",
@@ -147,6 +150,7 @@ class Settings:
                 "COMMAND_CENTER_API_TOKEN_OPERATOR", "authenticated-supervisor"
             ).strip()
             or "authenticated-supervisor",
+            agent_run_workers=max(1, min(32, int(os.getenv("AGENT_RUN_WORKERS", "4")))),
             cors_allow_origins=tuple(
                 origin.strip()
                 for origin in os.getenv(

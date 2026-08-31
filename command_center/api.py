@@ -102,6 +102,7 @@ agent_runs = AgentRunManager(
     orchestrator=orchestrator,
     provider=provider,
     workflow=dispatch_workflow,
+    max_workers=settings.agent_run_workers,
 )
 incident_store = IncidentStore(settings.data_dir / "incidents.json")
 incident_service = IncidentService(

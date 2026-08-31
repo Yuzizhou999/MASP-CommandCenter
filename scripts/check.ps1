@@ -35,10 +35,18 @@ try {
     $env:MASP_TEST_ENGINE_ROOT = $TestEngineRoot
     Push-Location $ProjectRoot
     try {
+        python -m ruff check .
+        if ($LASTEXITCODE -ne 0) { throw "ruff 静态检查失败。" }
+        python -m ruff format --check .
+        if ($LASTEXITCODE -ne 0) { throw "代码格式不符合 ruff format。" }
+        python -m mypy
+        if ($LASTEXITCODE -ne 0) { throw "mypy 类型检查失败。" }
         python -m pytest
         if ($LASTEXITCODE -ne 0) { throw "后端测试失败。" }
         Push-Location (Join-Path $ProjectRoot "frontend")
         try {
+            npm test
+            if ($LASTEXITCODE -ne 0) { throw "前端测试失败。" }
             npm run build
             if ($LASTEXITCODE -ne 0) { throw "前端构建失败。" }
         }
